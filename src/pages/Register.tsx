@@ -7,6 +7,7 @@ import { Eye, EyeOff, UserPlus, ShieldX, User, Phone, Send, Lock, AtSign, ArrowR
 import { motion } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { PlexusBackground } from "@/components/PlexusBackground";
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -71,6 +72,7 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-luxe-mesh relative overflow-hidden flex items-center justify-center px-4 py-10">
+      <PlexusBackground />
       <div className="pointer-events-none absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-neon-cyan/[0.10] blur-[140px] animate-float-slow" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 w-[640px] h-[640px] rounded-full bg-neon-violet/[0.12] blur-[140px] animate-float-slow" style={{ animationDelay: "4s" }} />
       <div
