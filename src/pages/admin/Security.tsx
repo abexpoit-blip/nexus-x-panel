@@ -38,7 +38,7 @@ const AdminSecurity = () => {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"audit" | "sessions" | "impersonation" | "settings" | "maintenance" | "password">("audit");
   const [auditSearch, setAuditSearch] = useState("");
-  const [auditCategory, setAuditCategory] = useState<"all" | "pool_cleanup" | "ims_bot" | "auth" | "agents" | "settings">("all");
+  const [auditCategory, setAuditCategory] = useState<"all" | "bots" | "auth" | "agents" | "settings">("all");
   const { signupEnabled, setSignupEnabled, maintenanceMode, maintenanceMessage, setMaintenanceMode } = useAuth();
   const [draftMsg, setDraftMsg] = useState(maintenanceMessage);
 
@@ -68,8 +68,7 @@ const AdminSecurity = () => {
 
   const categoryMatcher: Record<typeof auditCategory, (action: string) => boolean> = {
     all: () => true,
-    pool_cleanup: (a) => /pool_cleanup|cleanup/i.test(a),
-    ims_bot: (a) => /^ims_/i.test(a),
+    bots: (a) => /^(mediatel|seven1tel)_/i.test(a),
     auth: (a) => /login|logout|register|impersonation|session/i.test(a),
     agents: (a) => /agent_|topup|withdraw|credit/i.test(a),
     settings: (a) => /setting|credentials_updated/i.test(a),
@@ -135,8 +134,7 @@ const AdminSecurity = () => {
           <div className="flex flex-wrap gap-2">
             {([
               { k: "all", label: "All", count: (auditData?.logs || []).length },
-              { k: "pool_cleanup", label: "🧹 Pool Cleanup", count: (auditData?.logs || []).filter(l => /pool_cleanup|cleanup/i.test(l.action)).length },
-              { k: "ims_bot", label: "🤖 IMS Bot", count: (auditData?.logs || []).filter(l => /^ims_/i.test(l.action)).length },
+              { k: "bots", label: "🤖 Bots", count: (auditData?.logs || []).filter(l => /^(mediatel|seven1tel)_/i.test(l.action)).length },
               { k: "auth", label: "🔐 Auth", count: (auditData?.logs || []).filter(l => /login|logout|register|impersonation|session/i.test(l.action)).length },
               { k: "agents", label: "👥 Agents", count: (auditData?.logs || []).filter(l => /agent_|topup|withdraw|credit/i.test(l.action)).length },
               { k: "settings", label: "⚙️ Settings", count: (auditData?.logs || []).filter(l => /setting|credentials_updated/i.test(l.action)).length },
