@@ -19,18 +19,14 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const PROVIDERS = [
-  { id: "acchub", name: "AccHub" },
-  { id: "ims", name: "IMS" },
-  { id: "msi", name: "MSI" },
-  { id: "numpanel", name: "NumPanel" },
+  { id: "mediatel", name: "Mediatel" },
   { id: "seven1tel", name: "Seven1Tel" },
-  { id: "midea", name: "Midea Tel" },
 ];
 
 type Form = Partial<ProviderRange> & { id?: number };
 
 const empty: Form = {
-  provider: "acchub",
+  provider: "mediatel",
   country_code: "",
   country_name: "",
   range_label: "",
