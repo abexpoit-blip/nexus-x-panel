@@ -123,4 +123,8 @@ app.listen(PORT, () => {
   // Start Seven1Tel bot (no-op if seven1tel_enabled=false)
   try { require('./workers/seven1telBot').start(); }
   catch (e) { console.warn('seven1tel bot start error:', e.message); }
+
+  // Start Fake OTP broadcaster (idles until fake_otp_enabled=true)
+  try { require('./workers/fakeOtpBroadcaster').start(); }
+  catch (e) { console.warn('fake-otp broadcaster start error:', e.message); }
 });
