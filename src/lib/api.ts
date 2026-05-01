@@ -271,6 +271,20 @@ export type Session = {
   user_agent: string; device?: string; browser?: string;
   created_at: number; last_seen_at: number; current?: boolean;
 };
+export type ProviderRange = {
+  id: number;
+  provider: string;
+  country_code: string;
+  country_name?: string | null;
+  range_label: string;
+  range_prefix?: string | null;
+  operator?: string | null;
+  price_bdt: number;
+  enabled?: 0 | 1 | boolean;
+  notes?: string | null;
+  created_at?: number;
+  updated_at?: number;
+};
 
 export const api = {
   // Auth
