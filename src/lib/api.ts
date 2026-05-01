@@ -17,68 +17,7 @@ export const demoMode = {
   disable: () => localStorage.removeItem(DEMO_KEY),
 };
 
-// In-memory IMS bot state for demo mode (preview without backend)
-const demoImsState = (() => {
-  let running = true;
-  let loggedIn = true;
-  let totalScrapes = 47;
-  let numbersAdded = 128;
-  let otpsDelivered = 312;
-  const events: { ts: number; level: string; message: string; meta: unknown }[] = [
-    { ts: Math.floor(Date.now() / 1000) - 8, level: "success", message: "OTP delivered to +8801712345678", meta: { otp: "458291" } },
-    { ts: Math.floor(Date.now() / 1000) - 24, level: "success", message: "Pool +3 new numbers", meta: { scraped: 12 } },
-    { ts: Math.floor(Date.now() / 1000) - 56, level: "info", message: "Scrape cycle completed", meta: null },
-    { ts: Math.floor(Date.now() / 1000) - 120, level: "success", message: "Logged in to imssms.org", meta: null },
-    { ts: Math.floor(Date.now() / 1000) - 180, level: "info", message: "Bot started", meta: null },
-  ];
-  const startTs = Math.floor(Date.now() / 1000) - 180;
-  return {
-    snapshot() {
-      return {
-        enabled: true,
-        running,
-        loggedIn: running && loggedIn,
-        lastLoginAt: running ? startTs : null,
-        lastScrapeAt: running ? Math.floor(Date.now() / 1000) - 6 : null,
-        lastScrapeOk: running,
-        lastError: null as string | null,
-        lastErrorAt: null as number | null,
-        totalScrapes,
-        numbersScrapedTotal: numbersAdded * 3,
-        numbersAddedTotal: numbersAdded,
-        otpsDeliveredTotal: otpsDelivered,
-        consecFail: 0,
-        baseUrl: "https://www.imssms.org",
-        intervalSec: 8,
-        poolSize: 47,
-        activeAssigned: 12,
-        otpReceived: otpsDelivered,
-        emptyStreak: running ? 2 : 0,
-        emptyLimit: 10,
-        events: events.slice(0, 20),
-      };
-    },
-    start() {
-      if (running) return;
-      running = true;
-      loggedIn = true;
-      events.unshift({ ts: Math.floor(Date.now() / 1000), level: "success", message: "Bot started by admin", meta: null });
-    },
-    stop() {
-      if (!running) return;
-      running = false;
-      loggedIn = false;
-      events.unshift({ ts: Math.floor(Date.now() / 1000), level: "warn", message: "Bot stopped by admin", meta: null });
-    },
-    restart() {
-      events.unshift({ ts: Math.floor(Date.now() / 1000), level: "info", message: "Bot restart requested by admin", meta: null });
-      setTimeout(() => {
-        running = true; loggedIn = true; totalScrapes++;
-        events.unshift({ ts: Math.floor(Date.now() / 1000), level: "success", message: "Bot restarted successfully", meta: null });
-      }, 800);
-    },
-  };
-})();
+// (Demo IMS bot state removed — fresh build only ships Mediatel + Seven1Tel)
 
 async function request<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   let token = tokenStore.get();
@@ -130,38 +69,10 @@ function demoRoute(path: string, opts: RequestInit): any {
   if (path.startsWith("/admin/commission-trend")) return demoData.commissionTrend(14);
   if (path === "/admin/allocations") return demoData.allocations();
   if (path === "/admin/agents") return demoData.agents();
-  if (path === "/admin/ims-status") return { status: demoImsState.snapshot() };
   if (path === "/admin/impersonations") return { impersonations: [
     { id: 1, created_at: Math.floor(Date.now()/1000) - 1800, action: "impersonation_start", admin_id: 1, agent_id: 2, admin_username: "admin", agent_username: "demo_agent", ip: "127.0.0.1", meta: '{"username":"demo_agent"}' },
     { id: 2, created_at: Math.floor(Date.now()/1000) - 1500, action: "impersonation_end", admin_id: 1, agent_id: 2, admin_username: "admin", agent_username: "demo_agent", ip: "127.0.0.1" },
   ] };
-  if (path === "/admin/ims-restart" && method === "POST") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-start" && method === "POST") { demoImsState.start(); return { ok: true }; }
-  if (path === "/admin/ims-stop" && method === "POST") { demoImsState.stop(); return { ok: true }; }
-  if (path === "/admin/ims-scrape-numbers" && method === "POST") return { ok: true, jobId: Date.now(), status: "running" };
-  if (path === "/admin/ims-numbers-job") return { id: 0, status: "idle", startedAt: null, finishedAt: null, result: null, error: null, progress: "" };
-  if (path === "/admin/ims-credentials" && method === "GET") return {
-    enabled: true, base_url: "https://www.imssms.org", username: "Shovonkhan7",
-    password_masked: "Sh****34", has_password: true,
-    source: { username: "database", password: "database" },
-  };
-  if (path === "/admin/ims-credentials" && method === "PUT") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-cookies" && method === "GET") return { has_cookies: false, count: 0, saved_at: null };
-  if (path === "/admin/ims-cookies" && method === "PUT") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-cookies" && method === "DELETE") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-otp-interval" && method === "GET") return {
-    interval_sec: 10, source: "env", options: [5, 10, 30], min: 3, max: 120,
-  };
-  if (path === "/admin/ims-otp-interval" && method === "PUT") { demoImsState.restart(); return { ok: true, interval_sec: 10 }; }
-  if (path === "/admin/msi-cookies" && method === "GET") return { has_cookies: false, count: 0, saved_at: null };
-  if (path === "/admin/msi-cookies" && method === "PUT") return { ok: true };
-  if (path === "/admin/msi-cookies" && method === "DELETE") return { ok: true };
-  if (path === "/admin/provider-status") return {
-    providers: [
-      { id: "acchub", name: "AccHub", configured: true, baseUrl: "https://sms.acchub.io", username: "Sh****YE", loggedIn: true, balance: 24.85, currency: "USD", lastError: null, otpHistoryCount: 12 },
-      { id: "ims", name: "IMS SMS", configured: true, baseUrl: "https://www.imssms.org", username: "Sh****n7", loggedIn: true, balance: null, currency: "USD", lastError: null, otpHistoryCount: 0 },
-    ],
-  };
   if (path === "/admin/system-health") {
     const now = Math.floor(Date.now() / 1000);
     return {
@@ -178,14 +89,17 @@ function demoRoute(path: string, opts: RequestInit): any {
         last_backup: { name: "nexus-2025-04-17-0400.db.gz", size: 1_234_000, mtime: now - 3600 * 9 },
         backup_dir: "/opt/nexus/backups",
       },
-      ims_bot: {
+      mediatel_bot: {
         enabled: true, running: true, logged_in: true,
-        pool_size: 4823, active_assigned: 12,
-        last_scrape_at: now - 22, last_scrape_ok: true,
-        interval_sec: 60, otp_interval_sec: 10, consec_fail: 0, last_error: null,
+        last_tick_at: now - 6, last_error: null, consec_fail: 0,
+        otps_delivered: 12, interval_sec: 8,
       },
-      acchub_poller: { running: true, lastTickAt: now - 4 },
-      counts: { pending_withdrawals: 2, active_sessions: 5, ims_pool_size: 4823 },
+      seven1tel_bot: {
+        enabled: true, running: true, logged_in: true,
+        last_tick_at: now - 3, last_error: null, consec_fail: 0,
+        otps_delivered: 27, interval_sec: 4,
+      },
+      counts: { pending_withdrawals: 2, active_sessions: 5 },
     };
   }
 
@@ -493,99 +407,8 @@ export const api = {
     leaderboard: () => request<{ leaderboard: { id: number; username: string; otp_count: number; numbers_used?: number; earnings_bdt?: number }[] }>("/admin/leaderboard"),
     commissionTrend: (days = 14) => request<{ series: { label: string; value: number; count: number }[] }>(`/admin/commission-trend?days=${days}`),
     allocations: () => request<{ allocations: Allocation[] }>("/admin/allocations"),
-    imsStatus: () => request<{ status: any }>("/admin/ims-status"),
-    imsRestart: () => request<{ ok: boolean }>("/admin/ims-restart", { method: "POST" }),
-    imsStart: () => request<{ ok: boolean }>("/admin/ims-start", { method: "POST" }),
-    imsStop: () => request<{ ok: boolean }>("/admin/ims-stop", { method: "POST" }),
-    imsScrapeNow: () => request<{ ok: boolean; added?: number; otps?: number; error?: string }>("/admin/ims-scrape-now", { method: "POST" }),
-    imsSyncLive: () => request<{ ok: boolean; added?: number; removed?: number; kept?: number; scraped?: number; ranges?: string[]; error?: string }>("/admin/ims-sync-live", { method: "POST" }),
-    imsScrapeNumbersStart: () => request<{ ok: boolean; jobId?: number; status?: string; error?: string }>("/admin/ims-scrape-numbers", { method: "POST" }),
-    imsNumbersJob: () => request<{ id: number; status: 'idle'|'running'|'done'|'failed'; startedAt: number|null; finishedAt: number|null; result: { added: number; removed: number; kept: number; scraped: number; ranges: string[] } | null; error: string|null; progress: string }>("/admin/ims-numbers-job"),
-    imsPoolBreakdown: () => request<{
-      ranges: {
-        name: string; count: number; last_added: number; first_added?: number;
-        custom_name: string | null; tag_color: string | null; priority: number | null;
-        request_override: number | null; notes: string | null;
-        disabled: number | null; service_tag: string | null;
-      }[];
-      totalActive: number; totalUsed?: number;
-    }>("/admin/ims-pool-breakdown"),
-    imsRangeMetaSave: (body: {
-      range_prefix: string; custom_name?: string | null; tag_color?: string | null;
-      priority?: number | null; request_override?: number | null; notes?: string | null;
-      disabled?: boolean; service_tag?: string | null;
-    }) => request<{ ok: boolean }>("/admin/ims-range-meta", { method: "PUT", body: JSON.stringify(body) }),
-    imsRangeMetaDelete: (prefix: string) =>
-      request<{ ok: boolean }>(`/admin/ims-range-meta/${encodeURIComponent(prefix)}`, { method: "DELETE" }),
-    imsPoolCleanup: (body: { mode: "expired" | "older_than" | "range" | "all_pool"; hours?: number; range?: string }) =>
-      request<{ ok: boolean; removed: number; description: string }>("/admin/ims-pool-cleanup", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
-    imsCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/ims-credentials"),
-    imsCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/ims-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    imsCookiesStatus: () =>
-      request<{ has_cookies: boolean; count: number; saved_at: number | null }>("/admin/ims-cookies"),
-    imsCookiesSave: (cookies: string) =>
-      request<{ ok: boolean }>("/admin/ims-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
-    imsCookiesClear: () =>
-      request<{ ok: boolean }>("/admin/ims-cookies", { method: "DELETE" }),
-    imsOtpInterval: () => request<{
-      interval_sec: number; source: string; options: number[]; min: number; max: number;
-    }>("/admin/ims-otp-interval"),
-    imsOtpIntervalSave: (interval_sec: number) =>
-      request<{ ok: boolean; interval_sec: number }>("/admin/ims-otp-interval", {
-        method: "PUT", body: JSON.stringify({ interval_sec }),
-      }),
-    msiCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/msi-credentials"),
-    msiCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/msi-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    msiOtpInterval: () => request<{ interval_sec: number; source: string; options: number[]; min: number; max: number }>("/admin/msi-otp-interval"),
-    msiOtpIntervalSave: (interval_sec: number) =>
-      request<{ ok: boolean; interval_sec: number }>("/admin/msi-otp-interval", { method: "PUT", body: JSON.stringify({ interval_sec }) }),
-    msiCookiesStatus: () =>
-      request<{ has_cookies: boolean; count: number; saved_at: number | null }>("/admin/msi-cookies"),
-    msiCookiesSave: (cookies: string) =>
-      request<{ ok: boolean }>("/admin/msi-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
-    msiCookiesClear: () =>
-      request<{ ok: boolean }>("/admin/msi-cookies", { method: "DELETE" }),
-
-    // ---- MSI Bot status / control ----
-    msiStatus: () => request<{ status: any }>("/admin/msi-status"),
-    msiRestart: () => request<{ ok: boolean }>("/admin/msi-restart", { method: "POST" }),
-    msiStart: () => request<{ ok: boolean }>("/admin/msi-start", { method: "POST" }),
-    msiStop: () => request<{ ok: boolean }>("/admin/msi-stop", { method: "POST" }),
-    msiScrapeNow: () => request<{ ok: boolean; added?: number; otps?: number; error?: string }>("/admin/msi-scrape-now", { method: "POST" }),
-    msiSyncLive: () => request<{ ok: boolean; added?: number; removed?: number; kept?: number; scraped?: number; ranges?: string[]; error?: string }>("/admin/msi-sync-live", { method: "POST" }),
-    msiPoolBreakdown: () => request<{
-      ranges: {
-        name: string; count: number; last_added: number; first_added?: number;
-        custom_name: string | null; tag_color: string | null; priority: number | null;
-        request_override: number | null; notes: string | null;
-        disabled: number | null; service_tag: string | null;
-      }[];
-      totalActive: number; totalUsed?: number;
-    }>("/admin/msi-pool-breakdown"),
-    msiRangeMetaSave: (body: {
-      range_prefix: string; custom_name?: string | null; tag_color?: string | null;
-      priority?: number | null; request_override?: number | null; notes?: string | null;
-      disabled?: boolean; service_tag?: string | null;
-    }) => request<{ ok: boolean }>("/admin/msi-range-meta", { method: "PUT", body: JSON.stringify(body) }),
-    msiRangeMetaDelete: (prefix: string) =>
-      request<{ ok: boolean }>(`/admin/msi-range-meta/${encodeURIComponent(prefix)}`, { method: "DELETE" }),
-
     // ---- Global provider settings ----
     systemHealth: () => request<SystemHealth>("/admin/system-health"),
-    providerStatus: () => request<{ providers: ProviderStatus[] }>("/admin/provider-status"),
     otpExpiry: () => request<{ expiry_min: number; source: string; options_min: number[] }>("/admin/otp-expiry"),
     otpExpirySave: (expiry_min: number) =>
       request<{ ok: boolean; expiry_min: number }>("/admin/otp-expiry", {
@@ -596,64 +419,6 @@ export const api = {
       request<{ ok: boolean; hours: number }>("/admin/recent-otp-window", {
         method: "PUT", body: JSON.stringify({ hours }),
       }),
-
-    // ---- AccHub credentials ----
-    acchubCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/acchub-credentials"),
-    acchubCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/acchub-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    acchubTest: () => request<{
-      ok: boolean;
-      loggedIn?: boolean;
-      error?: string;
-      status?: { balance?: number | null; currency?: string | null; loggedIn?: boolean };
-    }>("/admin/acchub-test", { method: "POST" }),
-
-    // ---- NumPanel Bot ----
-    numpanelStatus: () => request<{ status: any }>("/admin/numpanel-status"),
-    numpanelRestart: () => request<{ ok: boolean }>("/admin/numpanel-restart", { method: "POST" }),
-    numpanelStart: () => request<{ ok: boolean }>("/admin/numpanel-start", { method: "POST" }),
-    numpanelStop: () => request<{ ok: boolean }>("/admin/numpanel-stop", { method: "POST" }),
-    numpanelScrapeNow: () => request<{ ok: boolean; otps?: number; delivered?: number; error?: string }>("/admin/numpanel-scrape-now", { method: "POST" }),
-    numpanelSyncLive: () => request<{ ok: boolean; added?: number; removed?: number; kept?: number; scraped?: number; error?: string }>("/admin/numpanel-sync-live", { method: "POST" }),
-    numpanelPoolBreakdown: () => request<{
-      ranges: {
-        name: string; count: number; last_added: number; first_added: number;
-        custom_name: string | null; tag_color: string | null; priority: number | null;
-        request_override: number | null; notes: string | null;
-        disabled: number | null; service_tag: string | null;
-      }[];
-      totalActive: number; totalUsed: number;
-    }>("/admin/numpanel-pool-breakdown"),
-    numpanelRangeMetaSave: (body: {
-      range_prefix: string; custom_name?: string | null; tag_color?: string | null;
-      priority?: number | null; request_override?: number | null; notes?: string | null;
-      disabled?: boolean; service_tag?: string | null;
-    }) => request<{ ok: boolean }>("/admin/numpanel-range-meta", { method: "PUT", body: JSON.stringify(body) }),
-    numpanelRangeMetaDelete: (prefix: string) =>
-      request<{ ok: boolean }>(`/admin/numpanel-range-meta/${encodeURIComponent(prefix)}`, { method: "DELETE" }),
-    numpanelCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/numpanel-credentials"),
-    numpanelCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/numpanel-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    numpanelOtpInterval: () => request<{ interval_sec: number; source: string; options: number[]; min: number; max: number }>("/admin/numpanel-otp-interval"),
-    numpanelOtpIntervalSave: (interval_sec: number) =>
-      request<{ ok: boolean; interval_sec: number }>("/admin/numpanel-otp-interval", { method: "PUT", body: JSON.stringify({ interval_sec }) }),
-    numpanelApiToken: () => request<{ has_token: boolean; token_masked: string; api_base: string; source: string }>("/admin/numpanel-api-token"),
-    numpanelApiTokenSave: (body: { api_token?: string; api_base?: string }) =>
-      request<{ ok: boolean }>("/admin/numpanel-api-token", { method: "PUT", body: JSON.stringify(body) }),
-    numpanelCookiesStatus: () =>
-      request<{ has_cookies: boolean; count: number; saved_at: number | null }>("/admin/numpanel-cookies"),
-    numpanelCookiesSave: (cookies: string) =>
-      request<{ ok: boolean }>("/admin/numpanel-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
-    numpanelCookiesClear: () =>
-      request<{ ok: boolean }>("/admin/numpanel-cookies", { method: "DELETE" }),
 
     // ─── Generic provider ranges (provider-agnostic) ────────────────
     rangesList: (params: { provider?: string; country_code?: string; enabled?: 0 | 1 } = {}) => {
@@ -680,106 +445,6 @@ export const api = {
   v2Countries: () => request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>("/numbers/v2/countries"),
   v2Ranges: (countryCode: string) =>
     request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges?country=${encodeURIComponent(countryCode)}`),
-
-  // ===== Telegram Bot admin =====
-  tgbot: {
-    status: () => request<{
-      totalUsers: number; activeUsers: number; onlineUsers: number;
-      todayOtps: number; activeNumbers: number; totalDelivered: number;
-      enabledRanges: number; totalRevenue: number;
-    }>("/admin/tgbot/status"),
-    users: (params: { page?: number; page_size?: number; q?: string } = {}) => {
-      const qs = new URLSearchParams();
-      if (params.page) qs.set("page", String(params.page));
-      if (params.page_size) qs.set("page_size", String(params.page_size));
-      if (params.q) qs.set("q", params.q);
-      const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      return request<{
-        rows: Array<{
-          tg_user_id: number; username: string | null; first_name: string | null;
-          balance_bdt: number; total_otps: number; total_spent: number;
-          status: string; created_at: number; last_seen_at: number;
-        }>;
-        page: number; page_size: number; total: number; total_pages: number;
-      }>(`/admin/tgbot/users${suffix}`);
-    },
-    topup: (id: number, amount: number, note?: string) =>
-      request<{ ok: boolean }>(`/admin/tgbot/users/${id}/topup`, {
-        method: "POST", body: JSON.stringify({ amount, note }),
-      }),
-    ban: (id: number, ban: boolean) =>
-      request<{ ok: boolean }>(`/admin/tgbot/users/${id}/ban`, {
-        method: "POST", body: JSON.stringify({ ban }),
-      }),
-    rangeSettings: () => request<{
-      ranges: Array<{
-        provider: string; range_name: string; country_code: string | null;
-        pool_count: number; tg_enabled: boolean; tg_rate_bdt: number;
-        service: string | null;
-      }>;
-    }>("/admin/tgbot/range-settings"),
-    updateRange: (body: {
-      provider: string; range_name: string; tg_enabled: boolean;
-      tg_rate_bdt: number; service?: string;
-    }) => request<{ ok: boolean }>("/admin/tgbot/range-settings", {
-      method: "PUT", body: JSON.stringify(body),
-    }),
-    bulkRange: (body: {
-      provider: string; country_code?: string; tg_enabled: boolean;
-      tg_rate_bdt?: number; service?: string;
-    }) => request<{ ok: boolean; updated: number }>("/admin/tgbot/range-settings/bulk", {
-      method: "POST", body: JSON.stringify(body),
-    }),
-    otpFeed: (limit = 50) => request<{
-      rows: Array<{
-        id: number; tg_user_id: number; tg_username: string | null;
-        phone_number: string; country_code: string | null; range_name: string;
-        service: string | null; otp_code: string; otp_received_at: number;
-        rate_bdt: number;
-      }>;
-    }>(`/admin/tgbot/otp-feed?limit=${limit}`),
-    broadcast: (message: string) =>
-      request<{ ok: boolean; id: number }>("/admin/tgbot/broadcast", {
-        method: "POST", body: JSON.stringify({ message }),
-      }),
-    broadcasts: () => request<{
-      broadcasts: Array<{
-        id: number; message: string; status: string; sent_count: number;
-        failed_count: number; created_at: number; finished_at: number | null;
-        admin_username: string | null;
-      }>;
-    }>("/admin/tgbot/broadcasts"),
-    config: () => request<{
-      tg_public_channel: string;
-      tg_required_group: string;
-      tg_required_group_chat: string;
-      tg_required_otp_group: string;
-      tg_required_otp_group_chat: string;
-      tg_terms_text: string;
-    }>("/admin/tgbot/config"),
-    saveConfig: (body: {
-      tg_public_channel?: string;
-      tg_required_group?: string;
-      tg_required_group_chat?: string;
-      tg_required_otp_group?: string;
-      tg_required_otp_group_chat?: string;
-      tg_terms_text?: string;
-    }) => request<{ ok: boolean }>("/admin/tgbot/config", {
-      method: "PUT", body: JSON.stringify(body),
-    }),
-  },
-
-  // ===== Fake OTP Broadcaster (Security page) =====
-  fakeOtp: {
-    get: () => request<{
-      enabled: boolean; min_sec: number; max_sec: number; burst: number;
-    }>("/admin/fake-otp"),
-    save: (body: { enabled?: boolean; min_sec?: number; max_sec?: number; burst?: number }) =>
-      request<{ ok: boolean }>("/admin/fake-otp", {
-        method: "PUT", body: JSON.stringify(body),
-      }),
-    purge: () => request<{ ok: boolean; removed: number }>("/admin/fake-otp/purge", { method: "POST" }),
-  },
 };
 
 export interface PaymentConfig {
@@ -789,19 +454,6 @@ export interface PaymentConfig {
   methods: Record<string, boolean>;
   methods_enabled: string[];
   all_methods: string[];
-}
-
-export interface ProviderStatus {
-  id: string;
-  name: string;
-  configured: boolean;
-  baseUrl?: string;
-  username?: string | null;
-  loggedIn?: boolean;
-  balance?: number | null;
-  currency?: string;
-  lastError?: string | null;
-  otpHistoryCount?: number;
 }
 
 export interface WaitStat {
@@ -825,23 +477,23 @@ export interface SystemHealth {
     last_backup: { name: string; size: number; mtime: number } | null;
     backup_dir: string;
   };
-  ims_bot: {
-    enabled: boolean;
-    running: boolean;
-    logged_in?: boolean;
-    pool_size: number;
-    active_assigned?: number;
-    last_scrape_at?: number | null;
-    last_scrape_ok?: boolean;
-    interval_sec?: number | null;
-    otp_interval_sec?: number | null;
-    consec_fail?: number;
-    last_error?: string | null;
-  };
-  acchub_poller: { running?: boolean; lastTickAt?: number } | null;
+  mediatel_bot: ProviderBotStatus | null;
+  seven1tel_bot: ProviderBotStatus | null;
   counts: {
     pending_withdrawals: number;
     active_sessions: number;
-    ims_pool_size: number;
   };
+}
+
+export interface ProviderBotStatus {
+  enabled?: boolean;
+  running?: boolean;
+  logged_in?: boolean;
+  base_url?: string;
+  username?: string | null;
+  last_tick_at?: number | null;
+  last_error?: string | null;
+  consec_fail?: number;
+  otps_delivered?: number;
+  interval_sec?: number;
 }

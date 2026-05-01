@@ -57,7 +57,7 @@ if (process.env.NODE_ENV === 'production') {
     skip: (req) => {
       // even in dev, mute the loudest pollers
       const url = req.originalUrl || req.url || '';
-      return /^\/api\/(notifications|admin\/(ims-status|msi-status)|health)(\?|$)/.test(url);
+      return /^\/api\/(notifications|health)(\?|$)/.test(url);
     },
   }));
 }
@@ -119,4 +119,8 @@ app.listen(PORT, () => {
   // Start Mediatel bot (no-op if mediatel_enabled=false)
   try { require('./workers/mediatelBot').start(); }
   catch (e) { console.warn('mediatel bot start error:', e.message); }
+
+  // Start Seven1Tel bot (no-op if seven1tel_enabled=false)
+  try { require('./workers/seven1telBot').start(); }
+  catch (e) { console.warn('seven1tel bot start error:', e.message); }
 });

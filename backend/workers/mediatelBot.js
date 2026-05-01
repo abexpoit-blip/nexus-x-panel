@@ -256,6 +256,9 @@ async function login() {
 // ────────────────────────────────────────────────────────────────────────
 let _running = false;
 let _stopFlag = false;
+let _lastTickAt = null;
+let _lastError = null;
+let _consecFail = 0;
 
 async function loop() {
   if (_running) return;
@@ -274,9 +277,14 @@ async function loop() {
       const url = page.url();
       dlog('idle keepalive @', url);
       // PHASE B: replace this with CDR-scrape → markOtpReceived(...)
+      _lastTickAt = Math.floor(Date.now() / 1000);
+      _lastError = null;
+      _consecFail = 0;
     } catch (e) {
       warn('loop error:', e.message);
       _loggedIn = false;
+      _lastError = e.message;
+      _consecFail++;
       // back off on errors so we don't hammer CF
       await new Promise((r) => setTimeout(r, 15000));
     }
@@ -298,4 +306,19 @@ async function stop() {
   _browser = null; _page = null; _loggedIn = false;
 }
 
-module.exports = { start, stop, login };
+function getStatus() {
+  const { ENABLED, BASE_URL, USERNAME } = resolveCreds();
+  return {
+    enabled: ENABLED,
+    running: _running,
+    logged_in: _loggedIn,
+    base_url: BASE_URL,
+    username: USERNAME ? USERNAME.replace(/.(?=.{2})/g, '*') : null,
+    last_tick_at: _lastTickAt,
+    last_error: _lastError,
+    consec_fail: _consecFail,
+    interval_sec: resolveOtpInterval(),
+  };
+}
+
+module.exports = { start, stop, login, getStatus };

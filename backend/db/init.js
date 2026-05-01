@@ -20,7 +20,6 @@ const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);
 
 // --- Idempotent column-add migrations for existing databases ---
-// MUST run BEFORE tg_schema.sql so CREATE INDEX statements on new columns succeed
 function tableExists(table) {
   return !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(table);
 }
@@ -38,56 +37,6 @@ addColIfMissing('withdrawals', 'reviewed_at', 'INTEGER');
 addColIfMissing('allocations', 'cli', 'TEXT');
 addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
-addColIfMissing('tg_assignments', 'batch_id', 'TEXT');
-
-// NumPanel range customization metadata
-db.exec(`
-  CREATE TABLE IF NOT EXISTS numpanel_range_meta (
-    range_prefix TEXT PRIMARY KEY,
-    custom_name TEXT,
-    tag_color TEXT,
-    priority INTEGER DEFAULT 0,
-    request_override INTEGER,
-    notes TEXT,
-    updated_at INTEGER DEFAULT (strftime('%s','now'))
-  );
-`);
-addColIfMissing('numpanel_range_meta', 'disabled', 'INTEGER DEFAULT 0');
-addColIfMissing('numpanel_range_meta', 'service_tag', 'TEXT'); // facebook|whatsapp|telegram|other
-
-// IMS range metadata (mirror of numpanel)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS ims_range_meta (
-    range_prefix TEXT PRIMARY KEY,
-    custom_name TEXT,
-    tag_color TEXT,
-    priority INTEGER DEFAULT 0,
-    request_override INTEGER,
-    notes TEXT,
-    disabled INTEGER DEFAULT 0,
-    service_tag TEXT,
-    updated_at INTEGER DEFAULT (strftime('%s','now'))
-  );
-`);
-addColIfMissing('ims_range_meta', 'disabled', 'INTEGER DEFAULT 0');
-addColIfMissing('ims_range_meta', 'service_tag', 'TEXT');
-
-// MSI range metadata (mirror of numpanel)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS msi_range_meta (
-    range_prefix TEXT PRIMARY KEY,
-    custom_name TEXT,
-    tag_color TEXT,
-    priority INTEGER DEFAULT 0,
-    request_override INTEGER,
-    notes TEXT,
-    disabled INTEGER DEFAULT 0,
-    service_tag TEXT,
-    updated_at INTEGER DEFAULT (strftime('%s','now'))
-  );
-`);
-addColIfMissing('msi_range_meta', 'disabled', 'INTEGER DEFAULT 0');
-addColIfMissing('msi_range_meta', 'service_tag', 'TEXT');
 
 // ─────────────────────────────────────────────────────────────────────
 // Generic provider_ranges table — provider-agnostic, admin-managed ranges.
@@ -114,13 +63,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_pranges_provider ON provider_ranges(provider, enabled);
 `);
 
-// Apply Telegram bot schema (additive) AFTER column migrations
-const tgSchemaPath = path.join(__dirname, 'tg_schema.sql');
-if (fs.existsSync(tgSchemaPath)) {
-  db.exec(fs.readFileSync(tgSchemaPath, 'utf8'));
-  console.log('✓ TG schema applied');
-}
-
 // Seed default admin (only if no admin exists)
 const adminExists = db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin'").get();
 if (adminExists.c === 0) {
@@ -131,6 +73,34 @@ if (adminExists.c === 0) {
   `).run(ADMIN_USERNAME, hash);
   console.log(`✓ Default admin created: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}`);
   console.log('  IMPORTANT: Change this password immediately in production!');
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Seed default provider bot settings (only if missing — never overwrite
+// admin edits). Lets the bots start on first deploy without manual SQL.
+// ─────────────────────────────────────────────────────────────────────
+function seedSetting(key, value) {
+  const existing = db.prepare("SELECT 1 FROM settings WHERE key = ?").get(key);
+  if (existing) return;
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES (?, ?, strftime('%s','now'))
+  `).run(key, String(value));
+  console.log(`✓ Seeded setting: ${key}`);
+}
+if (process.env.MEDIATEL_USERNAME) {
+  seedSetting('mediatel_enabled',   process.env.MEDIATEL_ENABLED   || 'false');
+  seedSetting('mediatel_base_url',  process.env.MEDIATEL_BASE_URL  || 'https://mediateluk.com/sms');
+  seedSetting('mediatel_username',  process.env.MEDIATEL_USERNAME);
+  seedSetting('mediatel_password',  process.env.MEDIATEL_PASSWORD || '');
+  seedSetting('mediatel_otp_interval', process.env.MEDIATEL_OTP_INTERVAL || '8');
+}
+if (process.env.SEVEN1TEL_USERNAME) {
+  seedSetting('seven1tel_enabled',  process.env.SEVEN1TEL_ENABLED   || 'true');
+  seedSetting('seven1tel_base_url', process.env.SEVEN1TEL_BASE_URL  || 'http://94.23.120.156/ints');
+  seedSetting('seven1tel_username', process.env.SEVEN1TEL_USERNAME);
+  seedSetting('seven1tel_password', process.env.SEVEN1TEL_PASSWORD || '');
+  seedSetting('seven1tel_otp_interval', process.env.SEVEN1TEL_OTP_INTERVAL || '4');
 }
 
 console.log(`✓ Database ready at ${DB_PATH}`);

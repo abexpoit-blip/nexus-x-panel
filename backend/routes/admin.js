@@ -116,9 +116,10 @@ router.get('/system-health', (req, res) => {
     }
   } catch (_) {}
 
-  // Mediatel bot snapshot (the only bot in this build)
-  let mediatel = null;
+  // Provider bot snapshots
+  let mediatel = null, seven1tel = null;
   try { mediatel = require('../workers/mediatelBot').getStatus?.() || null; } catch (_) {}
+  try { seven1tel = require('../workers/seven1telBot').getStatus?.() || null; } catch (_) {}
 
   const pendingWithdrawals = db.prepare("SELECT COUNT(*) c FROM withdrawals WHERE status='pending'").get().c;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE expires_at > strftime('%s','now')").get().c;
@@ -142,6 +143,7 @@ router.get('/system-health', (req, res) => {
       backup_dir: backupDir,
     },
     mediatel_bot: mediatel,
+    seven1tel_bot: seven1tel,
     counts: {
       pending_withdrawals: pendingWithdrawals,
       active_sessions: activeSessions,
