@@ -17,68 +17,7 @@ export const demoMode = {
   disable: () => localStorage.removeItem(DEMO_KEY),
 };
 
-// In-memory IMS bot state for demo mode (preview without backend)
-const demoImsState = (() => {
-  let running = true;
-  let loggedIn = true;
-  let totalScrapes = 47;
-  let numbersAdded = 128;
-  let otpsDelivered = 312;
-  const events: { ts: number; level: string; message: string; meta: unknown }[] = [
-    { ts: Math.floor(Date.now() / 1000) - 8, level: "success", message: "OTP delivered to +8801712345678", meta: { otp: "458291" } },
-    { ts: Math.floor(Date.now() / 1000) - 24, level: "success", message: "Pool +3 new numbers", meta: { scraped: 12 } },
-    { ts: Math.floor(Date.now() / 1000) - 56, level: "info", message: "Scrape cycle completed", meta: null },
-    { ts: Math.floor(Date.now() / 1000) - 120, level: "success", message: "Logged in to imssms.org", meta: null },
-    { ts: Math.floor(Date.now() / 1000) - 180, level: "info", message: "Bot started", meta: null },
-  ];
-  const startTs = Math.floor(Date.now() / 1000) - 180;
-  return {
-    snapshot() {
-      return {
-        enabled: true,
-        running,
-        loggedIn: running && loggedIn,
-        lastLoginAt: running ? startTs : null,
-        lastScrapeAt: running ? Math.floor(Date.now() / 1000) - 6 : null,
-        lastScrapeOk: running,
-        lastError: null as string | null,
-        lastErrorAt: null as number | null,
-        totalScrapes,
-        numbersScrapedTotal: numbersAdded * 3,
-        numbersAddedTotal: numbersAdded,
-        otpsDeliveredTotal: otpsDelivered,
-        consecFail: 0,
-        baseUrl: "https://www.imssms.org",
-        intervalSec: 8,
-        poolSize: 47,
-        activeAssigned: 12,
-        otpReceived: otpsDelivered,
-        emptyStreak: running ? 2 : 0,
-        emptyLimit: 10,
-        events: events.slice(0, 20),
-      };
-    },
-    start() {
-      if (running) return;
-      running = true;
-      loggedIn = true;
-      events.unshift({ ts: Math.floor(Date.now() / 1000), level: "success", message: "Bot started by admin", meta: null });
-    },
-    stop() {
-      if (!running) return;
-      running = false;
-      loggedIn = false;
-      events.unshift({ ts: Math.floor(Date.now() / 1000), level: "warn", message: "Bot stopped by admin", meta: null });
-    },
-    restart() {
-      events.unshift({ ts: Math.floor(Date.now() / 1000), level: "info", message: "Bot restart requested by admin", meta: null });
-      setTimeout(() => {
-        running = true; loggedIn = true; totalScrapes++;
-        events.unshift({ ts: Math.floor(Date.now() / 1000), level: "success", message: "Bot restarted successfully", meta: null });
-      }, 800);
-    },
-  };
-})();
+// (Demo IMS bot state removed — fresh build only ships Mediatel + Seven1Tel)
 
 async function request<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   let token = tokenStore.get();
@@ -130,38 +69,10 @@ function demoRoute(path: string, opts: RequestInit): any {
   if (path.startsWith("/admin/commission-trend")) return demoData.commissionTrend(14);
   if (path === "/admin/allocations") return demoData.allocations();
   if (path === "/admin/agents") return demoData.agents();
-  if (path === "/admin/ims-status") return { status: demoImsState.snapshot() };
   if (path === "/admin/impersonations") return { impersonations: [
     { id: 1, created_at: Math.floor(Date.now()/1000) - 1800, action: "impersonation_start", admin_id: 1, agent_id: 2, admin_username: "admin", agent_username: "demo_agent", ip: "127.0.0.1", meta: '{"username":"demo_agent"}' },
     { id: 2, created_at: Math.floor(Date.now()/1000) - 1500, action: "impersonation_end", admin_id: 1, agent_id: 2, admin_username: "admin", agent_username: "demo_agent", ip: "127.0.0.1" },
   ] };
-  if (path === "/admin/ims-restart" && method === "POST") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-start" && method === "POST") { demoImsState.start(); return { ok: true }; }
-  if (path === "/admin/ims-stop" && method === "POST") { demoImsState.stop(); return { ok: true }; }
-  if (path === "/admin/ims-scrape-numbers" && method === "POST") return { ok: true, jobId: Date.now(), status: "running" };
-  if (path === "/admin/ims-numbers-job") return { id: 0, status: "idle", startedAt: null, finishedAt: null, result: null, error: null, progress: "" };
-  if (path === "/admin/ims-credentials" && method === "GET") return {
-    enabled: true, base_url: "https://www.imssms.org", username: "Shovonkhan7",
-    password_masked: "Sh****34", has_password: true,
-    source: { username: "database", password: "database" },
-  };
-  if (path === "/admin/ims-credentials" && method === "PUT") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-cookies" && method === "GET") return { has_cookies: false, count: 0, saved_at: null };
-  if (path === "/admin/ims-cookies" && method === "PUT") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-cookies" && method === "DELETE") { demoImsState.restart(); return { ok: true }; }
-  if (path === "/admin/ims-otp-interval" && method === "GET") return {
-    interval_sec: 10, source: "env", options: [5, 10, 30], min: 3, max: 120,
-  };
-  if (path === "/admin/ims-otp-interval" && method === "PUT") { demoImsState.restart(); return { ok: true, interval_sec: 10 }; }
-  if (path === "/admin/msi-cookies" && method === "GET") return { has_cookies: false, count: 0, saved_at: null };
-  if (path === "/admin/msi-cookies" && method === "PUT") return { ok: true };
-  if (path === "/admin/msi-cookies" && method === "DELETE") return { ok: true };
-  if (path === "/admin/provider-status") return {
-    providers: [
-      { id: "acchub", name: "AccHub", configured: true, baseUrl: "https://sms.acchub.io", username: "Sh****YE", loggedIn: true, balance: 24.85, currency: "USD", lastError: null, otpHistoryCount: 12 },
-      { id: "ims", name: "IMS SMS", configured: true, baseUrl: "https://www.imssms.org", username: "Sh****n7", loggedIn: true, balance: null, currency: "USD", lastError: null, otpHistoryCount: 0 },
-    ],
-  };
   if (path === "/admin/system-health") {
     const now = Math.floor(Date.now() / 1000);
     return {
@@ -178,14 +89,17 @@ function demoRoute(path: string, opts: RequestInit): any {
         last_backup: { name: "nexus-2025-04-17-0400.db.gz", size: 1_234_000, mtime: now - 3600 * 9 },
         backup_dir: "/opt/nexus/backups",
       },
-      ims_bot: {
+      mediatel_bot: {
         enabled: true, running: true, logged_in: true,
-        pool_size: 4823, active_assigned: 12,
-        last_scrape_at: now - 22, last_scrape_ok: true,
-        interval_sec: 60, otp_interval_sec: 10, consec_fail: 0, last_error: null,
+        last_tick_at: now - 6, last_error: null, consec_fail: 0,
+        otps_delivered: 12, interval_sec: 8,
       },
-      acchub_poller: { running: true, lastTickAt: now - 4 },
-      counts: { pending_withdrawals: 2, active_sessions: 5, ims_pool_size: 4823 },
+      seven1tel_bot: {
+        enabled: true, running: true, logged_in: true,
+        last_tick_at: now - 3, last_error: null, consec_fail: 0,
+        otps_delivered: 27, interval_sec: 4,
+      },
+      counts: { pending_withdrawals: 2, active_sessions: 5 },
     };
   }
 
