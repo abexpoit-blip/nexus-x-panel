@@ -479,6 +479,11 @@ export const api = {
       list: () => request<{ bots: Record<string, BotInfo> }>("/admin/bots"),
       action: (bot: string, action: "start" | "stop" | "restart") =>
         request<{ ok: boolean; bot: string; action: string }>(`/admin/bots/${bot}/${action}`, { method: "POST" }),
+      health: (bot: string) =>
+        request<{ ok: boolean; bot: string; ms: number; error?: string; status?: Record<string, unknown> }>(
+          `/admin/bots/${bot}/health`,
+          { method: "POST" }
+        ),
     },
   },
 

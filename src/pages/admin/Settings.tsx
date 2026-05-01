@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink, HeartPulse, CheckCircle2, AlertTriangle, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -64,12 +64,18 @@ const AdminSettings = () => {
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
+  const [mediatelUrl, setMediatelUrl] = useState("");
   const [mediatelUser, setMediatelUser] = useState("");
   const [mediatelPass, setMediatelPass] = useState("");
   const [mediatelCookie, setMediatelCookie] = useState("");
+  const [mediatelInterval, setMediatelInterval] = useState<number>(8);
+  const [seven1Url, setSeven1Url] = useState("");
   const [seven1User, setSeven1User] = useState("");
   const [seven1Pass, setSeven1Pass] = useState("");
+  const [seven1Cookie, setSeven1Cookie] = useState("");
+  const [seven1Interval, setSeven1Interval] = useState<number>(4);
   const [showPw, setShowPw] = useState(false);
+  const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
   useEffect(() => {
     if (!s) return;
@@ -81,11 +87,16 @@ const AdminSettings = () => {
     setTgGroupChat(str(s, "tg_required_group_chat"));
     setTgOtpGroup(str(s, "tg_required_otp_group"));
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
+    setMediatelUrl(str(s, "mediatel_base_url", "https://mediateluk.com/sms"));
     setMediatelUser(str(s, "mediatel_username"));
     setMediatelPass(str(s, "mediatel_password"));
     setMediatelCookie(str(s, "mediatel_cookie_header"));
+    setMediatelInterval(Number(str(s, "mediatel_otp_interval", "8")) || 8);
+    setSeven1Url(str(s, "seven1tel_base_url", "http://94.23.120.156/ints"));
     setSeven1User(str(s, "seven1tel_username"));
     setSeven1Pass(str(s, "seven1tel_password"));
+    setSeven1Cookie(str(s, "seven1tel_cookie_header"));
+    setSeven1Interval(Number(str(s, "seven1tel_otp_interval", "4")) || 4);
   }, [s]);
 
   useEffect(() => {
@@ -145,6 +156,22 @@ const AdminSettings = () => {
     } catch (e) {
       toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
     } finally { setSavingKey(null); }
+  };
+
+  const runHealth = async (bot: string) => {
+    setHealthState((p) => ({ ...p, [bot]: "checking" }));
+    try {
+      const r = await api.admin.bots.health(bot);
+      setHealthState((p) => ({ ...p, [bot]: { ok: !!r.ok, ms: r.ms, error: r.error } }));
+      toast({
+        title: r.ok ? `✓ ${bot} login OK` : `✗ ${bot} login failed`,
+        description: r.ok ? `Logged in in ${r.ms}ms` : (r.error || "Unknown error"),
+        variant: r.ok ? "default" : "destructive",
+      });
+    } catch (e) {
+      setHealthState((p) => ({ ...p, [bot]: { ok: false, ms: 0, error: (e as Error).message } }));
+      toast({ title: "Health check failed", description: (e as Error).message, variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -483,126 +510,79 @@ const AdminSettings = () => {
 
         {/* ============ BOTS — credentials & cookies ============ */}
         <TabsContent value="bots" className="space-y-4 mt-4">
-          <GlassCard>
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 mt-0.5">
-                  <KeyRound className="w-4 h-4 text-neon-cyan" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Mediatel Bot</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Login at{" "}
-                    <a href="https://mediateluk.com/sms" target="_blank" rel="noreferrer"
-                      className="text-neon-cyan hover:underline inline-flex items-center gap-1">
-                      https://mediateluk.com/sms <ExternalLink className="w-3 h-3" />
-                    </a>
-                    . Cookies (incl. <code className="text-neon-amber">cf_clearance</code>) are persisted in DB after first successful login.
-                  </p>
-                </div>
-              </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Edit credentials, login URL, cookies and poll interval per bot. Use <span className="text-neon-cyan">Health Check</span> to test the login live before saving.
+            </p>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Show passwords</Label>
               <Switch checked={showPw} onCheckedChange={setShowPw} />
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Username</Label>
-                <Input value={mediatelUser} onChange={(e) => setMediatelUser(e.target.value)}
-                  placeholder="2673" className="bg-white/[0.04] border-white/[0.1] font-mono" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Password</Label>
-                <Input type={showPw ? "text" : "password"} value={mediatelPass}
-                  onChange={(e) => setMediatelPass(e.target.value)}
-                  className="bg-white/[0.04] border-white/[0.1] font-mono" />
-              </div>
-            </div>
+          {/* ─── Mediatel ─── */}
+          <BotConfigCard
+            tone="cyan"
+            title="Mediatel Bot"
+            urlKey="mediatel_base_url"
+            url={mediatelUrl} setUrl={setMediatelUrl}
+            user={mediatelUser} setUser={setMediatelUser} userKey="mediatel_username"
+            pass={mediatelPass} setPass={setMediatelPass} passKey="mediatel_password"
+            cookie={mediatelCookie} setCookie={setMediatelCookie} cookieKey="mediatel_cookie_header"
+            cookiePlaceholder="cf_clearance=...; PHPSESSID=..."
+            cookieHint="Cloudflare-protected. Paste browser Cookie header (cf_clearance + PHPSESSID) if the VPS browser can't pass the challenge."
+            interval={mediatelInterval} setInterval={setMediatelInterval} intervalKey="mediatel_otp_interval"
+            showPw={showPw}
+            health={healthState["mediatel"]}
+            onSave={async () => {
+              await setSetting("mediatel_base_url", mediatelUrl);
+              await setSetting("mediatel_username", mediatelUser);
+              await setSetting("mediatel_password", mediatelPass);
+              await setSetting("mediatel_cookie_header", mediatelCookie);
+              await setSetting("mediatel_otp_interval", String(mediatelInterval));
+            }}
+            onHealth={() => runHealth("mediatel")}
+            onClearCookies={async () => {
+              if (!confirm("Clear saved Mediatel cookies? Bot will solve Cloudflare again on next login.")) return;
+              await setSetting("mediatel_cookies", "");
+              toast({ title: "Mediatel cookie jar cleared" });
+            }}
+            saving={savingKey?.startsWith("mediatel_") || false}
+          />
 
-            <div className="space-y-1.5 mt-3">
-              <Label className="text-xs">Manual Cookie header</Label>
-              <Textarea value={mediatelCookie} onChange={(e) => setMediatelCookie(e.target.value)}
-                placeholder="cf_clearance=...; PHPSESSID=..."
-                className="bg-white/[0.04] border-white/[0.1] min-h-20 font-mono text-xs" />
-              <p className="text-[11px] text-muted-foreground">
-                Use this only when Cloudflare blocks the VPS browser: log in once in your browser, copy the Cookie header, save, then restart Mediatel Bot.
-              </p>
-            </div>
+          {/* ─── Seven1Tel ─── */}
+          <BotConfigCard
+            tone="magenta"
+            title="Seven1Tel Bot"
+            urlKey="seven1tel_base_url"
+            url={seven1Url} setUrl={setSeven1Url}
+            user={seven1User} setUser={setSeven1User} userKey="seven1tel_username"
+            pass={seven1Pass} setPass={setSeven1Pass} passKey="seven1tel_password"
+            cookie={seven1Cookie} setCookie={setSeven1Cookie} cookieKey="seven1tel_cookie_header"
+            cookiePlaceholder="PHPSESSID=..."
+            cookieHint="Optional. If set, bot uses this cookie instead of running the login form (skips captcha entirely)."
+            interval={seven1Interval} setInterval={setSeven1Interval} intervalKey="seven1tel_otp_interval"
+            showPw={showPw}
+            health={healthState["seven1tel"]}
+            onSave={async () => {
+              await setSetting("seven1tel_base_url", seven1Url);
+              await setSetting("seven1tel_username", seven1User);
+              await setSetting("seven1tel_password", seven1Pass);
+              await setSetting("seven1tel_cookie_header", seven1Cookie);
+              await setSetting("seven1tel_otp_interval", String(seven1Interval));
+            }}
+            onHealth={() => runHealth("seven1tel")}
+            onClearCookies={async () => {
+              if (!confirm("Clear saved Seven1Tel session cookie? Next tick re-logs in from scratch.")) return;
+              await setSetting("seven1tel_session_cookie", "");
+              toast({ title: "Seven1Tel session cleared" });
+            }}
+            saving={savingKey?.startsWith("seven1tel_") || false}
+          />
 
-            <div className="flex flex-wrap gap-2 mt-4">
-              <Button onClick={async () => {
-                await setSetting("mediatel_username", mediatelUser);
-                await setSetting("mediatel_password", mediatelPass);
-                await setSetting("mediatel_cookie_header", mediatelCookie);
-              }} disabled={savingKey?.startsWith("mediatel_")}
-                className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
-                {savingKey?.startsWith("mediatel_") ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
-                Save credentials
-              </Button>
-              <Button variant="outline" onClick={async () => {
-                if (!confirm("Clear saved Mediatel cookies? Bot will need to solve Cloudflare challenge again on next login.")) return;
-                await setSetting("mediatel_cookies", "");
-                toast({ title: "Mediatel cookies cleared", description: "Restart the bot to force a fresh login." });
-              }} className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10">
-                <Cookie className="w-4 h-4 mr-1.5" /> Clear cookies
-              </Button>
-            </div>
-          </GlassCard>
-
-          <GlassCard>
-            <div className="flex items-start gap-3 mb-4">
-              <div className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 mt-0.5">
-                <KeyRound className="w-4 h-4 text-neon-magenta" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Seven1Tel Bot</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Login at{" "}
-                  <a href="http://94.23.120.156/ints" target="_blank" rel="noreferrer"
-                    className="text-neon-cyan hover:underline inline-flex items-center gap-1">
-                    http://94.23.120.156/ints <ExternalLink className="w-3 h-3" />
-                  </a>
-                  . PHPSESSID cookie is auto-saved after a successful <code className="text-neon-amber">/signin</code>.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Username</Label>
-                <Input value={seven1User} onChange={(e) => setSeven1User(e.target.value)}
-                  placeholder="Sayedahmed" className="bg-white/[0.04] border-white/[0.1] font-mono" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Password</Label>
-                <Input type={showPw ? "text" : "password"} value={seven1Pass}
-                  onChange={(e) => setSeven1Pass(e.target.value)}
-                  className="bg-white/[0.04] border-white/[0.1] font-mono" />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 mt-4">
-              <Button onClick={async () => {
-                await setSetting("seven1tel_username", seven1User);
-                await setSetting("seven1tel_password", seven1Pass);
-              }} disabled={savingKey?.startsWith("seven1tel_")}
-                className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
-                {savingKey?.startsWith("seven1tel_") ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
-                Save credentials
-              </Button>
-              <Button variant="outline" onClick={async () => {
-                if (!confirm("Clear saved Seven1Tel session cookie? Next tick will re-login from scratch.")) return;
-                await setSetting("seven1tel_session_cookie", "");
-                toast({ title: "Seven1Tel session cleared", description: "Restart the bot to force a fresh login." });
-              }} className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10">
-                <Cookie className="w-4 h-4 mr-1.5" /> Clear session
-              </Button>
-            </div>
-
-            <p className="text-[11px] text-muted-foreground mt-3">
-              Tip: After saving new credentials, go to <span className="text-foreground">Bots Control</span> and hit{" "}
-              <span className="text-neon-cyan">Restart</span> on the affected bot.
-            </p>
-          </GlassCard>
+          <p className="text-[11px] text-muted-foreground">
+            After saving, go to <span className="text-foreground">Bots Control</span> → <span className="text-neon-cyan">Restart</span> for changes to take effect immediately.
+          </p>
         </TabsContent>
       </Tabs>
     </div>
@@ -610,3 +590,119 @@ const AdminSettings = () => {
 };
 
 export default AdminSettings;
+
+// ───────────────────────────────────────────────────────────────────────
+// BotConfigCard — full per-bot config (URL / user / pass / cookie / interval)
+// with live Health Check + Save + Clear cookies. Used in the Bots tab.
+// ───────────────────────────────────────────────────────────────────────
+type BotConfigCardProps = {
+  tone: "cyan" | "magenta";
+  title: string;
+  urlKey: string;
+  url: string; setUrl: (v: string) => void;
+  user: string; setUser: (v: string) => void; userKey: string;
+  pass: string; setPass: (v: string) => void; passKey: string;
+  cookie: string; setCookie: (v: string) => void; cookieKey: string;
+  cookiePlaceholder: string;
+  cookieHint: string;
+  interval: number; setInterval: (v: number) => void; intervalKey: string;
+  showPw: boolean;
+  health?: { ok: boolean; ms: number; error?: string } | "checking";
+  saving: boolean;
+  onSave: () => Promise<void> | void;
+  onHealth: () => void;
+  onClearCookies: () => Promise<void> | void;
+};
+
+function BotConfigCard(p: BotConfigCardProps) {
+  const accent = p.tone === "cyan" ? "text-neon-cyan" : "text-neon-magenta";
+  const accentBg = p.tone === "cyan" ? "bg-neon-cyan/10 border-neon-cyan/20" : "bg-neon-magenta/10 border-neon-magenta/20";
+  const checking = p.health === "checking";
+  const result = typeof p.health === "object" ? p.health : null;
+
+  return (
+    <GlassCard>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-start gap-3">
+          <div className={cn("p-2 rounded-lg border mt-0.5", accentBg)}>
+            <Bot className={cn("w-4 h-4", accent)} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground">{p.title}</h3>
+            <a href={p.url} target="_blank" rel="noreferrer"
+              className="text-xs text-neon-cyan hover:underline inline-flex items-center gap-1 mt-0.5">
+              {p.url || "—"} <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+
+        {/* Health pill */}
+        {result && (
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border",
+            result.ok
+              ? "bg-neon-green/10 border-neon-green/30 text-neon-green"
+              : "bg-destructive/10 border-destructive/30 text-destructive",
+          )}>
+            {result.ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+            {result.ok ? `Login OK · ${result.ms}ms` : (result.error || "Failed")}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Login URL</Label>
+          <Input value={p.url} onChange={(e) => p.setUrl(e.target.value)}
+            placeholder="https://example.com/portal"
+            className="bg-white/[0.04] border-white/[0.1] font-mono text-xs" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Username</Label>
+            <Input value={p.user} onChange={(e) => p.setUser(e.target.value)}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Password</Label>
+            <Input type={p.showPw ? "text" : "password"} value={p.pass}
+              onChange={(e) => p.setPass(e.target.value)}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Poll interval (sec)</Label>
+            <Input type="number" min={3} max={120} value={p.interval}
+              onChange={(e) => p.setInterval(Math.max(3, Math.min(120, +e.target.value || 0)))}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5"><Cookie className="w-3 h-3" /> Manual Cookie header</Label>
+          <Textarea value={p.cookie} onChange={(e) => p.setCookie(e.target.value)}
+            placeholder={p.cookiePlaceholder}
+            className="bg-white/[0.04] border-white/[0.1] min-h-20 font-mono text-xs" />
+          <p className="text-[11px] text-muted-foreground">{p.cookieHint}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        <Button onClick={() => p.onSave()} disabled={p.saving}
+          className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+          {p.saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+          Save all
+        </Button>
+        <Button variant="outline" onClick={p.onHealth} disabled={checking}
+          className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10">
+          {checking ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <HeartPulse className="w-4 h-4 mr-1.5" />}
+          {checking ? "Checking…" : "Health Check"}
+        </Button>
+        <Button variant="outline" onClick={() => p.onClearCookies()}
+          className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10 ml-auto">
+          <Cookie className="w-4 h-4 mr-1.5" /> Clear saved cookies
+        </Button>
+      </div>
+    </GlassCard>
+  );
+}
