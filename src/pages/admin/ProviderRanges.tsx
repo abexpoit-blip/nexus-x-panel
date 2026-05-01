@@ -1,0 +1,314 @@
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
+import { api, ProviderRange } from "@/lib/api";
+import { GlassCard } from "@/components/GlassCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Plus, Trash2, Pencil, Server, Loader2, Power } from "lucide-react";
+import { GradientMesh, PageHeader } from "@/components/premium";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+const PROVIDERS = [
+  { id: "acchub", name: "AccHub" },
+  { id: "ims", name: "IMS" },
+  { id: "msi", name: "MSI" },
+  { id: "numpanel", name: "NumPanel" },
+  { id: "seven1tel", name: "Seven1Tel" },
+  { id: "midea", name: "Midea Tel" },
+];
+
+type Form = Partial<ProviderRange> & { id?: number };
+
+const empty: Form = {
+  provider: "acchub",
+  country_code: "",
+  country_name: "",
+  range_label: "",
+  range_prefix: "",
+  operator: "",
+  price_bdt: 0,
+  enabled: 1,
+  notes: "",
+};
+
+const AdminProviderRanges = () => {
+  const [params, setParams] = useSearchParams();
+  const providerFilter = params.get("provider") || "";
+  const countryFilter = params.get("country") || "";
+
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery({
+    queryKey: ["provider-ranges", providerFilter, countryFilter],
+    queryFn: () =>
+      api.admin.rangesList({
+        provider: providerFilter || undefined,
+        country_code: countryFilter || undefined,
+      }),
+  });
+
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<Form>(empty);
+  const [saving, setSaving] = useState(false);
+
+  const startCreate = () => { setForm({ ...empty, provider: providerFilter || "acchub" }); setOpen(true); };
+  const startEdit = (r: ProviderRange) => { setForm({ ...r, enabled: r.enabled ? 1 : 0 }); setOpen(true); };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const body: Partial<ProviderRange> = {
+        provider: form.provider, country_code: form.country_code,
+        country_name: form.country_name || null,
+        range_label: form.range_label, range_prefix: form.range_prefix || null,
+        operator: form.operator || null,
+        price_bdt: Number(form.price_bdt) || 0,
+        enabled: form.enabled ? 1 : 0,
+        notes: form.notes || null,
+      };
+      if (form.id) await api.admin.rangeUpdate(form.id, body);
+      else await api.admin.rangeCreate(body);
+      toast({ title: form.id ? "Range updated" : "Range created" });
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["provider-ranges"] });
+    } catch (e) {
+      toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  const toggle = async (r: ProviderRange) => {
+    await api.admin.rangeUpdate(r.id, { enabled: r.enabled ? 0 : 1 });
+    qc.invalidateQueries({ queryKey: ["provider-ranges"] });
+  };
+
+  const remove = async (r: ProviderRange) => {
+    if (!confirm(`Delete range "${r.range_label}" (${r.country_code})?`)) return;
+    await api.admin.rangeDelete(r.id);
+    toast({ title: "Deleted" });
+    qc.invalidateQueries({ queryKey: ["provider-ranges"] });
+  };
+
+  const rows = data?.rows || [];
+
+  return (
+    <div className="relative space-y-6">
+      <GradientMesh variant="default" />
+      <PageHeader
+        eyebrow="Pool Management"
+        title="Provider Ranges"
+        description="Add countries & ranges per provider. Toggle on/off to control what agents see."
+        icon={<Server className="w-5 h-5 text-neon-cyan" />}
+      />
+
+      <GlassCard>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Provider</Label>
+            <Select value={providerFilter || "all"} onValueChange={(v) => {
+              const next = new URLSearchParams(params);
+              if (v === "all") next.delete("provider"); else next.set("provider", v);
+              setParams(next);
+            }}>
+              <SelectTrigger className="w-44 bg-white/[0.04] border-white/[0.1]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All providers</SelectItem>
+                {PROVIDERS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Country code</Label>
+            <Input
+              value={countryFilter}
+              onChange={(e) => {
+                const next = new URLSearchParams(params);
+                const v = e.target.value.toUpperCase();
+                if (v) next.set("country", v); else next.delete("country");
+                setParams(next);
+              }}
+              placeholder="e.g. BD, US, IN"
+              className="w-32 bg-white/[0.04] border-white/[0.1] uppercase"
+            />
+          </div>
+          <div className="ml-auto">
+            <Button onClick={startCreate} className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+              <Plus className="w-4 h-4 mr-1.5" /> Add Range
+            </Button>
+          </div>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="!p-0 overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 text-center text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /> Loading…
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="p-12 text-center text-muted-foreground">
+            No ranges yet. Click <span className="text-foreground">Add Range</span> to create one.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-white/[0.06] bg-white/[0.02]">
+                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3">Provider</th>
+                  <th className="px-4 py-3">Country</th>
+                  <th className="px-4 py-3">Range</th>
+                  <th className="px-4 py-3">Operator</th>
+                  <th className="px-4 py-3 text-right">Price (BDT)</th>
+                  <th className="px-4 py-3 text-center">Enabled</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className={cn(
+                    "border-b border-white/[0.03] hover:bg-white/[0.02]",
+                    !r.enabled && "opacity-60"
+                  )}>
+                    <td className="px-4 py-3 font-mono text-xs uppercase">{r.provider}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono font-bold">{r.country_code}</span>
+                      {r.country_name && <span className="text-muted-foreground ml-1.5">{r.country_name}</span>}
+                    </td>
+                    <td className="px-4 py-3 font-medium">
+                      {r.range_label}
+                      {r.range_prefix && <span className="text-muted-foreground ml-2 font-mono text-xs">{r.range_prefix}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.operator || "—"}</td>
+                    <td className="px-4 py-3 text-right font-mono">{Number(r.price_bdt).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <Switch checked={!!r.enabled} onCheckedChange={() => toggle(r)} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(r)} className="h-8 w-8 p-0">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => remove(r)} className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassCard>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{form.id ? "Edit Range" : "Add Range"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Provider *</Label>
+              <Select value={form.provider} onValueChange={(v) => setForm({ ...form, provider: v })}>
+                <SelectTrigger className="bg-white/[0.04] border-white/[0.1]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PROVIDERS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Country code *</Label>
+              <Input
+                value={form.country_code || ""}
+                onChange={(e) => setForm({ ...form, country_code: e.target.value.toUpperCase() })}
+                placeholder="BD"
+                className="bg-white/[0.04] border-white/[0.1] uppercase"
+                maxLength={4}
+              />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs">Country name</Label>
+              <Input
+                value={form.country_name || ""}
+                onChange={(e) => setForm({ ...form, country_name: e.target.value })}
+                placeholder="Bangladesh"
+                className="bg-white/[0.04] border-white/[0.1]"
+              />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs">Range label *</Label>
+              <Input
+                value={form.range_label || ""}
+                onChange={(e) => setForm({ ...form, range_label: e.target.value })}
+                placeholder="GP-01 / Robi-Pre / 880-1700"
+                className="bg-white/[0.04] border-white/[0.1]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Prefix</Label>
+              <Input
+                value={form.range_prefix || ""}
+                onChange={(e) => setForm({ ...form, range_prefix: e.target.value })}
+                placeholder="8801700"
+                className="bg-white/[0.04] border-white/[0.1] font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Operator</Label>
+              <Input
+                value={form.operator || ""}
+                onChange={(e) => setForm({ ...form, operator: e.target.value })}
+                placeholder="Grameenphone"
+                className="bg-white/[0.04] border-white/[0.1]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Price (BDT) per OTP</Label>
+              <Input
+                type="number" step="0.01" min={0}
+                value={form.price_bdt ?? 0}
+                onChange={(e) => setForm({ ...form, price_bdt: Number(e.target.value) })}
+                className="bg-white/[0.04] border-white/[0.1] font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Enabled (visible to agents)</Label>
+              <div className="h-10 flex items-center gap-2 px-3 rounded-md bg-white/[0.04] border border-white/[0.1]">
+                <Power className={cn("w-4 h-4", form.enabled ? "text-neon-green" : "text-muted-foreground")} />
+                <Switch checked={!!form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v ? 1 : 0 })} />
+                <span className="text-xs text-muted-foreground ml-auto">{form.enabled ? "ON" : "OFF"}</span>
+              </div>
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs">Notes</Label>
+              <Input
+                value={form.notes || ""}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Internal note (not shown to agents)"
+                className="bg-white/[0.04] border-white/[0.1]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={saving || !form.provider || !form.country_code || !form.range_label}
+              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+              {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+              {form.id ? "Save changes" : "Create range"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default AdminProviderRanges;
