@@ -32,11 +32,40 @@ if (cmd === 'list') {
   if (!arg) { console.error('Usage: make-admin <username>'); process.exit(1); }
   const r = db.prepare("UPDATE users SET role='admin', status='active' WHERE username=?").run(arg);
   console.log(r.changes ? `✓ ${arg} is now admin (active)` : `✗ user '${arg}' not found`);
+} else if (cmd === 'replace-admins') {
+  // Usage: replace-admins <username> <password>
+  // Deletes ALL existing admin accounts (and their sessions), then creates a fresh admin.
+  const newUser = process.argv[3];
+  const newPass = process.argv[4];
+  if (!newUser || !newPass) {
+    console.error('Usage: replace-admins <username> <password>');
+    process.exit(1);
+  }
+  const hash = bcrypt.hashSync(newPass, 10);
+  const tx = db.transaction(() => {
+    const oldAdmins = db.prepare("SELECT id, username FROM users WHERE role='admin'").all();
+    if (oldAdmins.length) {
+      const ids = oldAdmins.map((a) => a.id);
+      const placeholders = ids.map(() => '?').join(',');
+      // Best-effort: clear sessions for those admins so they get logged out everywhere
+      try { db.prepare(`DELETE FROM sessions WHERE user_id IN (${placeholders})`).run(...ids); } catch (_) {}
+      db.prepare(`DELETE FROM users WHERE id IN (${placeholders})`).run(...ids);
+      console.log(`✓ removed ${oldAdmins.length} old admin(s): ${oldAdmins.map((a) => a.username).join(', ')}`);
+    } else {
+      console.log('• no existing admins to remove');
+    }
+    db.prepare(
+      "INSERT INTO users (username, password_hash, role, full_name, status) VALUES (?, ?, 'admin', 'System Admin', 'active')"
+    ).run(newUser, hash);
+  });
+  tx();
+  console.log(`✓ new admin created — username='${newUser}', status=active`);
 } else {
   console.log('Usage:');
   console.log('  node scripts/admin-reset.js list');
   console.log('  node scripts/admin-reset.js reset-admin <newpassword>');
   console.log('  node scripts/admin-reset.js approve <username>');
   console.log('  node scripts/admin-reset.js make-admin <username>');
+  console.log('  node scripts/admin-reset.js replace-admins <username> <password>');
 }
 db.close();
