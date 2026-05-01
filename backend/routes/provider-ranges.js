@@ -115,6 +115,132 @@ router.post('/admin/provider-ranges/bulk-toggle', authRequired, adminOnly, (req,
   res.json({ ok: true, updated: ids.length });
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// POOL NUMBERS — manually pasted MSISDNs under a range.
+// ─────────────────────────────────────────────────────────────────────
+
+// Normalize an MSISDN: keep digits and a single leading +.
+function normalizeMsisdn(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  const plus = s.startsWith('+');
+  const digits = s.replace(/\D/g, '');
+  if (digits.length < 6 || digits.length > 18) return null;
+  return (plus ? '+' : '') + digits;
+}
+
+// GET /admin/provider-ranges/:id/pool — list numbers under a range
+router.get('/admin/provider-ranges/:id/pool', authRequired, adminOnly, (req, res) => {
+  const id = +req.params.id;
+  const range = db.prepare('SELECT id, provider, country_code, range_label FROM provider_ranges WHERE id = ?').get(id);
+  if (!range) return res.status(404).json({ error: 'Range not found' });
+  const status = (req.query.status || '').toString();
+  const where = ['range_id = ?'];
+  const params = [id];
+  if (['free', 'allocated', 'used', 'disabled'].includes(status)) {
+    where.push('status = ?'); params.push(status);
+  }
+  const rows = db.prepare(`
+    SELECT p.id, p.msisdn, p.status, p.allocated_user_id, p.allocated_at,
+           p.last_otp_at, p.otp_count, p.note, p.created_at,
+           u.username AS allocated_username
+    FROM pool_numbers p
+    LEFT JOIN users u ON u.id = p.allocated_user_id
+    WHERE ${where.join(' AND ')}
+    ORDER BY p.created_at DESC
+    LIMIT 2000
+  `).all(...params);
+  res.json({ range, rows });
+});
+
+// POST /admin/provider-ranges/:id/pool/bulk — paste MSISDNs (one per line / commas / spaces)
+router.post('/admin/provider-ranges/:id/pool/bulk', authRequired, adminOnly, (req, res) => {
+  const id = +req.params.id;
+  const range = db.prepare('SELECT id FROM provider_ranges WHERE id = ?').get(id);
+  if (!range) return res.status(404).json({ error: 'Range not found' });
+  const raw = String(req.body?.numbers || '');
+  if (!raw.trim()) return res.status(400).json({ error: 'numbers (string) required' });
+
+  const tokens = raw.split(/[\s,;]+/).map(normalizeMsisdn).filter(Boolean);
+  if (!tokens.length) return res.status(400).json({ error: 'no valid MSISDNs found' });
+
+  const ins = db.prepare(`
+    INSERT INTO pool_numbers (range_id, msisdn, status)
+    VALUES (?, ?, 'free')
+    ON CONFLICT(range_id, msisdn) DO NOTHING
+  `);
+  let added = 0, dup = 0;
+  const tx = db.transaction(() => {
+    for (const m of tokens) {
+      const r = ins.run(id, m);
+      if (r.changes) added++; else dup++;
+    }
+  });
+  tx();
+  logFromReq(req, 'pool_bulk_add', { targetId: id, meta: { added, dup, total: tokens.length } });
+  res.json({ ok: true, added, duplicates: dup, total_tokens: tokens.length });
+});
+
+// DELETE /admin/pool-numbers/:id — remove a single number (only if not in use)
+router.delete('/admin/pool-numbers/:id', authRequired, adminOnly, (req, res) => {
+  const id = +req.params.id;
+  const row = db.prepare('SELECT id, status FROM pool_numbers WHERE id = ?').get(id);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  if (row.status === 'allocated' && !req.query.force) {
+    return res.status(409).json({ error: 'Number is allocated — pass ?force=1 to delete anyway' });
+  }
+  db.prepare('DELETE FROM pool_numbers WHERE id = ?').run(id);
+  logFromReq(req, 'pool_delete', { targetId: id });
+  res.json({ ok: true });
+});
+
+// POST /admin/pool-numbers/:id/release — force a number back to 'free'
+router.post('/admin/pool-numbers/:id/release', authRequired, adminOnly, (req, res) => {
+  const id = +req.params.id;
+  const r = db.prepare(`
+    UPDATE pool_numbers
+    SET status = 'free', allocated_user_id = NULL, allocated_at = NULL,
+        updated_at = strftime('%s','now')
+    WHERE id = ?
+  `).run(id);
+  if (!r.changes) return res.status(404).json({ error: 'Not found' });
+  logFromReq(req, 'pool_release', { targetId: id });
+  res.json({ ok: true });
+});
+
+// POST /admin/provider-ranges/:id/pool/purge?status=free|used  — bulk delete by status
+router.post('/admin/provider-ranges/:id/pool/purge', authRequired, adminOnly, (req, res) => {
+  const id = +req.params.id;
+  const status = String(req.query.status || req.body?.status || '');
+  if (!['free', 'used'].includes(status)) {
+    return res.status(400).json({ error: 'status must be free or used' });
+  }
+  const r = db.prepare('DELETE FROM pool_numbers WHERE range_id = ? AND status = ?').run(id, status);
+  logFromReq(req, 'pool_purge', { targetId: id, meta: { status, removed: r.changes } });
+  res.json({ ok: true, removed: r.changes });
+});
+
+// GET /admin/provider-ranges/stats — per-range stock + last activity, all ranges in one shot
+router.get('/admin/provider-ranges-stats', authRequired, adminOnly, (req, res) => {
+  const rows = db.prepare(`
+    SELECT
+      r.id AS range_id,
+      COUNT(p.id)                                       AS total,
+      SUM(CASE WHEN p.status='free'      THEN 1 ELSE 0 END) AS free_count,
+      SUM(CASE WHEN p.status='allocated' THEN 1 ELSE 0 END) AS allocated_count,
+      SUM(CASE WHEN p.status='used'      THEN 1 ELSE 0 END) AS used_count,
+      MAX(p.last_otp_at)                                AS last_otp_at,
+      MAX(p.allocated_at)                               AS last_allocated_at,
+      SUM(p.otp_count)                                  AS total_otps
+    FROM provider_ranges r
+    LEFT JOIN pool_numbers p ON p.range_id = r.id
+    GROUP BY r.id
+  `).all();
+  const byId = {};
+  for (const r of rows) byId[r.range_id] = r;
+  res.json({ stats: byId });
+});
+
 // ============ AGENT ============
 // GET /api/numbers/v2/countries — distinct countries that have ≥1 enabled range
 router.get('/numbers/v2/countries', authRequired, (req, res) => {

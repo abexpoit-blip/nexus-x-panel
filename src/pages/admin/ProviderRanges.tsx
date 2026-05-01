@@ -13,10 +13,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square } from "lucide-react";
+import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square, Layers, RotateCw, Activity } from "lucide-react";
 import { GradientMesh, PageHeader } from "@/components/premium";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { PoolDialog } from "@/components/admin/PoolDialog";
 
 const PROVIDERS = [
   { id: "mediatel", name: "Mediatel" },
@@ -59,6 +60,41 @@ const AdminProviderRanges = () => {
   const [form, setForm] = useState<Form>(empty);
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [poolRangeId, setPoolRangeId] = useState<number | null>(null);
+
+  // Per-range stats (stock + last activity)
+  const { data: statsData } = useQuery({
+    queryKey: ["provider-ranges-stats"],
+    queryFn: () => api.admin.rangesStats(),
+    refetchInterval: 15_000,
+  });
+  const stats = statsData?.stats || {};
+
+  // Bot status (for the Bot column / quick restart)
+  const { data: botsData } = useQuery({
+    queryKey: ["admin-bots-status-mini"],
+    queryFn: () => api.admin.bots.list(),
+    refetchInterval: 10_000,
+  });
+  const bots = botsData?.bots || {};
+
+  const restartBot = async (provider: string) => {
+    try {
+      await api.admin.bots.action(`${provider}Bot`, "restart");
+      toast({ title: "Restart sent", description: `${provider}Bot` });
+    } catch (e) {
+      toast({ title: "Restart failed", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const fmtAgo = (ts: number | null | undefined) => {
+    if (!ts) return "—";
+    const s = Math.floor(Date.now() / 1000) - ts;
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
 
   const startCreate = () => {
     const fallback = PROVIDERS[0].id; // "mediatel"
@@ -236,6 +272,9 @@ const AdminProviderRanges = () => {
                   <th className="px-4 py-3">Range</th>
                   <th className="px-4 py-3">Operator</th>
                   <th className="px-4 py-3 text-right">Price (BDT)</th>
+                  <th className="px-4 py-3">Stock</th>
+                  <th className="px-4 py-3">Last OTP</th>
+                  <th className="px-4 py-3">Bot</th>
                   <th className="px-4 py-3 text-center">Enabled</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -264,11 +303,64 @@ const AdminProviderRanges = () => {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.operator || "—"}</td>
                     <td className="px-4 py-3 text-right font-mono">{Number(r.price_bdt).toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const st = stats[r.id];
+                        const free = st?.free_count ?? 0;
+                        const alloc = st?.allocated_count ?? 0;
+                        const total = st?.total ?? 0;
+                        return (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className={cn("font-mono px-1.5 py-0.5 rounded border",
+                              free > 0 ? "border-neon-green/30 bg-neon-green/10 text-neon-green"
+                                       : "border-white/10 text-muted-foreground"
+                            )}>{free} free</span>
+                            <span className="text-muted-foreground font-mono">{alloc}/{total}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        {fmtAgo(stats[r.id]?.last_otp_at)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const b = bots[`${r.provider}Bot`];
+                        const st = b?.status || null;
+                        const running = !!st?.running;
+                        const fails = st?.consec_fail ?? 0;
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-medium",
+                              running
+                                ? "border-neon-green/40 bg-neon-green/10 text-neon-green"
+                                : "border-neon-amber/40 bg-neon-amber/10 text-neon-amber"
+                            )}>
+                              {running ? "Running" : "Stopped"}
+                              {fails > 0 && <span className="ml-1 text-destructive">×{fails}</span>}
+                            </span>
+                            <Button size="sm" variant="ghost" onClick={() => restartBot(r.provider)}
+                              className="h-7 w-7 p-0" title="Restart bot">
+                              <RotateCw className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <Switch checked={!!r.enabled} onCheckedChange={() => toggle(r)} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setPoolRangeId(r.id)}
+                          className="h-8 px-2 text-neon-cyan hover:text-neon-cyan hover:bg-neon-cyan/10"
+                          title="Manage number pool">
+                          <Layers className="w-3.5 h-3.5 mr-1" />
+                          Pool
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => startEdit(r)} className="h-8 w-8 p-0">
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
@@ -383,6 +475,14 @@ const AdminProviderRanges = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PoolDialog
+        rangeId={poolRangeId}
+        onClose={() => {
+          setPoolRangeId(null);
+          qc.invalidateQueries({ queryKey: ["provider-ranges-stats"] });
+        }}
+      />
     </div>
   );
 };

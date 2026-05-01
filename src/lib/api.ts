@@ -440,6 +440,40 @@ export const api = {
         method: "POST", body: JSON.stringify({ ids, enabled }),
       }),
 
+    // ─── Range pool numbers (manual MSISDN stock) ────────────────
+    rangesStats: () =>
+      request<{ stats: Record<string, {
+        range_id: number; total: number;
+        free_count: number; allocated_count: number; used_count: number;
+        last_otp_at: number | null; last_allocated_at: number | null;
+        total_otps: number;
+      }> }>("/admin/provider-ranges-stats"),
+    poolList: (rangeId: number, status?: "free" | "allocated" | "used") => {
+      const qs = status ? `?status=${status}` : "";
+      return request<{
+        range: { id: number; provider: string; country_code: string; range_label: string };
+        rows: Array<{
+          id: number; msisdn: string; status: string;
+          allocated_user_id: number | null; allocated_username: string | null;
+          allocated_at: number | null; last_otp_at: number | null;
+          otp_count: number; note: string | null; created_at: number;
+        }>;
+      }>(`/admin/provider-ranges/${rangeId}/pool${qs}`);
+    },
+    poolBulkAdd: (rangeId: number, numbers: string) =>
+      request<{ ok: boolean; added: number; duplicates: number; total_tokens: number }>(
+        `/admin/provider-ranges/${rangeId}/pool/bulk`,
+        { method: "POST", body: JSON.stringify({ numbers }) }
+      ),
+    poolDelete: (id: number, force = false) =>
+      request<{ ok: boolean }>(`/admin/pool-numbers/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
+    poolRelease: (id: number) =>
+      request<{ ok: boolean }>(`/admin/pool-numbers/${id}/release`, { method: "POST" }),
+    poolPurge: (rangeId: number, status: "free" | "used") =>
+      request<{ ok: boolean; removed: number }>(
+        `/admin/provider-ranges/${rangeId}/pool/purge?status=${status}`, { method: "POST" }
+      ),
+
     // ─── Bots Control ─────────────────────────────────────────────
     bots: {
       list: () => request<{ bots: Record<string, BotInfo> }>("/admin/bots"),
