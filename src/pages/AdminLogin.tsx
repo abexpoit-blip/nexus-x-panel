@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, ShieldCheck, Lock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { PlexusBackground } from "@/components/PlexusBackground";
 
 const AdminLogin = () => {
   const [username, setUsername] = useState("");
@@ -35,6 +36,7 @@ const AdminLogin = () => {
 
   return (
     <div className="min-h-screen bg-luxe-mesh relative overflow-hidden flex items-center justify-center px-4 py-10">
+    <PlexusBackground hue={270} />
       <div className="pointer-events-none absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-neon-violet/[0.14] blur-[140px] animate-float-slow" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 w-[640px] h-[640px] rounded-full bg-neon-magenta/[0.12] blur-[140px] animate-float-slow" style={{ animationDelay: "4s" }} />
       <div
