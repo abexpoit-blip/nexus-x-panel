@@ -6,7 +6,14 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
-const db = new Database(process.env.DB_PATH || './data/nexus.db');
+const path = require('path');
+// Resolve DB the same way backend/lib/db.js does, but anchored to the backend folder
+// so this script works regardless of the cwd it's invoked from.
+const DB_PATH = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.resolve(__dirname, '..', 'data', 'nexus.db');
+console.log('[admin-reset] using DB:', DB_PATH);
+const db = new Database(DB_PATH);
 
 const cmd = process.argv[2];
 const arg = process.argv[3];
