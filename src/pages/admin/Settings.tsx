@@ -590,3 +590,119 @@ const AdminSettings = () => {
 };
 
 export default AdminSettings;
+
+// ───────────────────────────────────────────────────────────────────────
+// BotConfigCard — full per-bot config (URL / user / pass / cookie / interval)
+// with live Health Check + Save + Clear cookies. Used in the Bots tab.
+// ───────────────────────────────────────────────────────────────────────
+type BotConfigCardProps = {
+  tone: "cyan" | "magenta";
+  title: string;
+  urlKey: string;
+  url: string; setUrl: (v: string) => void;
+  user: string; setUser: (v: string) => void; userKey: string;
+  pass: string; setPass: (v: string) => void; passKey: string;
+  cookie: string; setCookie: (v: string) => void; cookieKey: string;
+  cookiePlaceholder: string;
+  cookieHint: string;
+  interval: number; setInterval: (v: number) => void; intervalKey: string;
+  showPw: boolean;
+  health?: { ok: boolean; ms: number; error?: string } | "checking";
+  saving: boolean;
+  onSave: () => Promise<void> | void;
+  onHealth: () => void;
+  onClearCookies: () => Promise<void> | void;
+};
+
+function BotConfigCard(p: BotConfigCardProps) {
+  const accent = p.tone === "cyan" ? "text-neon-cyan" : "text-neon-magenta";
+  const accentBg = p.tone === "cyan" ? "bg-neon-cyan/10 border-neon-cyan/20" : "bg-neon-magenta/10 border-neon-magenta/20";
+  const checking = p.health === "checking";
+  const result = typeof p.health === "object" ? p.health : null;
+
+  return (
+    <GlassCard>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-start gap-3">
+          <div className={cn("p-2 rounded-lg border mt-0.5", accentBg)}>
+            <Bot className={cn("w-4 h-4", accent)} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground">{p.title}</h3>
+            <a href={p.url} target="_blank" rel="noreferrer"
+              className="text-xs text-neon-cyan hover:underline inline-flex items-center gap-1 mt-0.5">
+              {p.url || "—"} <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+
+        {/* Health pill */}
+        {result && (
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border",
+            result.ok
+              ? "bg-neon-green/10 border-neon-green/30 text-neon-green"
+              : "bg-destructive/10 border-destructive/30 text-destructive",
+          )}>
+            {result.ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+            {result.ok ? `Login OK · ${result.ms}ms` : (result.error || "Failed")}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Login URL</Label>
+          <Input value={p.url} onChange={(e) => p.setUrl(e.target.value)}
+            placeholder="https://example.com/portal"
+            className="bg-white/[0.04] border-white/[0.1] font-mono text-xs" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Username</Label>
+            <Input value={p.user} onChange={(e) => p.setUser(e.target.value)}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Password</Label>
+            <Input type={p.showPw ? "text" : "password"} value={p.pass}
+              onChange={(e) => p.setPass(e.target.value)}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Poll interval (sec)</Label>
+            <Input type="number" min={3} max={120} value={p.interval}
+              onChange={(e) => p.setInterval(Math.max(3, Math.min(120, +e.target.value || 0)))}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5"><Cookie className="w-3 h-3" /> Manual Cookie header</Label>
+          <Textarea value={p.cookie} onChange={(e) => p.setCookie(e.target.value)}
+            placeholder={p.cookiePlaceholder}
+            className="bg-white/[0.04] border-white/[0.1] min-h-20 font-mono text-xs" />
+          <p className="text-[11px] text-muted-foreground">{p.cookieHint}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        <Button onClick={() => p.onSave()} disabled={p.saving}
+          className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+          {p.saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+          Save all
+        </Button>
+        <Button variant="outline" onClick={p.onHealth} disabled={checking}
+          className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10">
+          {checking ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <HeartPulse className="w-4 h-4 mr-1.5" />}
+          {checking ? "Checking…" : "Health Check"}
+        </Button>
+        <Button variant="outline" onClick={() => p.onClearCookies()}
+          className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10 ml-auto">
+          <Cookie className="w-4 h-4 mr-1.5" /> Clear saved cookies
+        </Button>
+      </div>
+    </GlassCard>
+  );
+}
