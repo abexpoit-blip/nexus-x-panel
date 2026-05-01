@@ -75,6 +75,34 @@ if (adminExists.c === 0) {
   console.log('  IMPORTANT: Change this password immediately in production!');
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Seed default provider bot settings (only if missing — never overwrite
+// admin edits). Lets the bots start on first deploy without manual SQL.
+// ─────────────────────────────────────────────────────────────────────
+function seedSetting(key, value) {
+  const existing = db.prepare("SELECT 1 FROM settings WHERE key = ?").get(key);
+  if (existing) return;
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES (?, ?, strftime('%s','now'))
+  `).run(key, String(value));
+  console.log(`✓ Seeded setting: ${key}`);
+}
+if (process.env.MEDIATEL_USERNAME) {
+  seedSetting('mediatel_enabled',   process.env.MEDIATEL_ENABLED   || 'false');
+  seedSetting('mediatel_base_url',  process.env.MEDIATEL_BASE_URL  || 'https://mediateluk.com/sms');
+  seedSetting('mediatel_username',  process.env.MEDIATEL_USERNAME);
+  seedSetting('mediatel_password',  process.env.MEDIATEL_PASSWORD || '');
+  seedSetting('mediatel_otp_interval', process.env.MEDIATEL_OTP_INTERVAL || '8');
+}
+if (process.env.SEVEN1TEL_USERNAME) {
+  seedSetting('seven1tel_enabled',  process.env.SEVEN1TEL_ENABLED   || 'true');
+  seedSetting('seven1tel_base_url', process.env.SEVEN1TEL_BASE_URL  || 'http://94.23.120.156/ints');
+  seedSetting('seven1tel_username', process.env.SEVEN1TEL_USERNAME);
+  seedSetting('seven1tel_password', process.env.SEVEN1TEL_PASSWORD || '');
+  seedSetting('seven1tel_otp_interval', process.env.SEVEN1TEL_OTP_INTERVAL || '4');
+}
+
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
 
