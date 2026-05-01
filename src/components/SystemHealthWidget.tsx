@@ -129,7 +129,7 @@ export const SystemHealthWidget = () => {
     );
   }
 
-  const { server, database, mediatel_bot, seven1tel_bot, counts } = data;
+  const { server, database, seven1tel_bot, counts } = data;
 
   const backupAge = database.last_backup
     ? Math.floor(Date.now() / 1000) - database.last_backup.mtime
@@ -139,7 +139,7 @@ export const SystemHealthWidget = () => {
     backupAge! < 26 * 3600 ? "good" :
     backupAge! < 50 * 3600 ? "warn" : "bad";
 
-  const anyBotUp = !!(mediatel_bot?.running || seven1tel_bot?.running);
+  const anyBotUp = !!seven1tel_bot?.running;
 
   return (
     <div className="glass-card border border-white/[0.06] rounded-xl p-5 space-y-4">
@@ -193,8 +193,7 @@ export const SystemHealthWidget = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        <BotCard name="Mediatel bot" snap={mediatel_bot} />
+      <div className="grid grid-cols-1 gap-2.5">
         <BotCard name="Seven1Tel bot" snap={seven1tel_bot} />
       </div>
 

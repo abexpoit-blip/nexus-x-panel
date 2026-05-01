@@ -7,7 +7,7 @@ const { logFromReq } = require('../lib/audit');
 
 const router = express.Router();
 
-const ALLOWED_PROVIDERS = ['mediatel', 'seven1tel'];
+const ALLOWED_PROVIDERS = ['seven1tel'];
 
 function validate(body, partial = false) {
   const out = {};

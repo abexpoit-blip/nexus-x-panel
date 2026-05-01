@@ -159,7 +159,7 @@ router.get('/summary', authRequired, (req, res) => {
 
 // =============================================================
 // Helper: when an OTP is confirmed, write CDR + credit agent.
-// Used by mediatelBot (and any future provider workers).
+// Used by provider bots (seven1telBot, etc.).
 // =============================================================
 async function markOtpReceived(allocation, otpCode, cli = null) {
   const { agent_amount } = agentPayout({

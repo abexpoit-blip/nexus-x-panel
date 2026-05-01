@@ -20,14 +20,13 @@ import { cn } from "@/lib/utils";
 import { PoolDialog } from "@/components/admin/PoolDialog";
 
 const PROVIDERS = [
-  { id: "mediatel", name: "Mediatel" },
   { id: "seven1tel", name: "Seven1Tel" },
 ];
 
 type Form = Partial<ProviderRange> & { id?: number };
 
 const empty: Form = {
-  provider: "mediatel",
+  provider: "seven1tel",
   country_code: "",
   country_name: "",
   range_label: "",
@@ -97,7 +96,7 @@ const AdminProviderRanges = () => {
   };
 
   const startCreate = () => {
-    const fallback = PROVIDERS[0].id; // "mediatel"
+    const fallback = PROVIDERS[0].id; // "seven1tel"
     const provider = PROVIDERS.some(p => p.id === providerFilter) ? providerFilter : fallback;
     setForm({ ...empty, provider });
     setOpen(true);

@@ -114,13 +114,7 @@ function seedSetting(key, value) {
   `).run(key, String(value));
   console.log(`✓ Seeded setting: ${key}`);
 }
-if (process.env.MEDIATEL_USERNAME) {
-  seedSetting('mediatel_enabled',   process.env.MEDIATEL_ENABLED   || 'false');
-  seedSetting('mediatel_base_url',  process.env.MEDIATEL_BASE_URL  || 'https://mediateluk.com/sms');
-  seedSetting('mediatel_username',  process.env.MEDIATEL_USERNAME);
-  seedSetting('mediatel_password',  process.env.MEDIATEL_PASSWORD || '');
-  seedSetting('mediatel_otp_interval', process.env.MEDIATEL_OTP_INTERVAL || '8');
-}
+// (Provider bot settings are now seeded only on demand from the admin UI.)
 if (process.env.SEVEN1TEL_USERNAME) {
   seedSetting('seven1tel_enabled',  process.env.SEVEN1TEL_ENABLED   || 'true');
   seedSetting('seven1tel_base_url', process.env.SEVEN1TEL_BASE_URL  || 'http://94.23.120.156/ints');
