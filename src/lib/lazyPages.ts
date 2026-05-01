@@ -12,7 +12,6 @@ const make = <T extends Loader>(loader: T) => {
 export const Pages = {
   // Agent
   "/agent/dashboard":   make(() => import("@/pages/agent/Dashboard")),
-  "/agent/get-number":  make(() => import("@/pages/agent/GetNumber")),
   "/agent/console":     make(() => import("@/pages/agent/Console")),
   "/agent/my-numbers":  make(() => import("@/pages/agent/MyNumbers")),
   "/agent/history":     make(() => import("@/pages/agent/History")),
