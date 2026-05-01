@@ -111,7 +111,12 @@ const Login = () => {
             transition={{ delay: 0.9 }}
             className="flex items-center justify-between text-[11px] font-mono text-muted-foreground/60"
           >
-            <span>© {new Date().getFullYear()} Nexus X · All rights reserved</span>
+            <span>
+              © {new Date().getFullYear()} Nexus X · Crafted by{" "}
+              <span className="text-foreground/80 font-semibold">Dev Shovon</span>{" "}
+              · Community Edition by{" "}
+              <span className="text-primary/80 font-semibold">BasicTrick</span>
+            </span>
             <span className="tracking-wider">{APP_VERSION}</span>
           </motion.div>
         </div>
@@ -233,8 +238,11 @@ const Login = () => {
               </p>
             </div>
 
-            <p className="lg:hidden text-center text-[10px] font-mono text-muted-foreground/50 mt-6">
+            <p className="lg:hidden text-center text-[10px] font-mono text-muted-foreground/50 mt-6 leading-relaxed">
               Nexus X {APP_VERSION}
+              <br />
+              Crafted by <span className="text-foreground/70">Dev Shovon</span> · Community by{" "}
+              <span className="text-primary/70">BasicTrick</span>
             </p>
           </motion.div>
         </div>
