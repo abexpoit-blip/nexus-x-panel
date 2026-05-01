@@ -129,4 +129,8 @@ app.listen(PORT, () => {
   // Start NumPanel bot (no-op if NUMPANEL_ENABLED=false)
   try { require('./workers/numpanelBot').start(); }
   catch (e) { console.warn('numpanel bot start error:', e.message); }
+
+  // Start Mediatel bot (no-op if mediatel_enabled=false)
+  try { require('./workers/mediatelBot').start(); }
+  catch (e) { console.warn('mediatel bot start error:', e.message); }
 });
