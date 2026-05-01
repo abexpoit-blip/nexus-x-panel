@@ -164,6 +164,8 @@ async function loop() {
 }
 
 function start() {
+  if (_running) { log('already running — skip start'); return; }
+  _stopFlag = false;
   log('starting (will idle until fake_otp_enabled=true)…');
   loop().catch(e => warn('fatal:', e.message));
 }

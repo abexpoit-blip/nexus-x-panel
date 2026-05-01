@@ -309,6 +309,8 @@ async function loop() {
 function start() {
   const cfg = resolveCfg();
   if (!cfg.ENABLED) { log('disabled (seven1tel_enabled=false) — not starting'); return; }
+  if (_running) { log('already running — skip start'); return; }
+  _stopFlag = false;
   log('starting…  base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's');
   loop().catch(e => warn('fatal:', e.message));
 }
