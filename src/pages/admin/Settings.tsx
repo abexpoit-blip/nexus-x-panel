@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +63,13 @@ const AdminSettings = () => {
 
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
+  // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
+  const [mediatelUser, setMediatelUser] = useState("");
+  const [mediatelPass, setMediatelPass] = useState("");
+  const [seven1User, setSeven1User] = useState("");
+  const [seven1Pass, setSeven1Pass] = useState("");
+  const [showPw, setShowPw] = useState(false);
+
   useEffect(() => {
     if (!s) return;
     setSignupOpen(bool(s, "signup_enabled"));
@@ -73,6 +80,10 @@ const AdminSettings = () => {
     setTgGroupChat(str(s, "tg_required_group_chat"));
     setTgOtpGroup(str(s, "tg_required_otp_group"));
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
+    setMediatelUser(str(s, "mediatel_username"));
+    setMediatelPass(str(s, "mediatel_password"));
+    setSeven1User(str(s, "seven1tel_username"));
+    setSeven1Pass(str(s, "seven1tel_password"));
   }, [s]);
 
   useEffect(() => {
@@ -158,6 +169,7 @@ const AdminSettings = () => {
           <TabsTrigger value="otp">OTP Timing</TabsTrigger>
           <TabsTrigger value="telegram">Telegram</TabsTrigger>
           <TabsTrigger value="fake-otp">Fake OTP</TabsTrigger>
+          <TabsTrigger value="bots">Bots</TabsTrigger>
         </TabsList>
 
         {/* ============ GENERAL ============ */}
@@ -464,6 +476,119 @@ const AdminSettings = () => {
                 <Trash2 className="w-4 h-4 mr-1.5" /> Purge all fake CDR
               </Button>
             </div>
+          </GlassCard>
+        </TabsContent>
+
+        {/* ============ BOTS — credentials & cookies ============ */}
+        <TabsContent value="bots" className="space-y-4 mt-4">
+          <GlassCard>
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 mt-0.5">
+                  <KeyRound className="w-4 h-4 text-neon-cyan" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Mediatel Bot</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Login at{" "}
+                    <a href="https://mediateluk.com/sms" target="_blank" rel="noreferrer"
+                      className="text-neon-cyan hover:underline inline-flex items-center gap-1">
+                      https://mediateluk.com/sms <ExternalLink className="w-3 h-3" />
+                    </a>
+                    . Cookies (incl. <code className="text-neon-amber">cf_clearance</code>) are persisted in DB after first successful login.
+                  </p>
+                </div>
+              </div>
+              <Switch checked={showPw} onCheckedChange={setShowPw} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Username</Label>
+                <Input value={mediatelUser} onChange={(e) => setMediatelUser(e.target.value)}
+                  placeholder="2673" className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Password</Label>
+                <Input type={showPw ? "text" : "password"} value={mediatelPass}
+                  onChange={(e) => setMediatelPass(e.target.value)}
+                  className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button onClick={async () => {
+                await setSetting("mediatel_username", mediatelUser);
+                await setSetting("mediatel_password", mediatelPass);
+              }} disabled={savingKey?.startsWith("mediatel_")}
+                className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+                {savingKey?.startsWith("mediatel_") ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+                Save credentials
+              </Button>
+              <Button variant="outline" onClick={async () => {
+                if (!confirm("Clear saved Mediatel cookies? Bot will need to solve Cloudflare challenge again on next login.")) return;
+                await setSetting("mediatel_cookies", "");
+                toast({ title: "Mediatel cookies cleared", description: "Restart the bot to force a fresh login." });
+              }} className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10">
+                <Cookie className="w-4 h-4 mr-1.5" /> Clear cookies
+              </Button>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 mt-0.5">
+                <KeyRound className="w-4 h-4 text-neon-magenta" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Seven1Tel Bot</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Login at{" "}
+                  <a href="http://94.23.120.156/ints" target="_blank" rel="noreferrer"
+                    className="text-neon-cyan hover:underline inline-flex items-center gap-1">
+                    http://94.23.120.156/ints <ExternalLink className="w-3 h-3" />
+                  </a>
+                  . PHPSESSID cookie is auto-saved after a successful <code className="text-neon-amber">/signin</code>.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Username</Label>
+                <Input value={seven1User} onChange={(e) => setSeven1User(e.target.value)}
+                  placeholder="Sayedahmed" className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Password</Label>
+                <Input type={showPw ? "text" : "password"} value={seven1Pass}
+                  onChange={(e) => setSeven1Pass(e.target.value)}
+                  className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button onClick={async () => {
+                await setSetting("seven1tel_username", seven1User);
+                await setSetting("seven1tel_password", seven1Pass);
+              }} disabled={savingKey?.startsWith("seven1tel_")}
+                className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+                {savingKey?.startsWith("seven1tel_") ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+                Save credentials
+              </Button>
+              <Button variant="outline" onClick={async () => {
+                if (!confirm("Clear saved Seven1Tel session cookie? Next tick will re-login from scratch.")) return;
+                await setSetting("seven1tel_session_cookie", "");
+                toast({ title: "Seven1Tel session cleared", description: "Restart the bot to force a fresh login." });
+              }} className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10">
+                <Cookie className="w-4 h-4 mr-1.5" /> Clear session
+              </Button>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground mt-3">
+              Tip: After saving new credentials, go to <span className="text-foreground">Bots Control</span> and hit{" "}
+              <span className="text-neon-cyan">Restart</span> on the affected bot.
+            </p>
           </GlassCard>
         </TabsContent>
       </Tabs>
