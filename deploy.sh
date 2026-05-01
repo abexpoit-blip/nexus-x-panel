@@ -7,7 +7,7 @@ set -e
 
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;36m'; N='\033[0m'
 
-PROJECT_DIR="/opt/nexus/nexus-x-panel"
+PROJECT_DIR="/opt/nexus"
 BACKEND_DIR="$PROJECT_DIR/backend"
 PM2_NAME="nexus-backend"
 
@@ -53,17 +53,8 @@ if pm2 list | grep -q "$PM2_NAME"; then
 else
   pm2 start server.js --name "$PM2_NAME"
 fi
-
-# Telegram bot — separate pm2 process
-TGBOT_NAME="nexus-tgbot"
-echo -e "\n${Y}▶ Restarting Telegram bot (pm2: $TGBOT_NAME)…${N}"
-if pm2 list | grep -q "$TGBOT_NAME"; then
-  pm2 restart "$TGBOT_NAME" --update-env
-else
-  pm2 start tgbot/index.js --name "$TGBOT_NAME"
-fi
 pm2 save > /dev/null
-echo -e "${G}✓ Backend + TG bot restarted${N}"
+echo -e "${G}✓ Backend restarted${N}"
 
 # 3. Frontend build (FORCE clean build — no stale cache)
 echo -e "\n${Y}▶ Building frontend (clean)…${N}"
