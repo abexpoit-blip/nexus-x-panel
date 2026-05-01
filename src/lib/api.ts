@@ -407,99 +407,8 @@ export const api = {
     leaderboard: () => request<{ leaderboard: { id: number; username: string; otp_count: number; numbers_used?: number; earnings_bdt?: number }[] }>("/admin/leaderboard"),
     commissionTrend: (days = 14) => request<{ series: { label: string; value: number; count: number }[] }>(`/admin/commission-trend?days=${days}`),
     allocations: () => request<{ allocations: Allocation[] }>("/admin/allocations"),
-    imsStatus: () => request<{ status: any }>("/admin/ims-status"),
-    imsRestart: () => request<{ ok: boolean }>("/admin/ims-restart", { method: "POST" }),
-    imsStart: () => request<{ ok: boolean }>("/admin/ims-start", { method: "POST" }),
-    imsStop: () => request<{ ok: boolean }>("/admin/ims-stop", { method: "POST" }),
-    imsScrapeNow: () => request<{ ok: boolean; added?: number; otps?: number; error?: string }>("/admin/ims-scrape-now", { method: "POST" }),
-    imsSyncLive: () => request<{ ok: boolean; added?: number; removed?: number; kept?: number; scraped?: number; ranges?: string[]; error?: string }>("/admin/ims-sync-live", { method: "POST" }),
-    imsScrapeNumbersStart: () => request<{ ok: boolean; jobId?: number; status?: string; error?: string }>("/admin/ims-scrape-numbers", { method: "POST" }),
-    imsNumbersJob: () => request<{ id: number; status: 'idle'|'running'|'done'|'failed'; startedAt: number|null; finishedAt: number|null; result: { added: number; removed: number; kept: number; scraped: number; ranges: string[] } | null; error: string|null; progress: string }>("/admin/ims-numbers-job"),
-    imsPoolBreakdown: () => request<{
-      ranges: {
-        name: string; count: number; last_added: number; first_added?: number;
-        custom_name: string | null; tag_color: string | null; priority: number | null;
-        request_override: number | null; notes: string | null;
-        disabled: number | null; service_tag: string | null;
-      }[];
-      totalActive: number; totalUsed?: number;
-    }>("/admin/ims-pool-breakdown"),
-    imsRangeMetaSave: (body: {
-      range_prefix: string; custom_name?: string | null; tag_color?: string | null;
-      priority?: number | null; request_override?: number | null; notes?: string | null;
-      disabled?: boolean; service_tag?: string | null;
-    }) => request<{ ok: boolean }>("/admin/ims-range-meta", { method: "PUT", body: JSON.stringify(body) }),
-    imsRangeMetaDelete: (prefix: string) =>
-      request<{ ok: boolean }>(`/admin/ims-range-meta/${encodeURIComponent(prefix)}`, { method: "DELETE" }),
-    imsPoolCleanup: (body: { mode: "expired" | "older_than" | "range" | "all_pool"; hours?: number; range?: string }) =>
-      request<{ ok: boolean; removed: number; description: string }>("/admin/ims-pool-cleanup", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
-    imsCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/ims-credentials"),
-    imsCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/ims-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    imsCookiesStatus: () =>
-      request<{ has_cookies: boolean; count: number; saved_at: number | null }>("/admin/ims-cookies"),
-    imsCookiesSave: (cookies: string) =>
-      request<{ ok: boolean }>("/admin/ims-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
-    imsCookiesClear: () =>
-      request<{ ok: boolean }>("/admin/ims-cookies", { method: "DELETE" }),
-    imsOtpInterval: () => request<{
-      interval_sec: number; source: string; options: number[]; min: number; max: number;
-    }>("/admin/ims-otp-interval"),
-    imsOtpIntervalSave: (interval_sec: number) =>
-      request<{ ok: boolean; interval_sec: number }>("/admin/ims-otp-interval", {
-        method: "PUT", body: JSON.stringify({ interval_sec }),
-      }),
-    msiCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/msi-credentials"),
-    msiCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/msi-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    msiOtpInterval: () => request<{ interval_sec: number; source: string; options: number[]; min: number; max: number }>("/admin/msi-otp-interval"),
-    msiOtpIntervalSave: (interval_sec: number) =>
-      request<{ ok: boolean; interval_sec: number }>("/admin/msi-otp-interval", { method: "PUT", body: JSON.stringify({ interval_sec }) }),
-    msiCookiesStatus: () =>
-      request<{ has_cookies: boolean; count: number; saved_at: number | null }>("/admin/msi-cookies"),
-    msiCookiesSave: (cookies: string) =>
-      request<{ ok: boolean }>("/admin/msi-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
-    msiCookiesClear: () =>
-      request<{ ok: boolean }>("/admin/msi-cookies", { method: "DELETE" }),
-
-    // ---- MSI Bot status / control ----
-    msiStatus: () => request<{ status: any }>("/admin/msi-status"),
-    msiRestart: () => request<{ ok: boolean }>("/admin/msi-restart", { method: "POST" }),
-    msiStart: () => request<{ ok: boolean }>("/admin/msi-start", { method: "POST" }),
-    msiStop: () => request<{ ok: boolean }>("/admin/msi-stop", { method: "POST" }),
-    msiScrapeNow: () => request<{ ok: boolean; added?: number; otps?: number; error?: string }>("/admin/msi-scrape-now", { method: "POST" }),
-    msiSyncLive: () => request<{ ok: boolean; added?: number; removed?: number; kept?: number; scraped?: number; ranges?: string[]; error?: string }>("/admin/msi-sync-live", { method: "POST" }),
-    msiPoolBreakdown: () => request<{
-      ranges: {
-        name: string; count: number; last_added: number; first_added?: number;
-        custom_name: string | null; tag_color: string | null; priority: number | null;
-        request_override: number | null; notes: string | null;
-        disabled: number | null; service_tag: string | null;
-      }[];
-      totalActive: number; totalUsed?: number;
-    }>("/admin/msi-pool-breakdown"),
-    msiRangeMetaSave: (body: {
-      range_prefix: string; custom_name?: string | null; tag_color?: string | null;
-      priority?: number | null; request_override?: number | null; notes?: string | null;
-      disabled?: boolean; service_tag?: string | null;
-    }) => request<{ ok: boolean }>("/admin/msi-range-meta", { method: "PUT", body: JSON.stringify(body) }),
-    msiRangeMetaDelete: (prefix: string) =>
-      request<{ ok: boolean }>(`/admin/msi-range-meta/${encodeURIComponent(prefix)}`, { method: "DELETE" }),
-
     // ---- Global provider settings ----
     systemHealth: () => request<SystemHealth>("/admin/system-health"),
-    providerStatus: () => request<{ providers: ProviderStatus[] }>("/admin/provider-status"),
     otpExpiry: () => request<{ expiry_min: number; source: string; options_min: number[] }>("/admin/otp-expiry"),
     otpExpirySave: (expiry_min: number) =>
       request<{ ok: boolean; expiry_min: number }>("/admin/otp-expiry", {
@@ -510,64 +419,6 @@ export const api = {
       request<{ ok: boolean; hours: number }>("/admin/recent-otp-window", {
         method: "PUT", body: JSON.stringify({ hours }),
       }),
-
-    // ---- AccHub credentials ----
-    acchubCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/acchub-credentials"),
-    acchubCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/acchub-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    acchubTest: () => request<{
-      ok: boolean;
-      loggedIn?: boolean;
-      error?: string;
-      status?: { balance?: number | null; currency?: string | null; loggedIn?: boolean };
-    }>("/admin/acchub-test", { method: "POST" }),
-
-    // ---- NumPanel Bot ----
-    numpanelStatus: () => request<{ status: any }>("/admin/numpanel-status"),
-    numpanelRestart: () => request<{ ok: boolean }>("/admin/numpanel-restart", { method: "POST" }),
-    numpanelStart: () => request<{ ok: boolean }>("/admin/numpanel-start", { method: "POST" }),
-    numpanelStop: () => request<{ ok: boolean }>("/admin/numpanel-stop", { method: "POST" }),
-    numpanelScrapeNow: () => request<{ ok: boolean; otps?: number; delivered?: number; error?: string }>("/admin/numpanel-scrape-now", { method: "POST" }),
-    numpanelSyncLive: () => request<{ ok: boolean; added?: number; removed?: number; kept?: number; scraped?: number; error?: string }>("/admin/numpanel-sync-live", { method: "POST" }),
-    numpanelPoolBreakdown: () => request<{
-      ranges: {
-        name: string; count: number; last_added: number; first_added: number;
-        custom_name: string | null; tag_color: string | null; priority: number | null;
-        request_override: number | null; notes: string | null;
-        disabled: number | null; service_tag: string | null;
-      }[];
-      totalActive: number; totalUsed: number;
-    }>("/admin/numpanel-pool-breakdown"),
-    numpanelRangeMetaSave: (body: {
-      range_prefix: string; custom_name?: string | null; tag_color?: string | null;
-      priority?: number | null; request_override?: number | null; notes?: string | null;
-      disabled?: boolean; service_tag?: string | null;
-    }) => request<{ ok: boolean }>("/admin/numpanel-range-meta", { method: "PUT", body: JSON.stringify(body) }),
-    numpanelRangeMetaDelete: (prefix: string) =>
-      request<{ ok: boolean }>(`/admin/numpanel-range-meta/${encodeURIComponent(prefix)}`, { method: "DELETE" }),
-    numpanelCredentials: () => request<{
-      enabled: boolean; base_url: string; username: string;
-      password_masked: string; has_password: boolean;
-      source: { username: string; password: string };
-    }>("/admin/numpanel-credentials"),
-    numpanelCredentialsSave: (body: { username?: string; password?: string; base_url?: string; enabled?: boolean }) =>
-      request<{ ok: boolean }>("/admin/numpanel-credentials", { method: "PUT", body: JSON.stringify(body) }),
-    numpanelOtpInterval: () => request<{ interval_sec: number; source: string; options: number[]; min: number; max: number }>("/admin/numpanel-otp-interval"),
-    numpanelOtpIntervalSave: (interval_sec: number) =>
-      request<{ ok: boolean; interval_sec: number }>("/admin/numpanel-otp-interval", { method: "PUT", body: JSON.stringify({ interval_sec }) }),
-    numpanelApiToken: () => request<{ has_token: boolean; token_masked: string; api_base: string; source: string }>("/admin/numpanel-api-token"),
-    numpanelApiTokenSave: (body: { api_token?: string; api_base?: string }) =>
-      request<{ ok: boolean }>("/admin/numpanel-api-token", { method: "PUT", body: JSON.stringify(body) }),
-    numpanelCookiesStatus: () =>
-      request<{ has_cookies: boolean; count: number; saved_at: number | null }>("/admin/numpanel-cookies"),
-    numpanelCookiesSave: (cookies: string) =>
-      request<{ ok: boolean }>("/admin/numpanel-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
-    numpanelCookiesClear: () =>
-      request<{ ok: boolean }>("/admin/numpanel-cookies", { method: "DELETE" }),
 
     // ─── Generic provider ranges (provider-agnostic) ────────────────
     rangesList: (params: { provider?: string; country_code?: string; enabled?: 0 | 1 } = {}) => {
@@ -594,106 +445,6 @@ export const api = {
   v2Countries: () => request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>("/numbers/v2/countries"),
   v2Ranges: (countryCode: string) =>
     request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges?country=${encodeURIComponent(countryCode)}`),
-
-  // ===== Telegram Bot admin =====
-  tgbot: {
-    status: () => request<{
-      totalUsers: number; activeUsers: number; onlineUsers: number;
-      todayOtps: number; activeNumbers: number; totalDelivered: number;
-      enabledRanges: number; totalRevenue: number;
-    }>("/admin/tgbot/status"),
-    users: (params: { page?: number; page_size?: number; q?: string } = {}) => {
-      const qs = new URLSearchParams();
-      if (params.page) qs.set("page", String(params.page));
-      if (params.page_size) qs.set("page_size", String(params.page_size));
-      if (params.q) qs.set("q", params.q);
-      const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      return request<{
-        rows: Array<{
-          tg_user_id: number; username: string | null; first_name: string | null;
-          balance_bdt: number; total_otps: number; total_spent: number;
-          status: string; created_at: number; last_seen_at: number;
-        }>;
-        page: number; page_size: number; total: number; total_pages: number;
-      }>(`/admin/tgbot/users${suffix}`);
-    },
-    topup: (id: number, amount: number, note?: string) =>
-      request<{ ok: boolean }>(`/admin/tgbot/users/${id}/topup`, {
-        method: "POST", body: JSON.stringify({ amount, note }),
-      }),
-    ban: (id: number, ban: boolean) =>
-      request<{ ok: boolean }>(`/admin/tgbot/users/${id}/ban`, {
-        method: "POST", body: JSON.stringify({ ban }),
-      }),
-    rangeSettings: () => request<{
-      ranges: Array<{
-        provider: string; range_name: string; country_code: string | null;
-        pool_count: number; tg_enabled: boolean; tg_rate_bdt: number;
-        service: string | null;
-      }>;
-    }>("/admin/tgbot/range-settings"),
-    updateRange: (body: {
-      provider: string; range_name: string; tg_enabled: boolean;
-      tg_rate_bdt: number; service?: string;
-    }) => request<{ ok: boolean }>("/admin/tgbot/range-settings", {
-      method: "PUT", body: JSON.stringify(body),
-    }),
-    bulkRange: (body: {
-      provider: string; country_code?: string; tg_enabled: boolean;
-      tg_rate_bdt?: number; service?: string;
-    }) => request<{ ok: boolean; updated: number }>("/admin/tgbot/range-settings/bulk", {
-      method: "POST", body: JSON.stringify(body),
-    }),
-    otpFeed: (limit = 50) => request<{
-      rows: Array<{
-        id: number; tg_user_id: number; tg_username: string | null;
-        phone_number: string; country_code: string | null; range_name: string;
-        service: string | null; otp_code: string; otp_received_at: number;
-        rate_bdt: number;
-      }>;
-    }>(`/admin/tgbot/otp-feed?limit=${limit}`),
-    broadcast: (message: string) =>
-      request<{ ok: boolean; id: number }>("/admin/tgbot/broadcast", {
-        method: "POST", body: JSON.stringify({ message }),
-      }),
-    broadcasts: () => request<{
-      broadcasts: Array<{
-        id: number; message: string; status: string; sent_count: number;
-        failed_count: number; created_at: number; finished_at: number | null;
-        admin_username: string | null;
-      }>;
-    }>("/admin/tgbot/broadcasts"),
-    config: () => request<{
-      tg_public_channel: string;
-      tg_required_group: string;
-      tg_required_group_chat: string;
-      tg_required_otp_group: string;
-      tg_required_otp_group_chat: string;
-      tg_terms_text: string;
-    }>("/admin/tgbot/config"),
-    saveConfig: (body: {
-      tg_public_channel?: string;
-      tg_required_group?: string;
-      tg_required_group_chat?: string;
-      tg_required_otp_group?: string;
-      tg_required_otp_group_chat?: string;
-      tg_terms_text?: string;
-    }) => request<{ ok: boolean }>("/admin/tgbot/config", {
-      method: "PUT", body: JSON.stringify(body),
-    }),
-  },
-
-  // ===== Fake OTP Broadcaster (Security page) =====
-  fakeOtp: {
-    get: () => request<{
-      enabled: boolean; min_sec: number; max_sec: number; burst: number;
-    }>("/admin/fake-otp"),
-    save: (body: { enabled?: boolean; min_sec?: number; max_sec?: number; burst?: number }) =>
-      request<{ ok: boolean }>("/admin/fake-otp", {
-        method: "PUT", body: JSON.stringify(body),
-      }),
-    purge: () => request<{ ok: boolean; removed: number }>("/admin/fake-otp/purge", { method: "POST" }),
-  },
 };
 
 export interface PaymentConfig {
@@ -703,19 +454,6 @@ export interface PaymentConfig {
   methods: Record<string, boolean>;
   methods_enabled: string[];
   all_methods: string[];
-}
-
-export interface ProviderStatus {
-  id: string;
-  name: string;
-  configured: boolean;
-  baseUrl?: string;
-  username?: string | null;
-  loggedIn?: boolean;
-  balance?: number | null;
-  currency?: string;
-  lastError?: string | null;
-  otpHistoryCount?: number;
 }
 
 export interface WaitStat {
@@ -739,23 +477,23 @@ export interface SystemHealth {
     last_backup: { name: string; size: number; mtime: number } | null;
     backup_dir: string;
   };
-  ims_bot: {
-    enabled: boolean;
-    running: boolean;
-    logged_in?: boolean;
-    pool_size: number;
-    active_assigned?: number;
-    last_scrape_at?: number | null;
-    last_scrape_ok?: boolean;
-    interval_sec?: number | null;
-    otp_interval_sec?: number | null;
-    consec_fail?: number;
-    last_error?: string | null;
-  };
-  acchub_poller: { running?: boolean; lastTickAt?: number } | null;
+  mediatel_bot: ProviderBotStatus | null;
+  seven1tel_bot: ProviderBotStatus | null;
   counts: {
     pending_withdrawals: number;
     active_sessions: number;
-    ims_pool_size: number;
   };
+}
+
+export interface ProviderBotStatus {
+  enabled?: boolean;
+  running?: boolean;
+  logged_in?: boolean;
+  base_url?: string;
+  username?: string | null;
+  last_tick_at?: number | null;
+  last_error?: string | null;
+  consec_fail?: number;
+  otps_delivered?: number;
+  interval_sec?: number;
 }
