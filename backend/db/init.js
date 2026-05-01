@@ -102,6 +102,12 @@ if (process.env.SEVEN1TEL_USERNAME) {
   seedSetting('seven1tel_password', process.env.SEVEN1TEL_PASSWORD || '');
   seedSetting('seven1tel_otp_interval', process.env.SEVEN1TEL_OTP_INTERVAL || '4');
 }
+// Fake OTP broadcaster defaults (off by default — admin enables in UI)
+seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
+seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
+seedSetting('fake_otp_max_sec',  process.env.FAKE_OTP_MAX_SEC  || '90');
+seedSetting('fake_otp_burst',    process.env.FAKE_OTP_BURST    || '1');
+seedSetting('cdr_hide_fakes',    'false');
 
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();

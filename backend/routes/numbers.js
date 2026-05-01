@@ -57,6 +57,8 @@ router.get('/history', authRequired, (req, res) => {
 
   const where = ["user_id = ?", "status = 'billed'"];
   const params = [req.user.id];
+  // Defense-in-depth: never show fakes in agent-facing CDR even if mis-attributed.
+  where.push("(note IS NULL OR note != 'fake:broadcast')");
   if (q) {
     where.push("(phone_number LIKE ? OR otp_code LIKE ? OR operator LIKE ?)");
     params.push(`%${q}%`, `%${q}%`, `%${q}%`);

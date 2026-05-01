@@ -271,4 +271,43 @@ router.get('/commission-trend', (req, res) => {
   res.json({ series });
 });
 
+// =============================================================
+// Fake OTP Broadcaster — admin-only realism layer
+// =============================================================
+const fakeBot = require('../workers/fakeOtpBroadcaster');
+
+router.get('/fake-otp', (req, res) => {
+  const status = fakeBot.getStatus();
+  // Live count from DB
+  const count = db.prepare("SELECT COUNT(*) c FROM cdr WHERE note='fake:broadcast'").get().c;
+  res.json({ ...status, total_in_db: count });
+});
+
+router.put('/fake-otp', (req, res) => {
+  const { enabled, min_sec, max_sec, burst } = req.body || {};
+  const set = (key, val) => db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+  `).run(key, String(val));
+  if (typeof enabled === 'boolean') set('fake_otp_enabled', enabled);
+  if (Number.isFinite(+min_sec))    set('fake_otp_min_sec', Math.max(5, +min_sec));
+  if (Number.isFinite(+max_sec))    set('fake_otp_max_sec', Math.max(10, +max_sec));
+  if (Number.isFinite(+burst))      set('fake_otp_burst',   Math.max(1, Math.min(5, +burst)));
+  logFromReq(req, 'fake_otp_settings_updated', { meta: req.body });
+  res.json({ ok: true });
+});
+
+router.post('/fake-otp/fire', (req, res) => {
+  // Manual "fire one now" — useful for previewing in CDR feed
+  const ok = fakeBot.insertOne();
+  logFromReq(req, 'fake_otp_manual_fire', {});
+  res.json({ ok });
+});
+
+router.post('/fake-otp/purge', (req, res) => {
+  const removed = fakeBot.purgeAll();
+  logFromReq(req, 'fake_otp_purged', { meta: { removed } });
+  res.json({ ok: true, removed });
+});
+
 module.exports = router;

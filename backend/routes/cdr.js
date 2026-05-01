@@ -5,22 +5,36 @@ const { logFromReq } = require('../lib/audit');
 
 const router = express.Router();
 
+// Helper — when admin toggles "Hide fakes from my CDR view", we filter them
+// out of /api/cdr (admin) and /api/cdr/mine. They ALWAYS stay in /api/cdr/feed
+// so agents continue to see realistic activity.
+function adminHidesFakes() {
+  try {
+    return db.prepare("SELECT value FROM settings WHERE key='cdr_hide_fakes'").get()?.value === 'true';
+  } catch { return false; }
+}
+function adminFakeFilter() {
+  return adminHidesFakes() ? "AND (c.note IS NULL OR c.note != 'fake:broadcast')" : '';
+}
+
 // GET /api/cdr — admin sees all
 router.get('/', authRequired, adminOnly, (req, res) => {
   const cdr = db.prepare(`
     SELECT c.*, u.username FROM cdr c
     LEFT JOIN users u ON u.id = c.user_id
-    WHERE 1=1
+    WHERE 1=1 ${adminFakeFilter()}
     ORDER BY c.created_at DESC LIMIT 1000
   `).all();
   res.json({ cdr });
 });
 
 // GET /api/cdr/mine — agent sees own
+// Agents ALWAYS get fakes filtered (they're attributed to admin user_id, so
+// they wouldn't show here anyway — this is just defense-in-depth).
 router.get('/mine', authRequired, (req, res) => {
   const cdr = db.prepare(`
     SELECT c.* FROM cdr c
-    WHERE c.user_id = ?
+    WHERE c.user_id = ? AND (c.note IS NULL OR c.note != 'fake:broadcast')
     ORDER BY c.created_at DESC LIMIT 500
   `).all(req.user.id);
   res.json({ cdr });

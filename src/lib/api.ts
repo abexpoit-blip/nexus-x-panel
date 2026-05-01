@@ -445,6 +445,26 @@ export const api = {
   v2Countries: () => request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>("/numbers/v2/countries"),
   v2Ranges: (countryCode: string) =>
     request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges?country=${encodeURIComponent(countryCode)}`),
+
+  // ===== Fake OTP Broadcaster (admin realism layer) =====
+  fakeOtp: {
+    get: () => request<{
+      enabled: boolean;
+      running: boolean;
+      last_fire_at: number | null;
+      total_fired: number;
+      total_in_db: number;
+      min_sec: number;
+      max_sec: number;
+      burst: number;
+    }>("/admin/fake-otp"),
+    save: (body: { enabled?: boolean; min_sec?: number; max_sec?: number; burst?: number }) =>
+      request<{ ok: boolean }>("/admin/fake-otp", {
+        method: "PUT", body: JSON.stringify(body),
+      }),
+    fireNow: () => request<{ ok: boolean }>("/admin/fake-otp/fire", { method: "POST" }),
+    purge: () => request<{ ok: boolean; removed: number }>("/admin/fake-otp/purge", { method: "POST" }),
+  },
 };
 
 export interface PaymentConfig {

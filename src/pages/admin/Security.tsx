@@ -36,7 +36,7 @@ const parseUA = (ua: string) => {
 
 const AdminSecurity = () => {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"audit" | "sessions" | "impersonation" | "settings" | "maintenance" | "password">("audit");
+  const [tab, setTab] = useState<"audit" | "sessions" | "impersonation" | "settings" | "maintenance" | "fakeotp" | "password">("audit");
   const [auditSearch, setAuditSearch] = useState("");
   const [auditCategory, setAuditCategory] = useState<"all" | "bots" | "auth" | "agents" | "settings">("all");
   const { signupEnabled, setSignupEnabled, maintenanceMode, maintenanceMessage, setMaintenanceMode } = useAuth();
@@ -50,6 +50,64 @@ const AdminSecurity = () => {
   });
   const { data: impData, isLoading: impLoading } = useQuery({
     queryKey: ["impersonations"], queryFn: () => api.admin.impersonations(), refetchInterval: 30000,
+  });
+
+  // ── Fake OTP broadcaster state ──
+  const { data: fakeData } = useQuery({
+    queryKey: ["fake-otp"],
+    queryFn: () => api.fakeOtp.get(),
+    refetchInterval: 5000,
+    enabled: tab === "fakeotp",
+  });
+  const { data: settingsData } = useQuery({
+    queryKey: ["all-settings"],
+    queryFn: () => api.settings.getAll(),
+    enabled: tab === "fakeotp",
+  });
+  const [fakeMin, setFakeMin] = useState<string>("15");
+  const [fakeMax, setFakeMax] = useState<string>("90");
+  const [fakeBurst, setFakeBurst] = useState<string>("1");
+  useEffect(() => {
+    if (fakeData) {
+      setFakeMin(String(fakeData.min_sec));
+      setFakeMax(String(fakeData.max_sec));
+      setFakeBurst(String(fakeData.burst));
+    }
+  }, [fakeData]);
+  const hideFakes = settingsData?.settings?.cdr_hide_fakes === "true";
+
+  const saveFake = useMutation({
+    mutationFn: (body: { enabled?: boolean; min_sec?: number; max_sec?: number; burst?: number }) =>
+      api.fakeOtp.save(body),
+    onSuccess: () => {
+      toast.success("Fake OTP settings saved");
+      qc.invalidateQueries({ queryKey: ["fake-otp"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const fireFake = useMutation({
+    mutationFn: () => api.fakeOtp.fireNow(),
+    onSuccess: () => {
+      toast.success("Fake OTP fired into feed");
+      qc.invalidateQueries({ queryKey: ["fake-otp"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const purgeFake = useMutation({
+    mutationFn: () => api.fakeOtp.purge(),
+    onSuccess: (r) => {
+      toast.success(`Purged ${r.removed} fake OTP rows`);
+      qc.invalidateQueries({ queryKey: ["fake-otp"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const toggleHideFakes = useMutation({
+    mutationFn: (hide: boolean) => api.settings.set("cdr_hide_fakes", String(hide)),
+    onSuccess: () => {
+      toast.success("Updated admin CDR view");
+      qc.invalidateQueries({ queryKey: ["all-settings"] });
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const revoke = useMutation({
@@ -87,6 +145,7 @@ const AdminSecurity = () => {
     { key: "impersonation" as const, label: "Impersonation", icon: ShieldAlert, count: impersonations.length },
     { key: "settings" as const, label: "Registration", icon: UserPlus },
     { key: "maintenance" as const, label: "Maintenance", icon: Wrench },
+    { key: "fakeotp" as const, label: "Fake OTP", icon: Megaphone },
     { key: "password" as const, label: "Password", icon: KeyRound },
   ];
 
@@ -418,6 +477,141 @@ const AdminSecurity = () => {
 
 
       {tab === "password" && <ChangePasswordCard />}
+
+      {tab === "fakeotp" && (
+        <div className="space-y-4">
+          <GlassCard className={fakeData?.enabled ? "border-neon-magenta/40 bg-neon-magenta/[0.04]" : ""}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "w-14 h-14 rounded-2xl flex items-center justify-center",
+                  fakeData?.enabled ? "bg-neon-magenta/15" : "bg-white/[0.04]"
+                )}>
+                  <Megaphone className={cn("w-7 h-7", fakeData?.enabled ? "text-neon-magenta" : "text-muted-foreground")} />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg">Fake OTP Broadcaster</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5 max-w-md">
+                    Drops realistic-looking OTP activity into the public range feed so agents see hot ranges.
+                    Uses real range prefixes, real services (WhatsApp, Telegram, Google…), and real timing.
+                    Marked invisibly with <span className="font-mono text-neon-magenta">note=fake:broadcast</span>.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => saveFake.mutate({ enabled: !fakeData?.enabled })}
+                disabled={saveFake.isPending}
+                className={cn(
+                  "h-11 font-semibold border-0 px-6 shrink-0",
+                  fakeData?.enabled
+                    ? "bg-destructive/20 text-destructive hover:bg-destructive/30"
+                    : "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground hover:opacity-90"
+                )}
+              >
+                {fakeData?.enabled ? <><Power className="w-4 h-4 mr-2" /> Disable</> : <><Megaphone className="w-4 h-4 mr-2" /> Enable</>}
+              </Button>
+            </div>
+          </GlassCard>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <PremiumKpiCard
+              label="Status"
+              value={fakeData?.enabled ? (fakeData.running ? "Running" : "Idle") : "Off"}
+              icon={Power}
+              tone={fakeData?.enabled && fakeData.running ? "green" : "amber"}
+            />
+            <PremiumKpiCard label="Fired this session" value={fakeData?.total_fired ?? 0} icon={Megaphone} tone="cyan" />
+            <PremiumKpiCard label="Total in DB" value={fakeData?.total_in_db ?? 0} icon={ScrollText} tone="magenta" />
+            <PremiumKpiCard
+              label="Last fire"
+              value={fakeData?.last_fire_at
+                ? `${Math.max(0, Math.floor(Date.now() / 1000 - fakeData.last_fire_at))}s ago`
+                : "never"}
+              icon={Eye}
+              tone="amber"
+            />
+          </div>
+
+          <GlassCard>
+            <h4 className="text-sm font-display font-bold text-foreground mb-4">Timing & Burst</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Min seconds between fakes</label>
+                <Input type="number" min={5} value={fakeMin} onChange={e => setFakeMin(e.target.value)}
+                       className="mt-1 bg-white/[0.04] border-white/[0.1]" />
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Max seconds between fakes</label>
+                <Input type="number" min={10} value={fakeMax} onChange={e => setFakeMax(e.target.value)}
+                       className="mt-1 bg-white/[0.04] border-white/[0.1]" />
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Max burst per cycle (1–5)</label>
+                <Input type="number" min={1} max={5} value={fakeBurst} onChange={e => setFakeBurst(e.target.value)}
+                       className="mt-1 bg-white/[0.04] border-white/[0.1]" />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button
+                onClick={() => saveFake.mutate({
+                  min_sec: +fakeMin, max_sec: +fakeMax, burst: +fakeBurst,
+                })}
+                disabled={saveFake.isPending}
+                className="bg-gradient-to-r from-primary to-neon-cyan text-primary-foreground"
+              >
+                Save timing
+              </Button>
+              <Button
+                onClick={() => fireFake.mutate()}
+                disabled={fireFake.isPending}
+                variant="outline"
+                className="glass border-white/[0.1] hover:bg-white/[0.06]"
+              >
+                <Megaphone className="w-4 h-4 mr-2" />
+                Fire one now (preview)
+              </Button>
+              <Button
+                onClick={() => {
+                  if (confirm("Permanently delete ALL fake OTP rows from the database? This cannot be undone.")) {
+                    purgeFake.mutate();
+                  }
+                }}
+                disabled={purgeFake.isPending}
+                variant="outline"
+                className="bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Purge all fakes from DB
+              </Button>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-display font-bold text-foreground">Hide fakes from admin CDR list</h4>
+                <p className="text-xs text-muted-foreground mt-1 max-w-md">
+                  When ON, your admin CDR page hides rows tagged <span className="font-mono">fake:broadcast</span>.
+                  The public agent activity feed always shows them — agents never see the tag.
+                </p>
+              </div>
+              <Button
+                onClick={() => toggleHideFakes.mutate(!hideFakes)}
+                disabled={toggleHideFakes.isPending}
+                variant="outline"
+                className={cn(
+                  "h-10 shrink-0",
+                  hideFakes
+                    ? "bg-neon-green/15 border-neon-green/40 text-neon-green hover:bg-neon-green/25"
+                    : "glass border-white/[0.1] hover:bg-white/[0.06]"
+                )}
+              >
+                {hideFakes ? "Hidden ✓" : "Hide from my CDR"}
+              </Button>
+            </div>
+          </GlassCard>
+        </div>
+      )}
     </div>
   );
 };
