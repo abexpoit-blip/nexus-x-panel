@@ -27,6 +27,7 @@ const AgentProfile = Pages["/agent/profile"].L;
 const AgentLeaderboard = Pages["/agent/leaderboard"].L;
 const AgentInbox = Pages["/agent/inbox"].L;
 const AgentHistory = Pages["/agent/history"].L;
+const AgentRanges = Pages["/agent/ranges"].L;
 
 const AdminDashboard = Pages["/admin/dashboard"].L;
 const AdminProviders = Pages["/admin/providers"].L;
@@ -41,6 +42,7 @@ const AdminImsStatus = Pages["/admin/ims-status"].L;
 const AdminMsiStatus = Pages["/admin/msi-status"].L;
 const AdminNumPanelStatus = Pages["/admin/numpanel-status"].L;
 const AdminProviderSettings = Pages["/admin/provider-settings"].L;
+const AdminProviderRanges = Pages["/admin/provider-ranges"].L;
 const AdminWithdrawals = Pages["/admin/withdrawals"].L;
 const AdminTgBot = Pages["/admin/tg-bot"].L;
 
@@ -109,6 +111,7 @@ const AppRoutes = () => {
             <Route path="/agent/profile" element={<AgentProfile />} />
             <Route path="/agent/leaderboard" element={<AgentLeaderboard />} />
             <Route path="/agent/inbox" element={<AgentInbox />} />
+            <Route path="/agent/ranges" element={<AgentRanges />} />
           </Route>
 
           {/* Admin Routes */}
@@ -126,6 +129,7 @@ const AppRoutes = () => {
             <Route path="/admin/msi-status" element={<AdminMsiStatus />} />
             <Route path="/admin/numpanel-status" element={<AdminNumPanelStatus />} />
             <Route path="/admin/provider-settings" element={<AdminProviderSettings />} />
+            <Route path="/admin/provider-ranges" element={<AdminProviderRanges />} />
             <Route path="/admin/tg-bot" element={<AdminTgBot />} />
             <Route path="/admin/notifications" element={<AdminNotifications />} />
           </Route>

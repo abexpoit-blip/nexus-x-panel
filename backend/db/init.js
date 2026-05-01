@@ -89,6 +89,31 @@ db.exec(`
 addColIfMissing('msi_range_meta', 'disabled', 'INTEGER DEFAULT 0');
 addColIfMissing('msi_range_meta', 'service_tag', 'TEXT');
 
+// ─────────────────────────────────────────────────────────────────────
+// Generic provider_ranges table — provider-agnostic, admin-managed ranges.
+// Agents only see ranges where enabled=1. OTP wiring per provider is added
+// later; this table is the source of truth for what's offered to agents.
+// ─────────────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS provider_ranges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    country_code TEXT NOT NULL,
+    country_name TEXT,
+    range_label TEXT NOT NULL,
+    range_prefix TEXT,
+    operator TEXT,
+    price_bdt REAL NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    UNIQUE(provider, country_code, range_label)
+  );
+  CREATE INDEX IF NOT EXISTS idx_pranges_lookup ON provider_ranges(enabled, country_code);
+  CREATE INDEX IF NOT EXISTS idx_pranges_provider ON provider_ranges(provider, enabled);
+`);
+
 // Apply Telegram bot schema (additive) AFTER column migrations
 const tgSchemaPath = path.join(__dirname, 'tg_schema.sql');
 if (fs.existsSync(tgSchemaPath)) {

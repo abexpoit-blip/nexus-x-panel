@@ -21,6 +21,7 @@ export const Pages = {
   "/agent/profile":     make(() => import("@/pages/agent/Profile")),
   "/agent/leaderboard": make(() => import("@/pages/agent/Leaderboard")),
   "/agent/inbox":       make(() => import("@/pages/agent/Inbox")),
+  "/agent/ranges":      make(() => import("@/pages/agent/Ranges")),
   // Admin
   "/admin/dashboard":         make(() => import("@/pages/admin/Dashboard")),
   "/admin/providers":         make(() => import("@/pages/admin/Providers")),
@@ -35,6 +36,7 @@ export const Pages = {
   "/admin/msi-status":        make(() => import("@/pages/admin/MsiStatus")),
   "/admin/numpanel-status":   make(() => import("@/pages/admin/NumPanelStatus")),
   "/admin/provider-settings": make(() => import("@/pages/admin/ProviderSettings")),
+  "/admin/provider-ranges":   make(() => import("@/pages/admin/ProviderRanges")),
   "/admin/tg-bot":            make(() => import("@/pages/admin/TgBot")),
   "/admin/notifications":     make(() => import("@/pages/admin/Notifications")),
 } as const;
