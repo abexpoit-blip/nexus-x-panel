@@ -66,6 +66,7 @@ const AdminSettings = () => {
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
   const [mediatelUser, setMediatelUser] = useState("");
   const [mediatelPass, setMediatelPass] = useState("");
+  const [mediatelCookie, setMediatelCookie] = useState("");
   const [seven1User, setSeven1User] = useState("");
   const [seven1Pass, setSeven1Pass] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -82,6 +83,7 @@ const AdminSettings = () => {
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
     setMediatelUser(str(s, "mediatel_username"));
     setMediatelPass(str(s, "mediatel_password"));
+    setMediatelCookie(str(s, "mediatel_cookie_header"));
     setSeven1User(str(s, "seven1tel_username"));
     setSeven1Pass(str(s, "seven1tel_password"));
   }, [s]);
@@ -516,10 +518,21 @@ const AdminSettings = () => {
               </div>
             </div>
 
+            <div className="space-y-1.5 mt-3">
+              <Label className="text-xs">Manual Cookie header</Label>
+              <Textarea value={mediatelCookie} onChange={(e) => setMediatelCookie(e.target.value)}
+                placeholder="cf_clearance=...; PHPSESSID=..."
+                className="bg-white/[0.04] border-white/[0.1] min-h-20 font-mono text-xs" />
+              <p className="text-[11px] text-muted-foreground">
+                Use this only when Cloudflare blocks the VPS browser: log in once in your browser, copy the Cookie header, save, then restart Mediatel Bot.
+              </p>
+            </div>
+
             <div className="flex flex-wrap gap-2 mt-4">
               <Button onClick={async () => {
                 await setSetting("mediatel_username", mediatelUser);
                 await setSetting("mediatel_password", mediatelPass);
+                await setSetting("mediatel_cookie_header", mediatelCookie);
               }} disabled={savingKey?.startsWith("mediatel_")}
                 className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
                 {savingKey?.startsWith("mediatel_") ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}

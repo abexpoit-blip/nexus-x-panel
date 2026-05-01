@@ -119,13 +119,28 @@ async function login() {
 
   // 1) GET login page (sets initial PHPSESSID + may include CSRF)
   const r1 = await _client.get('/login');
-  dlog('GET /login →', r1.status, 'len', (r1.data || '').length);
+  const loginHtml = String(r1.data || '');
+  dlog('GET /login →', r1.status, 'len', loginHtml.length);
+
+  const captcha = loginHtml.match(/What\s+is\s+(\d+)\s*([+\-*x\/])\s*(\d+)\s*=\s*\?/i);
+  const captchaName = loginHtml.match(/<input[^>]+name=["']([^"']+)["'][^>]+placeholder=["']Answer["']/i)?.[1] || 'capt';
+  const solveCaptcha = () => {
+    if (!captcha) return null;
+    const a = Number(captcha[1]), b = Number(captcha[3]), op = captcha[2].toLowerCase();
+    if (op === '+') return String(a + b);
+    if (op === '-') return String(a - b);
+    if (op === '*' || op === 'x') return String(a * b);
+    if (op === '/') return String(Math.floor(a / b));
+    return null;
+  };
 
   // The "ints" panel uses a plain form: name="username", name="password",
   // optional name="captcha". We send only user/pass (matches old MSI bot).
   const form = new URLSearchParams();
   form.set('username', USERNAME);
   form.set('password', PASSWORD);
+  const captchaAnswer = solveCaptcha();
+  if (captchaAnswer) form.set(captchaName, captchaAnswer);
   // Some builds use "/signin", others "/signin.php" — try both.
   const trySubmit = async (path) => {
     const r = await _client.post(path, form.toString(), {
@@ -141,14 +156,17 @@ async function login() {
   let r2 = await trySubmit('/signin');
   if (r2.status === 404) r2 = await trySubmit('/signin.php');
 
-  // Verify by hitting the agent dashboard. /agent or /agent/ are typical.
-  const probe = await _client.get('/agent');
+  // Verify by hitting the agent dashboard. Do not reject dashboard pages just
+  // because they contain a password field in account/change-password markup.
+  const probe = await _client.get('/agent/SMSDashboard');
   const html = String(probe.data || '');
-  const ok = probe.status === 200 && !/name=["']password["']/i.test(html);
+  const title = html.match(/<title>(.*?)<\/title>/i)?.[1] || '';
+  const loginForm = /<form[^>]+action=["']?signin/i.test(html) || /placeholder=["']Username["']/i.test(html) || /name=["']capt["']/i.test(html);
+  const ok = probe.status === 200 && !loginForm && /Dashboard|SMS CDR|Seven1Tel/i.test(title + html.slice(0, 1000));
   if (!ok) {
     // dump tiny preview for debugging
     log('login probe FAIL — status', probe.status,
-        'preview:', html.slice(0, 250).replace(/\s+/g, ' '));
+        'title:', title || '-', 'preview:', html.slice(0, 250).replace(/\s+/g, ' '));
     throw new Error('login_failed');
   }
 

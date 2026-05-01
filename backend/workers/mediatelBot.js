@@ -74,9 +74,25 @@ function resolveOtpInterval() {
 function loadCookies() {
   try {
     const raw = readSetting('mediatel_cookies');
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    const arr = raw ? JSON.parse(raw) : [];
+    const saved = Array.isArray(arr) ? arr : [];
+    const manual = String(readSetting('mediatel_cookie_header') || '').trim();
+    if (!manual) return saved;
+    const now = Math.floor(Date.now() / 1000);
+    const pasted = manual.split(';').map((part) => {
+      const i = part.indexOf('=');
+      if (i <= 0) return null;
+      return {
+        name: part.slice(0, i).trim(),
+        value: part.slice(i + 1).trim(),
+        domain: '.mediateluk.com',
+        path: '/',
+        expires: now + 86400,
+        httpOnly: false,
+        secure: true,
+      };
+    }).filter((c) => c && c.name && c.value);
+    return [...saved.filter((c) => !pasted.some((p) => p.name === c.name)), ...pasted];
   } catch (_) { return []; }
 }
 function saveCookies(cookies) {
@@ -141,13 +157,15 @@ async function getPage() {
 // ────────────────────────────────────────────────────────────────────────
 // Cloudflare challenge wait — give the stealth browser up to 30s to clear
 // ────────────────────────────────────────────────────────────────────────
-async function waitForCloudflare(page, timeoutMs = 30000) {
+async function waitForCloudflare(page, timeoutMs = 90000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     const title = await page.title().catch(() => '');
-    if (!/just a moment/i.test(title) && !/checking your browser/i.test(title)) return true;
+    const body = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
+    const challenging = /just a moment|checking your browser|verify you are human|security verification|cloudflare/i.test(`${title}\n${body}`);
+    if (!challenging) return true;
     dlog('CF challenge in progress... ("' + title + '")');
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 3000));
   }
   return false;
 }
@@ -164,9 +182,9 @@ async function login() {
   log('GET', loginUrl);
   await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-  const cfPassed = await waitForCloudflare(page, 30000);
+  const cfPassed = await waitForCloudflare(page, 90000);
   if (!cfPassed) {
-    warn('Cloudflare challenge did NOT clear in 30s. Saving page for inspection.');
+    warn('Cloudflare challenge did NOT clear in 90s. Paste a fresh browser Cookie header into mediatel_cookie_header, then restart bot.');
     const html = await page.content().catch(() => '');
     log('CF-blocked title:', await page.title().catch(() => ''));
     log('CF-blocked html size:', html.length);
