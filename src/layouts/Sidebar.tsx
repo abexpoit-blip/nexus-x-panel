@@ -41,6 +41,7 @@ const adminNav: NavItem[] = [
   { label: "Security", path: "/admin/security", icon: Shield },
   { label: "SMS CDR", path: "/admin/cdr", icon: FileText },
   { label: "Notifications", path: "/admin/notifications", icon: Bell },
+  { label: "Bots Control", path: "/admin/bots", icon: Bot },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
