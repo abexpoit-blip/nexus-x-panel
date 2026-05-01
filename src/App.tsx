@@ -18,7 +18,6 @@ import AdminLogin from "@/pages/AdminLogin";
 import NotFound from "@/pages/NotFound";
 
 const AgentDashboard = Pages["/agent/dashboard"].L;
-const AgentGetNumber = Pages["/agent/get-number"].L;
 const AgentConsole = Pages["/agent/console"].L;
 const AgentMyNumbers = Pages["/agent/my-numbers"].L;
 const AgentSummary = Pages["/agent/summary"].L;
@@ -96,7 +95,6 @@ const AppRoutes = () => {
           {/* Agent Routes */}
           <Route element={<AppLayout requiredRole="agent" />}>
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
-            <Route path="/agent/get-number" element={<AgentGetNumber />} />
             <Route path="/agent/console" element={<AgentConsole />} />
             <Route path="/agent/my-numbers" element={<AgentMyNumbers />} />
             <Route path="/agent/history" element={<AgentHistory />} />
