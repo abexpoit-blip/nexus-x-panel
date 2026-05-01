@@ -169,6 +169,7 @@ const AdminSettings = () => {
           <TabsTrigger value="otp">OTP Timing</TabsTrigger>
           <TabsTrigger value="telegram">Telegram</TabsTrigger>
           <TabsTrigger value="fake-otp">Fake OTP</TabsTrigger>
+          <TabsTrigger value="bots">Bots</TabsTrigger>
         </TabsList>
 
         {/* ============ GENERAL ============ */}
