@@ -68,6 +68,52 @@ const StatusPill = ({ ok, label }: { ok: boolean; label: string }) => (
   </span>
 );
 
+type BotSnapshot = {
+  enabled?: boolean;
+  running?: boolean;
+  logged_in?: boolean;
+  base_url?: string;
+  username?: string | null;
+  last_tick_at?: number | null;
+  last_error?: string | null;
+  consec_fail?: number;
+  otps_delivered?: number;
+  interval_sec?: number;
+} | null;
+
+const BotCard = ({ name, snap }: { name: string; snap: BotSnapshot }) => {
+  if (!snap) {
+    return (
+      <div className="glass p-3 rounded-xl border border-white/[0.04]">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{name}</div>
+        <div className="text-xs text-muted-foreground/60">not initialized</div>
+      </div>
+    );
+  }
+  return (
+    <div className="glass p-3 rounded-xl border border-white/[0.04] space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{name}</span>
+        <StatusPill ok={!!snap.running && !!snap.logged_in} label={snap.running ? (snap.logged_in ? "up" : "no auth") : "down"} />
+      </div>
+      <div className="text-xs text-muted-foreground/80">
+        Last tick: <span className="font-mono text-foreground">{fmtAgo(snap.last_tick_at)}</span>
+        {typeof snap.interval_sec === "number" && <span className="text-muted-foreground/50"> · every {snap.interval_sec}s</span>}
+      </div>
+      {typeof snap.otps_delivered === "number" && (
+        <div className="text-xs text-muted-foreground/80">
+          OTPs delivered: <span className="font-mono font-semibold text-neon-green">{snap.otps_delivered}</span>
+        </div>
+      )}
+      {snap.last_error && (
+        <div className="text-[10px] text-destructive/80 font-mono break-words pt-1 border-t border-white/[0.04]">
+          {snap.last_error}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const SystemHealthWidget = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["system-health"],
@@ -83,9 +129,8 @@ export const SystemHealthWidget = () => {
     );
   }
 
-  const { server, database, ims_bot, counts } = data;
+  const { server, database, mediatel_bot, seven1tel_bot, counts } = data;
 
-  // Backup freshness — warn after 26h, fail after 50h
   const backupAge = database.last_backup
     ? Math.floor(Date.now() / 1000) - database.last_backup.mtime
     : null;
@@ -94,13 +139,10 @@ export const SystemHealthWidget = () => {
     backupAge! < 26 * 3600 ? "good" :
     backupAge! < 50 * 3600 ? "warn" : "bad";
 
-  // Pool health — warn under 100, bad under 30
-  const poolTone: "good" | "warn" | "bad" =
-    counts.ims_pool_size > 100 ? "good" : counts.ims_pool_size > 30 ? "warn" : "bad";
+  const anyBotUp = !!(mediatel_bot?.running || seven1tel_bot?.running);
 
   return (
     <div className="glass-card border border-white/[0.06] rounded-xl p-5 space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-neon-cyan" />
@@ -112,14 +154,12 @@ export const SystemHealthWidget = () => {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <StatusPill ok={ims_bot.running} label={ims_bot.running ? "IMS bot up" : "IMS bot down"} />
-          <StatusPill ok={!!ims_bot.logged_in} label={ims_bot.logged_in ? "Logged in" : "Not logged in"} />
+          <StatusPill ok={anyBotUp} label={anyBotUp ? "Bots running" : "No bots running"} />
           <StatusPill ok={backupTone !== "bad"} label="Backup" />
         </div>
       </div>
 
-      {/* Tile grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <Tile
           icon={<Server className="w-3 h-3" />}
           label="Backend uptime"
@@ -151,23 +191,13 @@ export const SystemHealthWidget = () => {
           }
           tone={backupTone}
         />
-        <Tile
-          icon={<Bot className="w-3 h-3" />}
-          label="IMS pool"
-          value={counts.ims_pool_size.toLocaleString()}
-          hint={`${ims_bot.active_assigned ?? 0} assigned · scrape ${ims_bot.interval_sec ?? "?"}s`}
-          tone={poolTone}
-        />
-        <Tile
-          icon={<Clock className="w-3 h-3" />}
-          label="Last scrape"
-          value={fmtAgo(ims_bot.last_scrape_at)}
-          hint={`OTP poll every ${ims_bot.otp_interval_sec ?? "?"}s`}
-          tone={ims_bot.last_scrape_ok ? "good" : "bad"}
-        />
       </div>
 
-      {/* Counts row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <BotCard name="Mediatel bot" snap={mediatel_bot} />
+        <BotCard name="Seven1Tel bot" snap={seven1tel_bot} />
+      </div>
+
       <div className="flex flex-wrap gap-3 text-xs pt-3 border-t border-white/[0.04]">
         <span className="text-muted-foreground">
           Active sessions:
@@ -183,26 +213,7 @@ export const SystemHealthWidget = () => {
             {counts.pending_withdrawals}
           </span>
         </span>
-        {ims_bot.consec_fail && ims_bot.consec_fail > 0 && (
-          <>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="text-destructive">
-              Consec fails: <span className="font-mono font-semibold">{ims_bot.consec_fail}</span>
-            </span>
-          </>
-        )}
       </div>
-
-      {/* Last error */}
-      {ims_bot.last_error && (
-        <div className="flex items-start gap-2 text-xs p-2.5 rounded-md bg-destructive/5 border border-destructive/20">
-          <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-destructive mb-0.5">IMS bot last error</p>
-            <p className="text-destructive/80 font-mono break-words">{ims_bot.last_error}</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
