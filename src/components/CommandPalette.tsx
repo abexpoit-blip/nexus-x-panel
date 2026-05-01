@@ -25,7 +25,7 @@ interface NavItem {
 
 const agentItems: NavItem[] = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-  { label: "Get Number", path: "/agent/get-number", icon: Hash, hint: "Request a fresh number" },
+  { label: "Browse Ranges", path: "/agent/ranges", icon: Hash, hint: "Country → Range → Get Number" },
   { label: "Console", path: "/agent/console", icon: MessageSquare },
   { label: "My Numbers", path: "/agent/my-numbers", icon: List },
   { label: "Summary", path: "/agent/summary", icon: BarChart3 },
@@ -37,7 +37,7 @@ const agentItems: NavItem[] = [
 
 const adminItems: NavItem[] = [
   { label: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Providers", path: "/admin/providers", icon: Server },
+  { label: "Provider Ranges", path: "/admin/provider-ranges", icon: Server },
   { label: "Agents", path: "/admin/agents", icon: Users },
   { label: "Rate Card", path: "/admin/rates", icon: DollarSign },
   { label: "Allocation", path: "/admin/allocation", icon: Layers },
@@ -94,9 +94,9 @@ export const CommandPalette = () => {
 
         <CommandGroup heading="Quick actions">
           {user?.role === "agent" && (
-            <CommandItem value="get number new request" onSelect={() => go("/agent/get-number")}>
+            <CommandItem value="get number new request" onSelect={() => go("/agent/ranges")}>
               <Sparkles className="w-4 h-4 mr-2 text-neon-magenta" />
-              <span>New Get Number request</span>
+              <span>Browse Ranges</span>
             </CommandItem>
           )}
           {user?.role === "admin" && (

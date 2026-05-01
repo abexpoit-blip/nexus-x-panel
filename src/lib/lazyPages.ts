@@ -12,7 +12,6 @@ const make = <T extends Loader>(loader: T) => {
 export const Pages = {
   // Agent
   "/agent/dashboard":   make(() => import("@/pages/agent/Dashboard")),
-  "/agent/get-number":  make(() => import("@/pages/agent/GetNumber")),
   "/agent/console":     make(() => import("@/pages/agent/Console")),
   "/agent/my-numbers":  make(() => import("@/pages/agent/MyNumbers")),
   "/agent/history":     make(() => import("@/pages/agent/History")),
@@ -24,7 +23,6 @@ export const Pages = {
   "/agent/ranges":      make(() => import("@/pages/agent/Ranges")),
   // Admin
   "/admin/dashboard":         make(() => import("@/pages/admin/Dashboard")),
-  "/admin/providers":         make(() => import("@/pages/admin/Providers")),
   "/admin/agents":            make(() => import("@/pages/admin/Agents")),
   "/admin/rates":             make(() => import("@/pages/admin/RateCard")),
   "/admin/allocation":        make(() => import("@/pages/admin/Allocation")),
@@ -32,12 +30,7 @@ export const Pages = {
   "/admin/withdrawals":       make(() => import("@/pages/admin/Withdrawals")),
   "/admin/security":          make(() => import("@/pages/admin/Security")),
   "/admin/cdr":               make(() => import("@/pages/admin/CDR")),
-  "/admin/ims-status":        make(() => import("@/pages/admin/ImsStatus")),
-  "/admin/msi-status":        make(() => import("@/pages/admin/MsiStatus")),
-  "/admin/numpanel-status":   make(() => import("@/pages/admin/NumPanelStatus")),
-  "/admin/provider-settings": make(() => import("@/pages/admin/ProviderSettings")),
   "/admin/provider-ranges":   make(() => import("@/pages/admin/ProviderRanges")),
-  "/admin/tg-bot":            make(() => import("@/pages/admin/TgBot")),
   "/admin/notifications":     make(() => import("@/pages/admin/Notifications")),
 } as const;
 

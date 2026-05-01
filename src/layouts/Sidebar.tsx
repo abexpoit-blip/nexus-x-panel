@@ -19,7 +19,6 @@ interface NavItem {
 
 const agentNav: NavItem[] = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-  { label: "Get Number", path: "/agent/get-number", icon: Hash },
   { label: "Browse Ranges", path: "/agent/ranges", icon: Layers },
   { label: "Console", path: "/agent/console", icon: MessageSquare },
   { label: "My Numbers", path: "/agent/my-numbers", icon: List },
@@ -33,7 +32,6 @@ const agentNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { label: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Providers", path: "/admin/providers", icon: Server },
   { label: "Provider Ranges", path: "/admin/provider-ranges", icon: Layers },
   { label: "Agents", path: "/admin/agents", icon: Users },
   { label: "Rate Card", path: "/admin/rates", icon: DollarSign },
@@ -42,12 +40,6 @@ const adminNav: NavItem[] = [
   { label: "Withdrawals", path: "/admin/withdrawals", icon: ArrowDownToLine },
   { label: "Security", path: "/admin/security", icon: Shield },
   { label: "SMS CDR", path: "/admin/cdr", icon: FileText },
-  { label: "IMS Bot", path: "/admin/ims-status", icon: Bot },
-  { label: "MSI Bot", path: "/admin/msi-status", icon: Bot },
-  { label: "NumPanel Bot", path: "/admin/numpanel-status", icon: Bot },
-  { label: "TG Bot", path: "/admin/tg-bot", icon: Bot },
-  // Provider Settings (OTP expiry / recent-OTP window) is now embedded inside
-  // the IMS Bot page; route /admin/provider-settings still works for direct links.
   { label: "Notifications", path: "/admin/notifications", icon: Bell },
 ];
 
