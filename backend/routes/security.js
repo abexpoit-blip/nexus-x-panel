@@ -68,11 +68,12 @@ router.get('/settings', (req, res) => {
 router.put('/settings/:key', (req, res) => {
   const { value } = req.body || {};
   if (value === undefined) return res.status(400).json({ error: 'value required' });
+  const sensitive = /password|cookie|token|secret/i.test(req.params.key);
   db.prepare(`
     INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%s','now')
   `).run(req.params.key, String(value));
-  logFromReq(req, 'setting_updated', { meta: { key: req.params.key, value } });
+  logFromReq(req, 'setting_updated', { meta: { key: req.params.key, value: sensitive ? '[redacted]' : value } });
   res.json({ ok: true });
 });
 
