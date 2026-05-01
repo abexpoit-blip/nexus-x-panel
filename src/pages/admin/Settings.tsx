@@ -158,6 +158,22 @@ const AdminSettings = () => {
     } finally { setSavingKey(null); }
   };
 
+  const runHealth = async (bot: string) => {
+    setHealthState((p) => ({ ...p, [bot]: "checking" }));
+    try {
+      const r = await api.admin.bots.health(bot);
+      setHealthState((p) => ({ ...p, [bot]: { ok: !!r.ok, ms: r.ms, error: r.error } }));
+      toast({
+        title: r.ok ? `✓ ${bot} login OK` : `✗ ${bot} login failed`,
+        description: r.ok ? `Logged in in ${r.ms}ms` : (r.error || "Unknown error"),
+        variant: r.ok ? "default" : "destructive",
+      });
+    } catch (e) {
+      setHealthState((p) => ({ ...p, [bot]: { ok: false, ms: 0, error: (e as Error).message } }));
+      toast({ title: "Health check failed", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-12 text-center text-muted-foreground">
