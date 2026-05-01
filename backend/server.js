@@ -94,6 +94,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api', require('./routes/security'));            // /audit + /sessions + /settings
 app.use('/api/admin/tgbot', require('./routes/tgbot'));   // Telegram bot admin
+app.use('/api', require('./routes/provider-ranges'));     // /admin/provider-ranges + /numbers/v2/*
 
 // Health
 app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
