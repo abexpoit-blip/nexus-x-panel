@@ -66,6 +66,7 @@ const AdminSettings = () => {
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
   const [mediatelUser, setMediatelUser] = useState("");
   const [mediatelPass, setMediatelPass] = useState("");
+  const [mediatelCookie, setMediatelCookie] = useState("");
   const [seven1User, setSeven1User] = useState("");
   const [seven1Pass, setSeven1Pass] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -82,6 +83,7 @@ const AdminSettings = () => {
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
     setMediatelUser(str(s, "mediatel_username"));
     setMediatelPass(str(s, "mediatel_password"));
+    setMediatelCookie(str(s, "mediatel_cookie_header"));
     setSeven1User(str(s, "seven1tel_username"));
     setSeven1Pass(str(s, "seven1tel_password"));
   }, [s]);
