@@ -116,9 +116,7 @@ app.listen(PORT, () => {
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS origin: ${corsOrigins ? corsOrigins.join(', ') : '(allow all — dev only)'}\n`);
 
-  // Start Mediatel bot (no-op if mediatel_enabled=false)
-  try { require('./workers/mediatelBot').start(); }
-  catch (e) { console.warn('mediatel bot start error:', e.message); }
+  // Mediatel bot removed.
 
   // Start Seven1Tel bot (no-op if seven1tel_enabled=false)
   try { require('./workers/seven1telBot').start(); }

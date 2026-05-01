@@ -117,8 +117,7 @@ router.get('/system-health', (req, res) => {
   } catch (_) {}
 
   // Provider bot snapshots
-  let mediatel = null, seven1tel = null;
-  try { mediatel = require('../workers/mediatelBot').getStatus?.() || null; } catch (_) {}
+  let seven1tel = null;
   try { seven1tel = require('../workers/seven1telBot').getStatus?.() || null; } catch (_) {}
 
   const pendingWithdrawals = db.prepare("SELECT COUNT(*) c FROM withdrawals WHERE status='pending'").get().c;
@@ -142,7 +141,6 @@ router.get('/system-health', (req, res) => {
       last_backup,
       backup_dir: backupDir,
     },
-    mediatel_bot: mediatel,
     seven1tel_bot: seven1tel,
     counts: {
       pending_withdrawals: pendingWithdrawals,
@@ -315,14 +313,12 @@ router.post('/fake-otp/purge', (req, res) => {
 // =============================================================
 function loadBots() {
   const bots = {};
-  try { bots.mediatel = require('../workers/mediatelBot'); } catch (_) {}
   try { bots.seven1tel = require('../workers/seven1telBot'); } catch (_) {}
   try { bots.fake_otp = require('../workers/fakeOtpBroadcaster'); } catch (_) {}
   return bots;
 }
 
 const BOT_LABELS = {
-  mediatel:  { name: 'Mediatel Bot',          desc: 'Scrapes mediatel SMS portal for live OTPs' },
   seven1tel: { name: 'Seven1Tel Bot',         desc: 'Scrapes seven1tel SMS portal for live OTPs' },
   fake_otp:  { name: 'Fake OTP Broadcaster',  desc: 'Synthetic CDR rows to keep the public feed warm' },
 };
