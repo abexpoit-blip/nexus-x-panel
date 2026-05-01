@@ -475,6 +475,14 @@ const AdminProviderRanges = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PoolDialog
+        rangeId={poolRangeId}
+        onClose={() => {
+          setPoolRangeId(null);
+          qc.invalidateQueries({ queryKey: ["provider-ranges-stats"] });
+        }}
+      />
     </div>
   );
 };
