@@ -1,324 +1,332 @@
-// Mediatel Browser Bot — headless Chrome (stealth) that stays logged into
-// https://mediateluk.com/sms and scrapes OTP CDRs for fast delivery to agents.
+// Seven1Tel Bot — lightweight axios + tough-cookie scraper for the
+// "ints" SMS panel at http://94.23.120.156/ints.
 //
-// CLOUDFLARE: Mediatel sits behind CF "Just a moment..." managed challenge.
-//   Strategy:
-//     1. puppeteer-extra + stealth plugin (passes managed challenge in most cases)
-//     2. Persistent cookie jar in DB (so we only solve the challenge once per
-//        ~24h, then reuse the cf_clearance cookie across restarts)
-//     3. Slow human-like nav timings (no rapid-fire requests)
+// Why no headless browser:
+//   The /ints panel is plain PHP — no Cloudflare, no JS challenge, no captcha
+//   for the user/agent role. A simple POST /ints/signin with PHPSESSID cookie
+//   is enough to stay logged in and poll the AJAX CDR endpoint. This keeps
+//   VPS RAM/CPU near zero (vs ~150MB for puppeteer).
 //
-// Required settings (admin UI → Mediatel, or backend/.env fallback):
-//   mediatel_enabled           true|false
-//   mediatel_base_url          https://mediateluk.com/sms
-//   mediatel_username          2673
-//   mediatel_password          shahriya9900
-//   mediatel_otp_interval      8     (seconds between CDR scrapes — min 5)
+// Settings (DB first, .env fallback):
+//   seven1tel_enabled            true|false
+//   seven1tel_base_url           http://94.23.120.156/ints
+//   seven1tel_username           Sayedahmed
+//   seven1tel_password           Rumon1275
+//   seven1tel_otp_interval       4   (sec between CDR polls — min 3)
+//   seven1tel_session_cookie     (auto-saved PHPSESSID for fast restart)
 //
-// Phase A (this file): login, persist session, log post-login URL + page
-// structure. Phase B will add CDR selectors once we see real DOM in logs.
+// Flow:
+//   1. login()       → POST /signin, capture PHPSESSID
+//   2. fetchCdr()    → GET /res/data_smscdr.php?fdate1=...&fdate2=...
+//   3. processRows() → for each new SMS, find matching active allocation
+//                      by phone_number suffix-match → markOtpReceived().
 
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
+const tough = require('tough-cookie');
+const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
+const { markOtpReceived } = require('../routes/numbers');
 
 const QUIET = process.env.NODE_ENV === 'production';
-const log  = (...a) => console.log('[mediatel-bot]', ...a);
-const dlog = (...a) => { if (!QUIET) console.log('[mediatel-bot]', ...a); };
-const warn = (...a) => console.warn('[mediatel-bot]', ...a);
+const log  = (...a) => console.log('[seven1tel-bot]', ...a);
+const dlog = (...a) => { if (!QUIET) console.log('[seven1tel-bot]', ...a); };
+const warn = (...a) => console.warn('[seven1tel-bot]', ...a);
 
-// ────────────────────────────────────────────────────────────────────────
-// Settings helpers (DB-first, env fallback)
-// ────────────────────────────────────────────────────────────────────────
+// ───────── settings helpers ─────────
 function readSetting(key) {
-  try { return db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value || null; }
+  try { return db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value || null; }
   catch (_) { return null; }
 }
 function writeSetting(key, value) {
   try {
     db.prepare(`
       INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%s','now')
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
     `).run(key, String(value));
   } catch (e) { warn('writeSetting failed:', e.message); }
 }
 function normalizeBase(raw) {
-  const fallback = 'https://mediateluk.com/sms';
-  if (!raw) return fallback;
+  const fb = 'http://94.23.120.156/ints';
+  if (!raw) return fb;
   let s = String(raw).trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  if (!/^https?:\/\//i.test(s)) s = `http://${s}`;
   return s;
 }
-function resolveCreds() {
-  const dbEnabled = readSetting('mediatel_enabled');
-  const dbUser    = readSetting('mediatel_username');
-  const dbPass    = readSetting('mediatel_password');
-  const dbBase    = readSetting('mediatel_base_url');
+function resolveCfg() {
+  const dbEnabled = readSetting('seven1tel_enabled');
   return {
-    ENABLED:  (dbEnabled !== null ? dbEnabled : (process.env.MEDIATEL_ENABLED || 'false'))
+    ENABLED: (dbEnabled !== null ? dbEnabled : (process.env.SEVEN1TEL_ENABLED || 'false'))
               .toString().toLowerCase() === 'true',
-    BASE_URL: normalizeBase(dbBase || process.env.MEDIATEL_BASE_URL),
-    USERNAME: dbUser || process.env.MEDIATEL_USERNAME || '',
-    PASSWORD: dbPass || process.env.MEDIATEL_PASSWORD || '',
+    BASE_URL: normalizeBase(readSetting('seven1tel_base_url') || process.env.SEVEN1TEL_BASE_URL),
+    USERNAME: readSetting('seven1tel_username') || process.env.SEVEN1TEL_USERNAME || '',
+    PASSWORD: readSetting('seven1tel_password') || process.env.SEVEN1TEL_PASSWORD || '',
+    INTERVAL: Math.max(3, +(readSetting('seven1tel_otp_interval') || process.env.SEVEN1TEL_OTP_INTERVAL || 4)),
   };
 }
-function resolveOtpInterval() {
-  const fromDb = +(readSetting('mediatel_otp_interval') || 0);
-  const fromEnv = +(process.env.MEDIATEL_SCRAPE_INTERVAL || 8);
-  return Math.max(5, fromDb > 0 ? fromDb : fromEnv);
-}
 
-// ────────────────────────────────────────────────────────────────────────
-// Cookie persistence (so CF challenge only needs to be solved ~once/day)
-// ────────────────────────────────────────────────────────────────────────
-function loadCookies() {
-  try {
-    const raw = readSetting('mediatel_cookies');
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch (_) { return []; }
-}
-function saveCookies(cookies) {
-  try { writeSetting('mediatel_cookies', JSON.stringify(cookies || [])); }
-  catch (e) { warn('saveCookies failed:', e.message); }
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Browser bootstrap (puppeteer-extra + stealth)
-// ────────────────────────────────────────────────────────────────────────
-let _browser = null;
-let _page = null;
+// ───────── http client w/ cookie jar ─────────
+let _client = null;
+let _jar = null;
 let _loggedIn = false;
-
-async function getBrowser() {
-  if (_browser) return _browser;
-  // Lazy-require so server.js doesn't pay the cost when bot is disabled
-  const puppeteer = require('puppeteer-extra');
-  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-  puppeteer.use(StealthPlugin());
-
-  const headless = (process.env.MEDIATEL_HEADLESS || 'true').toLowerCase() !== 'false';
-  const execPath = process.env.MEDIATEL_CHROME_PATH || undefined;
-
-  log('launching browser (headless=' + headless + ')');
-  _browser = await puppeteer.launch({
-    headless: headless ? 'new' : false,
-    executablePath: execPath,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-dev-shm-usage',
-      '--window-size=1366,768',
-    ],
-    defaultViewport: { width: 1366, height: 768 },
-  });
-  return _browser;
-}
-
-async function getPage() {
-  if (_page && !_page.isClosed()) return _page;
-  const browser = await getBrowser();
-  _page = await browser.newPage();
-  await _page.setUserAgent(
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
-    'Chrome/121.0.0.0 Safari/537.36'
-  );
-  await _page.setExtraHTTPHeaders({
-    'Accept-Language': 'en-US,en;q=0.9',
-  });
-
-  // Restore saved cookies BEFORE first navigation → reuse cf_clearance
-  const cookies = loadCookies();
-  if (cookies.length) {
-    try { await _page.setCookie(...cookies); log('restored', cookies.length, 'cookies'); }
-    catch (e) { warn('cookie restore failed:', e.message); }
-  }
-  return _page;
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Cloudflare challenge wait — give the stealth browser up to 30s to clear
-// ────────────────────────────────────────────────────────────────────────
-async function waitForCloudflare(page, timeoutMs = 30000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    const title = await page.title().catch(() => '');
-    if (!/just a moment/i.test(title) && !/checking your browser/i.test(title)) return true;
-    dlog('CF challenge in progress... ("' + title + '")');
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  return false;
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Login flow — Phase A: login + log everything we see for selector discovery
-// ────────────────────────────────────────────────────────────────────────
-async function login() {
-  const { BASE_URL, USERNAME, PASSWORD } = resolveCreds();
-  if (!USERNAME || !PASSWORD) throw new Error('mediatel creds missing');
-
-  const page = await getPage();
-  const loginUrl = `${BASE_URL}/index.php`;
-  log('GET', loginUrl);
-  await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-  const cfPassed = await waitForCloudflare(page, 30000);
-  if (!cfPassed) {
-    warn('Cloudflare challenge did NOT clear in 30s. Saving page for inspection.');
-    const html = await page.content().catch(() => '');
-    log('CF-blocked title:', await page.title().catch(() => ''));
-    log('CF-blocked html size:', html.length);
-    throw new Error('cloudflare_challenge_blocked');
-  }
-  log('CF passed — title:', await page.title().catch(() => ''));
-
-  // Discover login form fields. Mediatel form name guesses: username/password
-  // or user/pass. Try common patterns and log what we find.
-  const fieldInfo = await page.evaluate(() => {
-    const forms = Array.from(document.querySelectorAll('form')).map((f) => ({
-      action: f.action, method: f.method,
-      inputs: Array.from(f.querySelectorAll('input')).map((i) => ({
-        name: i.name, type: i.type, id: i.id, placeholder: i.placeholder,
-      })),
-    }));
-    return { url: location.href, title: document.title, forms };
-  });
-  log('login page discovery:', JSON.stringify(fieldInfo).slice(0, 1500));
-
-  // Try most common combos
-  const userSel = ['input[name="username"]', 'input[name="user"]', 'input[name="login"]', 'input[type="text"]'];
-  const passSel = ['input[name="password"]', 'input[name="pass"]', 'input[type="password"]'];
-  let userField = null, passField = null;
-  for (const s of userSel) { if (await page.$(s)) { userField = s; break; } }
-  for (const s of passSel) { if (await page.$(s)) { passField = s; break; } }
-  if (!userField || !passField) {
-    throw new Error('login form fields not found — see discovery log above');
-  }
-  log('using selectors → user:', userField, '| pass:', passField);
-
-  await page.click(userField, { clickCount: 3 });
-  await page.type(userField, USERNAME, { delay: 40 });
-  await page.click(passField, { clickCount: 3 });
-  await page.type(passField, PASSWORD, { delay: 40 });
-
-  // Submit — try button[type=submit], else press Enter
-  const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
-  if (submitBtn) {
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null),
-      submitBtn.click(),
-    ]);
-  } else {
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null),
-      page.keyboard.press('Enter'),
-    ]);
-  }
-
-  // Persist cookies for next restart (CF + session)
-  try {
-    const cookies = await page.cookies();
-    saveCookies(cookies);
-    log('saved', cookies.length, 'cookies for next restart');
-  } catch (e) { warn('cookie save failed:', e.message); }
-
-  // Log post-login state — this is the critical info for Phase B selectors
-  const post = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('a')).slice(0, 40).map((a) => ({
-      text: (a.textContent || '').trim().slice(0, 60),
-      href: a.getAttribute('href'),
-    }));
-    return {
-      url: location.href,
-      title: document.title,
-      bodySize: document.body.innerText.length,
-      bodyPreview: document.body.innerText.slice(0, 400),
-      links,
-    };
-  });
-  log('=== POST-LOGIN PAGE ===');
-  log(JSON.stringify(post, null, 2));
-
-  if (/login|index\.php/i.test(post.url) && /login|password/i.test(post.bodyPreview)) {
-    throw new Error('still on login page after submit — wrong creds or form changed');
-  }
-
-  _loggedIn = true;
-  log('✓ login OK');
-  return true;
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Worker loop — Phase A: login, then idle ping every interval
-// (Phase B will replace ping with real CDR scrape)
-// ────────────────────────────────────────────────────────────────────────
 let _running = false;
 let _stopFlag = false;
 let _lastTickAt = null;
 let _lastError = null;
 let _consecFail = 0;
+let _otpDelivered = 0;
+let _seenIds = new Set();   // de-dupe processed CDR rows in-process
+const SEEN_MAX = 5000;
+
+function buildClient(baseURL) {
+  _jar = new tough.CookieJar();
+  // Restore saved PHPSESSID if present
+  const saved = readSetting('seven1tel_session_cookie');
+  if (saved) {
+    try {
+      _jar.setCookieSync(saved, baseURL);
+      dlog('restored saved session cookie');
+    } catch (e) { warn('cookie restore failed:', e.message); }
+  }
+  const c = wrapper(axios.create({
+    baseURL,
+    jar: _jar,
+    withCredentials: true,
+    timeout: 15000,
+    maxRedirects: 5,
+    validateStatus: (s) => s < 500,   // let us inspect 4xx
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  }));
+  return c;
+}
+
+async function persistSessionCookie() {
+  try {
+    const cookies = await _jar.getCookies(_client.defaults.baseURL);
+    const sess = cookies.find(c => /^PHPSESSID/i.test(c.key));
+    if (sess) writeSetting('seven1tel_session_cookie', sess.cookieString());
+  } catch (e) { warn('persistSession failed:', e.message); }
+}
+
+// ───────── login ─────────
+async function login() {
+  const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
+  if (!USERNAME || !PASSWORD) throw new Error('seven1tel creds missing');
+
+  if (!_client) _client = buildClient(BASE_URL);
+
+  // 1) GET login page (sets initial PHPSESSID + may include CSRF)
+  const r1 = await _client.get('/login');
+  dlog('GET /login →', r1.status, 'len', (r1.data || '').length);
+
+  // The "ints" panel uses a plain form: name="username", name="password",
+  // optional name="captcha". We send only user/pass (matches old MSI bot).
+  const form = new URLSearchParams();
+  form.set('username', USERNAME);
+  form.set('password', PASSWORD);
+  // Some builds use "/signin", others "/signin.php" — try both.
+  const trySubmit = async (path) => {
+    const r = await _client.post(path, form.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': `${BASE_URL}/login`,
+        'Origin': BASE_URL,
+      },
+    });
+    dlog('POST', path, '→', r.status, 'final', r.request?.res?.responseUrl || '?');
+    return r;
+  };
+  let r2 = await trySubmit('/signin');
+  if (r2.status === 404) r2 = await trySubmit('/signin.php');
+
+  // Verify by hitting the agent dashboard. /agent or /agent/ are typical.
+  const probe = await _client.get('/agent');
+  const html = String(probe.data || '');
+  const ok = probe.status === 200 && !/name=["']password["']/i.test(html);
+  if (!ok) {
+    // dump tiny preview for debugging
+    log('login probe FAIL — status', probe.status,
+        'preview:', html.slice(0, 250).replace(/\s+/g, ' '));
+    throw new Error('login_failed');
+  }
+
+  await persistSessionCookie();
+  _loggedIn = true;
+  log('✓ login OK as', USERNAME);
+  return true;
+}
+
+// ───────── CDR poll ─────────
+//
+// The "ints" SMSCDRStats DataTable uses an AJAX endpoint:
+//   /res/data_smscdr.php?fdate1=YYYY-MM-DD HH:MM:SS&fdate2=YYYY-MM-DD HH:MM:SS&iDisplayLength=N
+// Returns DataTables JSON: { aaData: [ [date, range, number, cli, msg], ... ] }
+// Column order can vary slightly between builds — we detect the phone column
+// by regex (digits with optional +, length >= 7).
+//
+function fmtDate(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ` +
+         `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+async function fetchCdrRows() {
+  // Pull last 10 minutes of CDR — plenty of overlap, dedupe handles repeats.
+  const now = new Date();
+  const past = new Date(now.getTime() - 10 * 60_000);
+  const params = new URLSearchParams({
+    fdate1: fmtDate(past),
+    fdate2: fmtDate(now),
+    iDisplayLength: '100',
+    iDisplayStart: '0',
+    sEcho: String(Date.now() % 100000),
+  });
+  const r = await _client.get(`/res/data_smscdr.php?${params.toString()}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_client.defaults.baseURL}/agent/SMSCDRStats` },
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
+  if (typeof r.data === 'string' && /name=["']password["']/i.test(r.data)) {
+    throw new Error('cdr_session_lost');
+  }
+  const rows = (r.data && r.data.aaData) || [];
+  return rows;
+}
+
+// Detect phone & otp from a CDR row (column-position-agnostic).
+function parseRow(row) {
+  if (!Array.isArray(row)) return null;
+  let phone = null, msg = null, range = null, cli = null, dateCol = null;
+  for (const cell of row) {
+    if (cell == null) continue;
+    const s = String(cell).trim();
+    // date like "2026-05-01 12:34:56"
+    if (!dateCol && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) { dateCol = s; continue; }
+    // phone — digits 7+ with optional + (and not too long → exclude unix ts)
+    if (!phone && /^\+?\d{7,15}$/.test(s.replace(/[\s-]/g, ''))) {
+      phone = s.replace(/[\s-]/g, '').replace(/^\+/, '');
+      continue;
+    }
+    // message: longest cell with letters
+    if (/[a-z]/i.test(s) && (!msg || s.length > msg.length)) msg = s;
+    // range: short alphanum tag
+    if (!range && /^[A-Z0-9_\-]{2,20}$/i.test(s) && s.length < (msg?.length || 999)) range = s;
+  }
+  // CLI = sender id often in 2nd column. Pull whatever isn't phone/msg/date.
+  for (const cell of row) {
+    const s = String(cell || '').trim();
+    if (!s || s === phone || s === msg || s === dateCol) continue;
+    if (s.length <= 20 && !cli) cli = s;
+  }
+  if (!phone || !msg) return null;
+  // OTP extract — first 4-8 digit run in message
+  const otpMatch = msg.match(/\b(\d{4,8})\b/);
+  return {
+    phone,
+    otp: otpMatch ? otpMatch[1] : null,
+    msg,
+    cli,
+    range,
+    dedup_key: `${phone}|${(msg || '').slice(0, 60)}`,
+  };
+}
+
+function findActiveAllocation(phone) {
+  // suffix match — last 9 digits — handles "+44…" vs "44…" etc.
+  const tail = phone.slice(-9);
+  return db.prepare(`
+    SELECT id, user_id, phone_number, provider, country_code, operator
+    FROM allocations
+    WHERE status = 'active' AND phone_number LIKE ?
+    ORDER BY allocated_at DESC LIMIT 1
+  `).get(`%${tail}`);
+}
+
+async function tickOnce() {
+  if (!_loggedIn) await login();
+  const rows = await fetchCdrRows();
+  let delivered = 0;
+  for (const raw of rows) {
+    const r = parseRow(raw);
+    if (!r || !r.otp) continue;
+    if (_seenIds.has(r.dedup_key)) continue;
+    _seenIds.add(r.dedup_key);
+    if (_seenIds.size > SEEN_MAX) {
+      // reset oldest half
+      const arr = Array.from(_seenIds);
+      _seenIds = new Set(arr.slice(arr.length / 2));
+    }
+    const alloc = findActiveAllocation(r.phone);
+    if (!alloc) {
+      dlog('no active alloc for', r.phone, '→ skip');
+      continue;
+    }
+    try {
+      await markOtpReceived(alloc, r.otp, r.cli);
+      delivered++;
+      _otpDelivered++;
+      log(`✓ OTP ${r.phone} → ${r.otp} (alloc#${alloc.id}, agent#${alloc.user_id})`);
+    } catch (e) {
+      warn('markOtpReceived failed:', e.message);
+    }
+  }
+  return delivered;
+}
 
 async function loop() {
   if (_running) return;
   _running = true;
   while (!_stopFlag) {
-    const { ENABLED } = resolveCreds();
-    if (!ENABLED) {
+    const cfg = resolveCfg();
+    if (!cfg.ENABLED) {
       _running = false;
-      log('disabled — bot stopped');
+      log('disabled — stopping');
       return;
     }
     try {
-      if (!_loggedIn) await login();
-      const page = await getPage();
-      // Phase A keepalive — visit base URL to keep session warm
-      const url = page.url();
-      dlog('idle keepalive @', url);
-      // PHASE B: replace this with CDR-scrape → markOtpReceived(...)
+      const n = await tickOnce();
       _lastTickAt = Math.floor(Date.now() / 1000);
       _lastError = null;
       _consecFail = 0;
+      if (n) log('delivered', n, 'OTPs this tick');
     } catch (e) {
-      warn('loop error:', e.message);
-      _loggedIn = false;
+      warn('tick error:', e.message);
       _lastError = e.message;
       _consecFail++;
-      // back off on errors so we don't hammer CF
-      await new Promise((r) => setTimeout(r, 15000));
+      if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
+        _loggedIn = false;
+      }
+      // back off harder after repeated fails
+      const backoff = Math.min(60, 5 + _consecFail * 2);
+      await new Promise(r => setTimeout(r, backoff * 1000));
     }
-    await new Promise((r) => setTimeout(r, resolveOtpInterval() * 1000));
+    await new Promise(r => setTimeout(r, cfg.INTERVAL * 1000));
   }
   _running = false;
 }
 
 function start() {
-  const { ENABLED } = resolveCreds();
-  if (!ENABLED) { log('disabled (mediatel_enabled=false) — not starting'); return; }
-  log('starting…');
-  loop().catch((e) => warn('fatal:', e.message));
+  const cfg = resolveCfg();
+  if (!cfg.ENABLED) { log('disabled (seven1tel_enabled=false) — not starting'); return; }
+  log('starting…  base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's');
+  loop().catch(e => warn('fatal:', e.message));
 }
-
-async function stop() {
-  _stopFlag = true;
-  try { if (_browser) await _browser.close(); } catch (_) {}
-  _browser = null; _page = null; _loggedIn = false;
-}
-
+function stop() { _stopFlag = true; _loggedIn = false; }
 function getStatus() {
-  const { ENABLED, BASE_URL, USERNAME } = resolveCreds();
+  const cfg = resolveCfg();
   return {
-    enabled: ENABLED,
+    enabled: cfg.ENABLED,
     running: _running,
     logged_in: _loggedIn,
-    base_url: BASE_URL,
-    username: USERNAME ? USERNAME.replace(/.(?=.{2})/g, '*') : null,
+    base_url: cfg.BASE_URL,
+    username: cfg.USERNAME ? cfg.USERNAME.replace(/.(?=.{2})/g, '*') : null,
     last_tick_at: _lastTickAt,
     last_error: _lastError,
     consec_fail: _consecFail,
-    interval_sec: resolveOtpInterval(),
+    otps_delivered: _otpDelivered,
+    interval_sec: cfg.INTERVAL,
   };
 }
 
-module.exports = { start, stop, login, getStatus };
+module.exports = { start, stop, login, tickOnce, getStatus };
