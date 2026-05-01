@@ -30,7 +30,6 @@ const AgentHistory = Pages["/agent/history"].L;
 const AgentRanges = Pages["/agent/ranges"].L;
 
 const AdminDashboard = Pages["/admin/dashboard"].L;
-const AdminProviders = Pages["/admin/providers"].L;
 const AdminAgents = Pages["/admin/agents"].L;
 const AdminRateCard = Pages["/admin/rates"].L;
 const AdminAllocation = Pages["/admin/allocation"].L;
@@ -38,13 +37,8 @@ const AdminCDR = Pages["/admin/cdr"].L;
 const AdminNotifications = Pages["/admin/notifications"].L;
 const AdminPayments = Pages["/admin/payments"].L;
 const AdminSecurity = Pages["/admin/security"].L;
-const AdminImsStatus = Pages["/admin/ims-status"].L;
-const AdminMsiStatus = Pages["/admin/msi-status"].L;
-const AdminNumPanelStatus = Pages["/admin/numpanel-status"].L;
-const AdminProviderSettings = Pages["/admin/provider-settings"].L;
 const AdminProviderRanges = Pages["/admin/provider-ranges"].L;
 const AdminWithdrawals = Pages["/admin/withdrawals"].L;
-const AdminTgBot = Pages["/admin/tg-bot"].L;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,7 +111,6 @@ const AppRoutes = () => {
           {/* Admin Routes */}
           <Route element={<AppLayout requiredRole="admin" />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/providers" element={<AdminProviders />} />
             <Route path="/admin/agents" element={<AdminAgents />} />
             <Route path="/admin/rates" element={<AdminRateCard />} />
             <Route path="/admin/allocation" element={<AdminAllocation />} />
@@ -125,12 +118,7 @@ const AppRoutes = () => {
             <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
             <Route path="/admin/security" element={<AdminSecurity />} />
             <Route path="/admin/cdr" element={<AdminCDR />} />
-            <Route path="/admin/ims-status" element={<AdminImsStatus />} />
-            <Route path="/admin/msi-status" element={<AdminMsiStatus />} />
-            <Route path="/admin/numpanel-status" element={<AdminNumPanelStatus />} />
-            <Route path="/admin/provider-settings" element={<AdminProviderSettings />} />
             <Route path="/admin/provider-ranges" element={<AdminProviderRanges />} />
-            <Route path="/admin/tg-bot" element={<AdminTgBot />} />
             <Route path="/admin/notifications" element={<AdminNotifications />} />
           </Route>
 
