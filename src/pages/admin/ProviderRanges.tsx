@@ -272,6 +272,9 @@ const AdminProviderRanges = () => {
                   <th className="px-4 py-3">Range</th>
                   <th className="px-4 py-3">Operator</th>
                   <th className="px-4 py-3 text-right">Price (BDT)</th>
+                  <th className="px-4 py-3">Stock</th>
+                  <th className="px-4 py-3">Last OTP</th>
+                  <th className="px-4 py-3">Bot</th>
                   <th className="px-4 py-3 text-center">Enabled</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -300,11 +303,63 @@ const AdminProviderRanges = () => {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.operator || "—"}</td>
                     <td className="px-4 py-3 text-right font-mono">{Number(r.price_bdt).toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const st = stats[r.id];
+                        const free = st?.free_count ?? 0;
+                        const alloc = st?.allocated_count ?? 0;
+                        const total = st?.total ?? 0;
+                        return (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className={cn("font-mono px-1.5 py-0.5 rounded border",
+                              free > 0 ? "border-neon-green/30 bg-neon-green/10 text-neon-green"
+                                       : "border-white/10 text-muted-foreground"
+                            )}>{free} free</span>
+                            <span className="text-muted-foreground font-mono">{alloc}/{total}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        {fmtAgo(stats[r.id]?.last_otp_at)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const b = bots[`${r.provider}Bot`];
+                        const running = !!b?.running;
+                        const fails = b?.consecutive_failures ?? 0;
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-medium",
+                              running
+                                ? "border-neon-green/40 bg-neon-green/10 text-neon-green"
+                                : "border-neon-amber/40 bg-neon-amber/10 text-neon-amber"
+                            )}>
+                              {running ? "Running" : "Stopped"}
+                              {fails > 0 && <span className="ml-1 text-destructive">×{fails}</span>}
+                            </span>
+                            <Button size="sm" variant="ghost" onClick={() => restartBot(r.provider)}
+                              className="h-7 w-7 p-0" title="Restart bot">
+                              <RotateCw className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <Switch checked={!!r.enabled} onCheckedChange={() => toggle(r)} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setPoolRangeId(r.id)}
+                          className="h-8 px-2 text-neon-cyan hover:text-neon-cyan hover:bg-neon-cyan/10"
+                          title="Manage number pool">
+                          <Layers className="w-3.5 h-3.5 mr-1" />
+                          Pool
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => startEdit(r)} className="h-8 w-8 p-0">
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
