@@ -93,7 +93,6 @@ app.use('/api', require('./routes/payments'));            // /payments + /withdr
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api', require('./routes/security'));            // /audit + /sessions + /settings
-app.use('/api/admin/tgbot', require('./routes/tgbot'));   // Telegram bot admin
 app.use('/api', require('./routes/provider-ranges'));     // /admin/provider-ranges + /numbers/v2/*
 
 // Health
@@ -116,19 +115,6 @@ app.listen(PORT, () => {
   console.log(`\n🚀 NexusX backend listening on http://localhost:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS origin: ${corsOrigins ? corsOrigins.join(', ') : '(allow all — dev only)'}\n`);
-
-  // Start OTP poller (AccHub auto polling) after server is up
-  require('./workers/otpPoller').start();
-
-  // Start IMS browser bot (no-op if IMS_ENABLED=false)
-  require('./workers/imsBot').start();
-
-  // Start MSI browser bot (no-op if MSI_ENABLED=false)
-  require('./workers/msiBot').start();
-
-  // Start NumPanel bot (no-op if NUMPANEL_ENABLED=false)
-  try { require('./workers/numpanelBot').start(); }
-  catch (e) { console.warn('numpanel bot start error:', e.message); }
 
   // Start Mediatel bot (no-op if mediatel_enabled=false)
   try { require('./workers/mediatelBot').start(); }
