@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Geist:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,23 +6,25 @@
 
 @layer base {
   :root {
-    /* Core surfaces — deeper, richer blacks */
-    --background: 240 18% 3%;
-    --foreground: 210 40% 96%;
+    /* === V2.0 Neo-Cyber Lux — $100k tier === */
+    --background: 230 20% 2.5%;
+    --foreground: 210 40% 98%;
 
-    --card: 240 14% 5.5%;
-    --card-foreground: 210 40% 96%;
+    --card: 230 18% 4.5%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 240 14% 5.5%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 230 18% 5%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 185 100% 55%;
-    --primary-foreground: 240 18% 3%;
-    --primary-glow: 185 100% 65%;
+    /* Primary = electric cyan */
+    --primary: 188 100% 50%;
+    --primary-foreground: 230 20% 2.5%;
+    --primary-glow: 188 100% 65%;
 
-    --secondary: 300 100% 55%;
+    /* Secondary = violet */
+    --secondary: 258 90% 66%;
     --secondary-foreground: 210 40% 98%;
-    --secondary-glow: 300 100% 65%;
+    --secondary-glow: 258 90% 76%;
 
     --muted: 240 10% 11%;
     --muted-foreground: 215 18% 60%;
@@ -33,23 +35,24 @@
     --destructive: 0 84% 62%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 240 10% 14%;
-    --input: 240 10% 14%;
-    --ring: 185 100% 55%;
+    --border: 230 12% 12%;
+    --input: 230 12% 12%;
+    --ring: 188 100% 50%;
 
     --radius: 0.875rem;
 
-    --sidebar-background: 240 16% 4%;
-    --sidebar-foreground: 210 20% 78%;
-    --sidebar-primary: 185 100% 55%;
-    --sidebar-primary-foreground: 240 18% 3%;
-    --sidebar-accent: 240 12% 9%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 240 10% 11%;
-    --sidebar-ring: 185 100% 55%;
+    --sidebar-background: 230 20% 3%;
+    --sidebar-foreground: 210 20% 80%;
+    --sidebar-primary: 188 100% 50%;
+    --sidebar-primary-foreground: 230 20% 2.5%;
+    --sidebar-accent: 230 14% 8%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 230 12% 10%;
+    --sidebar-ring: 188 100% 50%;
 
-    --neon-cyan: 185 100% 55%;
-    --neon-magenta: 300 100% 55%;
+    --neon-cyan: 188 100% 50%;
+    --neon-violet: 258 90% 66%;
+    --neon-magenta: 320 95% 60%;
     --neon-green: 150 100% 55%;
     --neon-amber: 38 100% 55%;
     --neon-red: 0 100% 62%;
@@ -59,19 +62,22 @@
     --glass-bg: 240 10% 8%;
     --glass-border: 0 0% 100%;
 
-    /* Premium gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(185 100% 55%) 0%, hsl(220 100% 60%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(300 100% 55%) 0%, hsl(270 100% 65%) 100%);
-    --gradient-aurora: linear-gradient(120deg, hsl(185 100% 55%) 0%, hsl(270 100% 65%) 50%, hsl(300 100% 55%) 100%);
+    /* Signature gradient: cyan → violet → magenta */
+    --gradient-primary: linear-gradient(135deg, hsl(188 100% 50%) 0%, hsl(258 90% 66%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(258 90% 66%) 0%, hsl(320 95% 60%) 100%);
+    --gradient-brand: linear-gradient(120deg, hsl(188 100% 50%) 0%, hsl(220 90% 60%) 35%, hsl(258 90% 66%) 70%, hsl(320 95% 60%) 100%);
+    --gradient-aurora: linear-gradient(120deg, hsl(188 100% 50%) 0%, hsl(258 90% 66%) 50%, hsl(320 95% 60%) 100%);
     --gradient-sunset: linear-gradient(135deg, hsl(38 100% 55%) 0%, hsl(0 100% 62%) 100%);
-    --gradient-mint: linear-gradient(135deg, hsl(150 100% 55%) 0%, hsl(185 100% 55%) 100%);
+    --gradient-mint: linear-gradient(135deg, hsl(150 100% 55%) 0%, hsl(188 100% 50%) 100%);
 
     /* Premium shadows */
-    --shadow-glow-cyan: 0 0 24px hsl(185 100% 55% / 0.25), 0 0 80px hsl(185 100% 55% / 0.08);
-    --shadow-glow-magenta: 0 0 24px hsl(300 100% 55% / 0.25), 0 0 80px hsl(300 100% 55% / 0.08);
+    --shadow-glow-cyan: 0 0 24px hsl(188 100% 50% / 0.28), 0 0 80px hsl(188 100% 50% / 0.10);
+    --shadow-glow-violet: 0 0 24px hsl(258 90% 66% / 0.28), 0 0 80px hsl(258 90% 66% / 0.10);
+    --shadow-glow-magenta: 0 0 24px hsl(320 95% 60% / 0.28), 0 0 80px hsl(320 95% 60% / 0.10);
     --shadow-glow-green: 0 0 24px hsl(150 100% 55% / 0.25), 0 0 80px hsl(150 100% 55% / 0.08);
-    --shadow-elegant: 0 8px 40px -12px hsl(240 18% 0% / 0.6), 0 0 0 1px hsl(0 0% 100% / 0.04);
-    --shadow-elevated: 0 24px 80px -20px hsl(240 18% 0% / 0.8), 0 0 0 1px hsl(0 0% 100% / 0.06);
+    --shadow-elegant: 0 8px 40px -12px hsl(230 30% 0% / 0.7), 0 0 0 1px hsl(0 0% 100% / 0.05);
+    --shadow-elevated: 0 24px 80px -20px hsl(230 30% 0% / 0.85), 0 0 0 1px hsl(0 0% 100% / 0.07);
+    --shadow-luxe: 0 30px 100px -25px hsl(188 100% 50% / 0.15), 0 24px 80px -20px hsl(258 90% 66% / 0.12), 0 0 0 1px hsl(0 0% 100% / 0.06);
   }
 }
 
