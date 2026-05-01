@@ -11,11 +11,12 @@ interface NexusLogoProps {
 const APP_VERSION = "v2.0";
 
 const sizes = {
-  xs: { wrap: "gap-[3px]", nexus: "text-[11px]", x: "text-[15px]", track: "tracking-[0.18em]" },
-  sm: { wrap: "gap-1",     nexus: "text-base",   x: "text-xl",    track: "tracking-[0.2em]"  },
-  md: { wrap: "gap-1.5",   nexus: "text-xl",     x: "text-3xl",   track: "tracking-[0.22em]" },
-  lg: { wrap: "gap-2",     nexus: "text-3xl",    x: "text-5xl",   track: "tracking-[0.24em]" },
-  xl: { wrap: "gap-2.5",   nexus: "text-5xl",    x: "text-7xl",   track: "tracking-[0.26em]" },
+  // X is sized to match NEXUS cap-height (same font-size, just heavier weight)
+  xs: { wrap: "gap-[4px]", nexus: "text-[11px]", x: "text-[12px]", track: "tracking-[0.18em]" },
+  sm: { wrap: "gap-1.5",   nexus: "text-base",   x: "text-base",   track: "tracking-[0.2em]"  },
+  md: { wrap: "gap-2",     nexus: "text-xl",     x: "text-xl",     track: "tracking-[0.22em]" },
+  lg: { wrap: "gap-2.5",   nexus: "text-3xl",    x: "text-3xl",    track: "tracking-[0.24em]" },
+  xl: { wrap: "gap-3",     nexus: "text-5xl",    x: "text-5xl",    track: "tracking-[0.26em]" },
 };
 
 /**
@@ -46,7 +47,7 @@ export const NexusLogo = ({ size = "md", className, showVersion = false, glyphOn
   }
 
   return (
-    <div className={cn("inline-flex items-baseline select-none", s.wrap, className)} aria-label="Nexus X">
+    <div className={cn("inline-flex items-center select-none", s.wrap, className)} aria-label="Nexus X">
       <span
         className={cn(
           "font-display font-semibold uppercase text-foreground leading-none",
@@ -57,7 +58,7 @@ export const NexusLogo = ({ size = "md", className, showVersion = false, glyphOn
         Nexus
       </span>
       <span
-        className={cn("font-display font-black relative leading-none", s.x)}
+        className={cn("font-display font-black uppercase relative leading-none", s.x)}
         style={{
           background:
             "linear-gradient(135deg, hsl(188 100% 55%) 0%, hsl(220 90% 70%) 30%, hsl(258 90% 70%) 60%, hsl(320 95% 65%) 100%)",
@@ -65,7 +66,7 @@ export const NexusLogo = ({ size = "md", className, showVersion = false, glyphOn
           WebkitTextFillColor: "transparent",
           backgroundClip: "text",
           filter:
-            "drop-shadow(0 0 14px hsl(188 100% 50% / 0.55)) drop-shadow(0 0 28px hsl(258 90% 66% / 0.35))",
+            "drop-shadow(0 0 10px hsl(188 100% 50% / 0.45)) drop-shadow(0 0 20px hsl(258 90% 66% / 0.3))",
         }}
       >
         X

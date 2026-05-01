@@ -143,8 +143,11 @@ const AdminLogin = () => {
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-[11px] text-muted-foreground/60 font-mono">
+          <p className="mt-6 text-center text-[11px] text-muted-foreground/60 font-mono leading-relaxed">
             Secure admin gateway · Nexus X {APP_VERSION}
+            <br />
+            Crafted by <span className="text-foreground/70">Dev Shovon</span> · Community by{" "}
+            <span className="text-primary/70">BasicTrick</span>
           </p>
         </div>
       </motion.div>
