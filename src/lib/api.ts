@@ -465,15 +465,6 @@ export const api = {
     fireNow: () => request<{ ok: boolean }>("/admin/fake-otp/fire", { method: "POST" }),
     purge: () => request<{ ok: boolean; removed: number }>("/admin/fake-otp/purge", { method: "POST" }),
   },
-
-  cdr: {
-    hideFakes: {
-      get: () => request<{ value: string }>("/settings/cdr_hide_fakes").catch(() => ({ value: "false" })),
-      set: (hide: boolean) => request<{ ok: boolean }>("/settings/cdr_hide_fakes", {
-        method: "PUT", body: JSON.stringify({ value: String(hide) }),
-      }),
-    },
-  },
 };
 
 export interface PaymentConfig {
