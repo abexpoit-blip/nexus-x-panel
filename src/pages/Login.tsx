@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, LogIn, ArrowRight, ShieldCheck, Zap, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
+import { PlexusBackground } from "@/components/PlexusBackground";
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -35,6 +36,9 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-luxe-mesh relative overflow-hidden">
+      {/* Animated plexus / network background */}
+      <PlexusBackground />
+
       {/* Ambient floating orbs */}
       <div className="pointer-events-none absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-neon-cyan/[0.10] blur-[140px] animate-float-slow" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 w-[640px] h-[640px] rounded-full bg-neon-violet/[0.12] blur-[140px] animate-float-slow" style={{ animationDelay: "4s" }} />

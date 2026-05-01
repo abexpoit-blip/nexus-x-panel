@@ -310,4 +310,64 @@ router.post('/fake-otp/purge', (req, res) => {
   res.json({ ok: true, removed });
 });
 
+// =============================================================
+// Unified Bots Control — status + start/stop/restart for every worker
+// =============================================================
+function loadBots() {
+  const bots = {};
+  try { bots.mediatel = require('../workers/mediatelBot'); } catch (_) {}
+  try { bots.seven1tel = require('../workers/seven1telBot'); } catch (_) {}
+  try { bots.fake_otp = require('../workers/fakeOtpBroadcaster'); } catch (_) {}
+  return bots;
+}
+
+const BOT_LABELS = {
+  mediatel:  { name: 'Mediatel Bot',          desc: 'Scrapes mediatel SMS portal for live OTPs' },
+  seven1tel: { name: 'Seven1Tel Bot',         desc: 'Scrapes seven1tel SMS portal for live OTPs' },
+  fake_otp:  { name: 'Fake OTP Broadcaster',  desc: 'Synthetic CDR rows to keep the public feed warm' },
+};
+
+router.get('/bots', (req, res) => {
+  const bots = loadBots();
+  const out = {};
+  for (const [key, mod] of Object.entries(bots)) {
+    let status = null;
+    try { status = mod.getStatus?.() || null; } catch (e) { status = { error: e.message }; }
+    out[key] = {
+      key,
+      label: BOT_LABELS[key]?.name || key,
+      description: BOT_LABELS[key]?.desc || '',
+      status,
+    };
+  }
+  res.json({ bots: out });
+});
+
+router.post('/bots/:bot/:action', (req, res) => {
+  const { bot, action } = req.params;
+  const bots = loadBots();
+  const mod = bots[bot];
+  if (!mod) return res.status(404).json({ error: `Unknown bot: ${bot}` });
+  if (!['start', 'stop', 'restart'].includes(action)) {
+    return res.status(400).json({ error: 'action must be start | stop | restart' });
+  }
+  try {
+    if (action === 'start') {
+      if (typeof mod.start !== 'function') throw new Error('bot does not support start');
+      mod.start();
+    } else if (action === 'stop') {
+      if (typeof mod.stop !== 'function') throw new Error('bot does not support stop');
+      mod.stop();
+    } else if (action === 'restart') {
+      try { mod.stop?.(); } catch (_) {}
+      // Small delay so the worker tick can drain before restarting.
+      setTimeout(() => { try { mod.start?.(); } catch (_) {} }, 500);
+    }
+    logFromReq(req, `bot_${action}`, { meta: { bot } });
+    res.json({ ok: true, bot, action });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

@@ -439,6 +439,13 @@ export const api = {
       request<{ ok: boolean; updated: number }>("/admin/provider-ranges/bulk-toggle", {
         method: "POST", body: JSON.stringify({ ids, enabled }),
       }),
+
+    // ─── Bots Control ─────────────────────────────────────────────
+    bots: {
+      list: () => request<{ bots: Record<string, BotInfo> }>("/admin/bots"),
+      action: (bot: string, action: "start" | "stop" | "restart") =>
+        request<{ ok: boolean; bot: string; action: string }>(`/admin/bots/${bot}/${action}`, { method: "POST" }),
+    },
   },
 
   // ===== Agent v2 ranges =====
@@ -516,4 +523,18 @@ export interface ProviderBotStatus {
   consec_fail?: number;
   otps_delivered?: number;
   interval_sec?: number;
+}
+
+export interface BotInfo {
+  key: string;
+  label: string;
+  description: string;
+  status: (ProviderBotStatus & {
+    total_fired?: number;
+    last_fire_at?: number | null;
+    min_sec?: number;
+    max_sec?: number;
+    burst?: number;
+    error?: string;
+  }) | null;
 }

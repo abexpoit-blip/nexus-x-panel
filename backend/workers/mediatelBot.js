@@ -296,6 +296,8 @@ async function loop() {
 function start() {
   const { ENABLED } = resolveCreds();
   if (!ENABLED) { log('disabled (mediatel_enabled=false) — not starting'); return; }
+  if (_running) { log('already running — skip start'); return; }
+  _stopFlag = false;
   log('starting…');
   loop().catch((e) => warn('fatal:', e.message));
 }
