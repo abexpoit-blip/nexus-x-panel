@@ -79,13 +79,24 @@ const SEEN_MAX = 5000;
 
 function buildClient(baseURL) {
   _jar = new tough.CookieJar();
-  // Restore saved PHPSESSID if present
-  const saved = readSetting('seven1tel_session_cookie');
-  if (saved) {
-    try {
-      _jar.setCookieSync(saved, baseURL);
-      dlog('restored saved session cookie');
-    } catch (e) { warn('cookie restore failed:', e.message); }
+  // 1) Manual cookie header (admin-pasted) wins — lets us bypass captcha entirely.
+  const manual = String(readSetting('seven1tel_cookie_header') || '').trim();
+  if (manual) {
+    for (const part of manual.split(/;\s*/)) {
+      if (!part) continue;
+      try { _jar.setCookieSync(part + '; Path=/', baseURL); }
+      catch (e) { warn('manual cookie parse failed for', part.slice(0, 40), e.message); }
+    }
+    dlog('loaded manual cookie header (' + manual.split(';').length + ' cookies)');
+  } else {
+    // 2) Otherwise restore the auto-saved PHPSESSID from last successful login
+    const saved = readSetting('seven1tel_session_cookie');
+    if (saved) {
+      try {
+        _jar.setCookieSync(saved, baseURL);
+        dlog('restored saved session cookie');
+      } catch (e) { warn('cookie restore failed:', e.message); }
+    }
   }
   const c = wrapper(axios.create({
     baseURL,
