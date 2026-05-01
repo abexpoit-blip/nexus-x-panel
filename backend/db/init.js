@@ -114,7 +114,7 @@ function seedSetting(key, value) {
   `).run(key, String(value));
   console.log(`✓ Seeded setting: ${key}`);
 }
-// Mediatel removed — provider replaced by XISORA (coming next).
+// (Provider bot settings are now seeded only on demand from the admin UI.)
 if (process.env.SEVEN1TEL_USERNAME) {
   seedSetting('seven1tel_enabled',  process.env.SEVEN1TEL_ENABLED   || 'true');
   seedSetting('seven1tel_base_url', process.env.SEVEN1TEL_BASE_URL  || 'http://94.23.120.156/ints');

@@ -116,7 +116,7 @@ app.listen(PORT, () => {
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS origin: ${corsOrigins ? corsOrigins.join(', ') : '(allow all — dev only)'}\n`);
 
-  // Mediatel bot removed.
+  // (Provider bots: Seven1Tel only for now; XISORA pending wire-up.)
 
   // Start Seven1Tel bot (no-op if seven1tel_enabled=false)
   try { require('./workers/seven1telBot').start(); }
