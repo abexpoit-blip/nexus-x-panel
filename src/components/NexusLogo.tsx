@@ -11,12 +11,12 @@ interface NexusLogoProps {
 const APP_VERSION = "v2.0";
 
 const sizes = {
-  // X is sized to match NEXUS cap-height (same font-size, just heavier weight)
-  xs: { wrap: "gap-[4px]", nexus: "text-[11px]", x: "text-[12px]", track: "tracking-[0.18em]" },
-  sm: { wrap: "gap-1.5",   nexus: "text-base",   x: "text-base",   track: "tracking-[0.2em]"  },
-  md: { wrap: "gap-2",     nexus: "text-xl",     x: "text-xl",     track: "tracking-[0.22em]" },
-  lg: { wrap: "gap-2.5",   nexus: "text-3xl",    x: "text-3xl",    track: "tracking-[0.24em]" },
-  xl: { wrap: "gap-3",     nexus: "text-5xl",    x: "text-5xl",    track: "tracking-[0.26em]" },
+  // X is slightly larger than NEXUS, sharing the same baseline (small inline gap)
+  xs: { wrap: "gap-[5px]",  nexus: "text-[11px]", x: "text-[13px]", track: "tracking-[0.18em]" },
+  sm: { wrap: "gap-2",      nexus: "text-base",   x: "text-[18px]", track: "tracking-[0.2em]"  },
+  md: { wrap: "gap-2.5",    nexus: "text-xl",     x: "text-[26px]", track: "tracking-[0.22em]" },
+  lg: { wrap: "gap-3",      nexus: "text-3xl",    x: "text-[38px]", track: "tracking-[0.24em]" },
+  xl: { wrap: "gap-3.5",    nexus: "text-5xl",    x: "text-[60px]", track: "tracking-[0.26em]" },
 };
 
 /**
@@ -47,7 +47,7 @@ export const NexusLogo = ({ size = "md", className, showVersion = false, glyphOn
   }
 
   return (
-    <div className={cn("inline-flex items-center select-none", s.wrap, className)} aria-label="Nexus X">
+    <div className={cn("inline-flex items-baseline select-none", s.wrap, className)} aria-label="Nexus X">
       <span
         className={cn(
           "font-display font-semibold uppercase text-foreground leading-none",
