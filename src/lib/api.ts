@@ -308,7 +308,7 @@ export const api = {
   countries: (provider: string) => request<{ countries: any[] }>(`/numbers/countries/${provider}`),
   operators: (provider: string, countryId: number) =>
     request<{ operators: any[] }>(`/numbers/operators/${provider}/${countryId}`),
-  getNumber: (body: { provider: string; country_id?: number; operator_id?: number; range?: string; count?: number }) =>
+  getNumber: (body: { provider: string; country_id?: number; operator_id?: number; country_code?: string; operator?: string; range?: string; count?: number }) =>
     request<{ allocated: any[]; errors: string[] }>("/numbers/get", { method: "POST", body: JSON.stringify(body) }),
   imsRanges: () => request<{ ranges: { name: string; count: number }[] }>("/numbers/ims/ranges"),
   msiRanges: () => request<{ ranges: { name: string; count: number }[] }>("/numbers/msi/ranges"),
