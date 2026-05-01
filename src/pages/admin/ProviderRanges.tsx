@@ -60,6 +60,41 @@ const AdminProviderRanges = () => {
   const [form, setForm] = useState<Form>(empty);
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [poolRangeId, setPoolRangeId] = useState<number | null>(null);
+
+  // Per-range stats (stock + last activity)
+  const { data: statsData } = useQuery({
+    queryKey: ["provider-ranges-stats"],
+    queryFn: () => api.admin.rangesStats(),
+    refetchInterval: 15_000,
+  });
+  const stats = statsData?.stats || {};
+
+  // Bot status (for the Bot column / quick restart)
+  const { data: botsData } = useQuery({
+    queryKey: ["admin-bots-status-mini"],
+    queryFn: () => api.admin.bots.list(),
+    refetchInterval: 10_000,
+  });
+  const bots = botsData?.bots || {};
+
+  const restartBot = async (provider: string) => {
+    try {
+      await api.admin.bots.action(`${provider}Bot`, "restart");
+      toast({ title: "Restart sent", description: `${provider}Bot` });
+    } catch (e) {
+      toast({ title: "Restart failed", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const fmtAgo = (ts: number | null | undefined) => {
+    if (!ts) return "—";
+    const s = Math.floor(Date.now() / 1000) - ts;
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
 
   const startCreate = () => {
     const fallback = PROVIDERS[0].id; // "mediatel"
