@@ -13,10 +13,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square } from "lucide-react";
+import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square, Layers, RotateCw, Activity } from "lucide-react";
 import { GradientMesh, PageHeader } from "@/components/premium";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { PoolDialog } from "@/components/admin/PoolDialog";
 
 const PROVIDERS = [
   { id: "mediatel", name: "Mediatel" },
