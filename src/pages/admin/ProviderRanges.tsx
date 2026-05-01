@@ -329,8 +329,9 @@ const AdminProviderRanges = () => {
                     <td className="px-4 py-3">
                       {(() => {
                         const b = bots[`${r.provider}Bot`];
-                        const running = !!b?.running;
-                        const fails = b?.consecutive_failures ?? 0;
+                        const st = b?.status || null;
+                        const running = !!st?.running;
+                        const fails = st?.consec_fail ?? 0;
                         return (
                           <div className="flex items-center gap-1.5">
                             <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-medium",
