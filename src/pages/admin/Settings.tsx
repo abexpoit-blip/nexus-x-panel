@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink, HeartPulse, CheckCircle2, AlertTriangle, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -64,12 +64,18 @@ const AdminSettings = () => {
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
+  const [mediatelUrl, setMediatelUrl] = useState("");
   const [mediatelUser, setMediatelUser] = useState("");
   const [mediatelPass, setMediatelPass] = useState("");
   const [mediatelCookie, setMediatelCookie] = useState("");
+  const [mediatelInterval, setMediatelInterval] = useState<number>(8);
+  const [seven1Url, setSeven1Url] = useState("");
   const [seven1User, setSeven1User] = useState("");
   const [seven1Pass, setSeven1Pass] = useState("");
+  const [seven1Cookie, setSeven1Cookie] = useState("");
+  const [seven1Interval, setSeven1Interval] = useState<number>(4);
   const [showPw, setShowPw] = useState(false);
+  const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
   useEffect(() => {
     if (!s) return;
@@ -81,11 +87,16 @@ const AdminSettings = () => {
     setTgGroupChat(str(s, "tg_required_group_chat"));
     setTgOtpGroup(str(s, "tg_required_otp_group"));
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
+    setMediatelUrl(str(s, "mediatel_base_url", "https://mediateluk.com/sms"));
     setMediatelUser(str(s, "mediatel_username"));
     setMediatelPass(str(s, "mediatel_password"));
     setMediatelCookie(str(s, "mediatel_cookie_header"));
+    setMediatelInterval(Number(str(s, "mediatel_otp_interval", "8")) || 8);
+    setSeven1Url(str(s, "seven1tel_base_url", "http://94.23.120.156/ints"));
     setSeven1User(str(s, "seven1tel_username"));
     setSeven1Pass(str(s, "seven1tel_password"));
+    setSeven1Cookie(str(s, "seven1tel_cookie_header"));
+    setSeven1Interval(Number(str(s, "seven1tel_otp_interval", "4")) || 4);
   }, [s]);
 
   useEffect(() => {
