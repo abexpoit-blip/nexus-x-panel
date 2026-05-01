@@ -28,11 +28,15 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-luxe-mesh relative">
+      {/* Ambient page glow */}
+      <div className="pointer-events-none fixed -top-40 -right-40 w-[640px] h-[640px] rounded-full bg-neon-violet/[0.05] blur-[140px]" />
+      <div className="pointer-events-none fixed -bottom-40 -left-40 w-[640px] h-[640px] rounded-full bg-neon-cyan/[0.04] blur-[140px]" />
+
       <CommandPalette />
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {impersonator && (
           <div className="flex items-center justify-between gap-3 px-4 py-2 bg-neon-amber/15 border-b border-neon-amber/40 text-neon-amber text-xs sm:text-sm font-semibold">
             <div className="flex items-center gap-2 min-w-0">
@@ -50,10 +54,11 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
           </div>
         )}
         {/* Header */}
-        <header className="h-14 flex items-center justify-between px-4 md:px-6 border-b border-white/[0.06] bg-background/80 backdrop-blur-md shrink-0">
+        <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-white/[0.06] bg-background/40 backdrop-blur-2xl shrink-0 relative">
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+            className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] mr-2"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -61,15 +66,14 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
           <div className="flex-1 flex items-center">
             <button
               onClick={() => {
-                // Trigger command palette via synthetic Cmd+K event
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
               }}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors w-72"
+              className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.06] hover:border-white/[0.1] transition-colors w-80 group"
               aria-label="Open command palette"
             >
-              <Search className="w-3.5 h-3.5" />
+              <Search className="w-3.5 h-3.5 group-hover:text-primary transition-colors" />
               <span>Search or jump to…</span>
-              <kbd className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.08] border border-white/[0.1]">⌘K</kbd>
+              <kbd className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.1] tracking-wider">⌘K</kbd>
             </button>
           </div>
 
@@ -87,10 +91,10 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
               </div>
             )}
             {user?.role === "agent" && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 glass rounded-lg text-sm">
+              <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm">
                 <Wallet className="w-4 h-4 text-neon-green" />
-                <span className="text-muted-foreground">Balance:</span>
-                <span className="font-semibold text-foreground">৳{user.balance.toFixed(2)}</span>
+                <span className="text-muted-foreground">Balance</span>
+                <span className="font-semibold text-foreground tabular-nums">৳{user.balance.toFixed(2)}</span>
               </div>
             )}
             <NotificationBell />

@@ -64,19 +64,26 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
       <aside
         className={cn(
           "fixed top-0 left-0 h-full w-64 z-50 flex flex-col transition-transform duration-300 ease-out",
-          "bg-[hsl(240,12%,5%)] border-r border-white/[0.06]",
+          "bg-sidebar/80 backdrop-blur-2xl border-r border-white/[0.06]",
+          "before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-gradient-to-b before:from-transparent before:via-primary/30 before:to-transparent before:opacity-60",
           "lg:translate-x-0 lg:static lg:z-auto",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between px-5 h-16 border-b border-white/[0.06]">
-          <NexusLogo size="sm" />
+        <div className="relative flex items-center justify-between px-5 h-16 border-b border-white/[0.06]">
+          <NexusLogo size="sm" showVersion />
           <button onClick={onClose} className="lg:hidden p-1 text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
+          <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
         </div>
 
-        <nav className="flex-1 overflow-y-auto scrollbar-none px-3 py-4 space-y-1">
+        <div className="px-5 pt-4 pb-2">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/50 font-semibold">
+            {user?.role === "admin" ? "Operations" : "Workspace"}
+          </p>
+        </div>
+        <nav className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-0.5">
           {nav.map((item) => {
             const active = location.pathname === item.path;
             return (
@@ -88,21 +95,26 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
                 onFocus={() => prefetchPage(item.path)}
                 onTouchStart={() => prefetchPage(item.path)}
                 className={cn(
-                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300",
+                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
                   active
-                    ? "text-primary gradient-border-glow bg-gradient-to-r from-primary/15 via-primary/5 to-transparent shadow-[0_0_20px_-5px_hsl(185_100%_50%/0.4)]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04] hover:translate-x-0.5"
+                    ? "text-foreground bg-gradient-to-r from-primary/[0.18] via-secondary/[0.10] to-transparent border border-white/[0.06] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.08),0_8px_24px_-12px_hsl(188_100%_50%/0.4)]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
                 )}
               >
+                {active && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-primary to-secondary shadow-[0_0_10px_hsl(188_100%_50%/0.7)]" />
+                )}
                 <item.icon
                   className={cn(
-                    "w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-110",
-                    active && "text-primary drop-shadow-[0_0_6px_hsl(185_100%_50%/0.8)]"
+                    "w-4 h-4 transition-all duration-300 shrink-0",
+                    active
+                      ? "text-primary drop-shadow-[0_0_8px_hsl(188_100%_50%/0.8)]"
+                      : "group-hover:text-foreground/80 group-hover:scale-105"
                   )}
                 />
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1 truncate">{item.label}</span>
                 {item.path === "/agent/inbox" && unreadAnnouncements > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-neon-magenta/20 text-neon-magenta min-w-[18px] text-center animate-pulse">
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-neon-magenta/20 text-neon-magenta border border-neon-magenta/30 min-w-[18px] text-center">
                     {unreadAnnouncements > 9 ? "9+" : unreadAnnouncements}
                   </span>
                 )}
@@ -111,26 +123,25 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/[0.06]">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center text-xs font-bold text-foreground">
+        <div className="p-4 border-t border-white/[0.06] bg-gradient-to-b from-transparent to-black/30">
+          <div className="flex items-center gap-3 mb-3 p-2 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+            <div className="w-9 h-9 rounded-lg bg-gradient-brand flex items-center justify-center text-sm font-bold text-primary-foreground shadow-glow-cyan shrink-0">
               {user?.username?.[0]?.toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{user?.username}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground truncate">{user?.username}</p>
+              <p className="text-[10px] text-muted-foreground capitalize tracking-wider uppercase">
+                {user?.role}
+              </p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-neon-red hover:bg-neon-red/10 transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-neon-red hover:bg-neon-red/10 transition-colors group"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             Sign Out
           </button>
-          <div className="mt-3 pt-3 border-t border-white/[0.06] text-center">
-            <span className="text-[10px] font-mono text-muted-foreground/60">Nexus X {APP_VERSION}</span>
-          </div>
         </div>
       </aside>
     </>
