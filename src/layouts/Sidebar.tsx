@@ -19,7 +19,6 @@ interface NavItem {
 
 const agentNav: NavItem[] = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-  { label: "Get Number", path: "/agent/get-number", icon: Hash },
   { label: "Browse Ranges", path: "/agent/ranges", icon: Layers },
   { label: "Console", path: "/agent/console", icon: MessageSquare },
   { label: "My Numbers", path: "/agent/my-numbers", icon: List },
@@ -33,7 +32,6 @@ const agentNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { label: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Providers", path: "/admin/providers", icon: Server },
   { label: "Provider Ranges", path: "/admin/provider-ranges", icon: Layers },
   { label: "Agents", path: "/admin/agents", icon: Users },
   { label: "Rate Card", path: "/admin/rates", icon: DollarSign },
