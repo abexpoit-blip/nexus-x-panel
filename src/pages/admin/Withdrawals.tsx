@@ -11,8 +11,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { GradientMesh, PageHeader, PremiumKpiCard } from "@/components/premium";
 
-const FEE_PERCENT = 2; // mirrors backend default
-
 const statusBadge = (s: string) => cn(
   "px-2 py-0.5 rounded text-xs font-semibold uppercase",
   s === "pending" && "bg-neon-amber/15 text-neon-amber animate-pulse",
@@ -33,6 +31,14 @@ const AdminWithdrawals = () => {
     queryFn: () => api.withdrawals.all(statusFilter === "all" ? undefined : statusFilter),
     refetchInterval: 15000,
   });
+
+  // Pull live fee % from admin payment config so the UI always matches what the backend will charge.
+  const { data: cfg } = useQuery({
+    queryKey: ["payment-config"],
+    queryFn: () => api.withdrawals.config(),
+    staleTime: 30_000,
+  });
+  const FEE_PERCENT = cfg?.fee_percent ?? 2;
 
   const all = data?.withdrawals || [];
   const stats = useMemo(() => {
