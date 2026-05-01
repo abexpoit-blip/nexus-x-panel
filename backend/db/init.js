@@ -63,6 +63,32 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_pranges_provider ON provider_ranges(provider, enabled);
 `);
 
+// ─────────────────────────────────────────────────────────────────────
+// pool_numbers — manually-pasted MSISDNs that belong to a range.
+// Status: free → allocated → used (or free again if released).
+// ─────────────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pool_numbers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    range_id INTEGER NOT NULL,
+    msisdn TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'free',
+    allocated_user_id INTEGER,
+    allocated_at INTEGER,
+    last_otp_at INTEGER,
+    otp_count INTEGER NOT NULL DEFAULT 0,
+    note TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    UNIQUE(range_id, msisdn),
+    FOREIGN KEY(range_id) REFERENCES provider_ranges(id) ON DELETE CASCADE,
+    FOREIGN KEY(allocated_user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_pool_range_status ON pool_numbers(range_id, status);
+  CREATE INDEX IF NOT EXISTS idx_pool_msisdn ON pool_numbers(msisdn);
+  CREATE INDEX IF NOT EXISTS idx_pool_alloc_user ON pool_numbers(allocated_user_id);
+`);
+
 // Seed default admin (only if no admin exists)
 const adminExists = db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin'").get();
 if (adminExists.c === 0) {
