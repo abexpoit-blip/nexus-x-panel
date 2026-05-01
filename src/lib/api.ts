@@ -640,7 +640,32 @@ export const api = {
       request<{ ok: boolean }>("/admin/numpanel-cookies", { method: "PUT", body: JSON.stringify({ cookies }) }),
     numpanelCookiesClear: () =>
       request<{ ok: boolean }>("/admin/numpanel-cookies", { method: "DELETE" }),
+
+    // ─── Generic provider ranges (provider-agnostic) ────────────────
+    rangesList: (params: { provider?: string; country_code?: string; enabled?: 0 | 1 } = {}) => {
+      const qs = new URLSearchParams();
+      if (params.provider) qs.set("provider", params.provider);
+      if (params.country_code) qs.set("country_code", params.country_code);
+      if (params.enabled !== undefined) qs.set("enabled", String(params.enabled));
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      return request<{ rows: ProviderRange[] }>(`/admin/provider-ranges${suffix}`);
+    },
+    rangeCreate: (body: Partial<ProviderRange>) =>
+      request<{ id: number }>("/admin/provider-ranges", { method: "POST", body: JSON.stringify(body) }),
+    rangeUpdate: (id: number, body: Partial<ProviderRange>) =>
+      request<{ ok: boolean }>(`/admin/provider-ranges/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    rangeDelete: (id: number) =>
+      request<{ ok: boolean }>(`/admin/provider-ranges/${id}`, { method: "DELETE" }),
+    rangeBulkToggle: (ids: number[], enabled: boolean) =>
+      request<{ ok: boolean; updated: number }>("/admin/provider-ranges/bulk-toggle", {
+        method: "POST", body: JSON.stringify({ ids, enabled }),
+      }),
   },
+
+  // ===== Agent v2 ranges =====
+  v2Countries: () => request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>("/numbers/v2/countries"),
+  v2Ranges: (countryCode: string) =>
+    request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges?country=${encodeURIComponent(countryCode)}`),
 
   // ===== Telegram Bot admin =====
   tgbot: {
