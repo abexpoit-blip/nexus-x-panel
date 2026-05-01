@@ -370,4 +370,26 @@ router.post('/bots/:bot/:action', (req, res) => {
   }
 });
 
+// Health probe — actually attempts a login() against the live portal and
+// reports OK / failure reason. Use this from the Settings UI before saving.
+router.post('/bots/:bot/health', async (req, res) => {
+  const { bot } = req.params;
+  const bots = loadBots();
+  const mod = bots[bot];
+  if (!mod) return res.status(404).json({ error: `Unknown bot: ${bot}` });
+  if (typeof mod.login !== 'function') {
+    return res.status(400).json({ error: 'bot does not support health check' });
+  }
+  const t0 = Date.now();
+  try {
+    await mod.login();
+    const status = mod.getStatus?.() || {};
+    logFromReq(req, 'bot_health_ok', { meta: { bot, ms: Date.now() - t0 } });
+    res.json({ ok: true, bot, ms: Date.now() - t0, status });
+  } catch (e) {
+    logFromReq(req, 'bot_health_fail', { meta: { bot, error: e.message } });
+    res.status(200).json({ ok: false, bot, ms: Date.now() - t0, error: e.message });
+  }
+});
+
 module.exports = router;
