@@ -64,11 +64,6 @@ const AdminSettings = () => {
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
-  const [mediatelUrl, setMediatelUrl] = useState("");
-  const [mediatelUser, setMediatelUser] = useState("");
-  const [mediatelPass, setMediatelPass] = useState("");
-  const [mediatelCookie, setMediatelCookie] = useState("");
-  const [mediatelInterval, setMediatelInterval] = useState<number>(8);
   const [seven1Url, setSeven1Url] = useState("");
   const [seven1User, setSeven1User] = useState("");
   const [seven1Pass, setSeven1Pass] = useState("");
@@ -87,11 +82,6 @@ const AdminSettings = () => {
     setTgGroupChat(str(s, "tg_required_group_chat"));
     setTgOtpGroup(str(s, "tg_required_otp_group"));
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
-    setMediatelUrl(str(s, "mediatel_base_url", "https://mediateluk.com/sms"));
-    setMediatelUser(str(s, "mediatel_username"));
-    setMediatelPass(str(s, "mediatel_password"));
-    setMediatelCookie(str(s, "mediatel_cookie_header"));
-    setMediatelInterval(Number(str(s, "mediatel_otp_interval", "8")) || 8);
     setSeven1Url(str(s, "seven1tel_base_url", "http://94.23.120.156/ints"));
     setSeven1User(str(s, "seven1tel_username"));
     setSeven1Pass(str(s, "seven1tel_password"));
@@ -519,36 +509,6 @@ const AdminSettings = () => {
               <Switch checked={showPw} onCheckedChange={setShowPw} />
             </div>
           </div>
-
-          {/* ─── Mediatel ─── */}
-          <BotConfigCard
-            tone="cyan"
-            title="Mediatel Bot"
-            urlKey="mediatel_base_url"
-            url={mediatelUrl} setUrl={setMediatelUrl}
-            user={mediatelUser} setUser={setMediatelUser} userKey="mediatel_username"
-            pass={mediatelPass} setPass={setMediatelPass} passKey="mediatel_password"
-            cookie={mediatelCookie} setCookie={setMediatelCookie} cookieKey="mediatel_cookie_header"
-            cookiePlaceholder="cf_clearance=...; PHPSESSID=..."
-            cookieHint="Cloudflare-protected. Paste browser Cookie header (cf_clearance + PHPSESSID) if the VPS browser can't pass the challenge."
-            interval={mediatelInterval} setInterval={setMediatelInterval} intervalKey="mediatel_otp_interval"
-            showPw={showPw}
-            health={healthState["mediatel"]}
-            onSave={async () => {
-              await setSetting("mediatel_base_url", mediatelUrl);
-              await setSetting("mediatel_username", mediatelUser);
-              await setSetting("mediatel_password", mediatelPass);
-              await setSetting("mediatel_cookie_header", mediatelCookie);
-              await setSetting("mediatel_otp_interval", String(mediatelInterval));
-            }}
-            onHealth={() => runHealth("mediatel")}
-            onClearCookies={async () => {
-              if (!confirm("Clear saved Mediatel cookies? Bot will solve Cloudflare again on next login.")) return;
-              await setSetting("mediatel_cookies", "");
-              toast({ title: "Mediatel cookie jar cleared" });
-            }}
-            saving={savingKey?.startsWith("mediatel_") || false}
-          />
 
           {/* ─── Seven1Tel ─── */}
           <BotConfigCard
