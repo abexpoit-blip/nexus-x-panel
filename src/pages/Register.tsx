@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { NexusLogo } from "@/components/NexusLogo";
-import { ParticleCanvas } from "@/components/ParticleCanvas";
+import { NexusLogo, APP_VERSION } from "@/components/NexusLogo";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff, UserPlus, Sparkles, ShieldX, User, Phone, Send, Lock, AtSign } from "lucide-react";
+import { Eye, EyeOff, UserPlus, ShieldX, User, Phone, Send, Lock, AtSign, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
-import { APP_VERSION } from "@/components/NexusLogo";
 import { api } from "@/lib/api";
 
 const Register = () => {
@@ -72,39 +70,42 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-8">
-      <ParticleCanvas />
-
-      <div className="absolute top-1/4 -left-32 w-[500px] h-[500px] rounded-full bg-neon-cyan/[0.06] blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/4 -right-32 w-[500px] h-[500px] rounded-full bg-neon-magenta/[0.06] blur-[120px] animate-pulse" style={{ animationDelay: "1s" }} />
-
+    <div className="min-h-screen bg-luxe-mesh relative overflow-hidden flex items-center justify-center px-4 py-10">
+      <div className="pointer-events-none absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-neon-cyan/[0.10] blur-[140px] animate-float-slow" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 w-[640px] h-[640px] rounded-full bg-neon-violet/[0.12] blur-[140px] animate-float-slow" style={{ animationDelay: "4s" }} />
       <div
-        className="absolute inset-0 opacity-[0.02]"
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
         style={{
-          backgroundImage: `linear-gradient(hsl(185 100% 50% / 0.4) 1px, transparent 1px), linear-gradient(90deg, hsl(185 100% 50% / 0.4) 1px, transparent 1px)`,
-          backgroundSize: "50px 50px",
+          backgroundImage: `radial-gradient(circle at 1px 1px, hsl(0 0% 100% / 0.06) 1px, transparent 0)`,
+          backgroundSize: "32px 32px",
+          maskImage: "radial-gradient(ellipse at center, black 40%, transparent 80%)",
+          WebkitMaskImage: "radial-gradient(ellipse at center, black 40%, transparent 80%)",
         }}
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="relative z-10 w-full max-w-lg"
       >
-        <div className="glass-card p-8 md:p-10 neon-glow-cyan relative overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-neon-magenta to-transparent" />
+        <div className="flex justify-center mb-8">
+          <NexusLogo size="md" />
+        </div>
 
-          <div className="flex flex-col items-center mb-6">
-            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 }}>
-              <NexusLogo size="md" />
-            </motion.div>
-            <div className="flex items-center gap-2 justify-center mt-3">
-              <Sparkles className="w-3.5 h-3.5 text-neon-amber" />
-              <span className="text-[10px] uppercase tracking-[0.3em] text-neon-amber font-semibold">Join Nexus X</span>
-              <Sparkles className="w-3.5 h-3.5 text-neon-amber" />
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">Create your agent account</p>
+        <div className="glass-luxe p-8 sm:p-10 relative">
+          <div className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+
+          <div className="mb-8 text-center">
+            <p className="text-[10px] uppercase tracking-[0.32em] text-primary font-semibold mb-3">
+              New agent
+            </p>
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-foreground">
+              Request your account
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Submit your details — admin will approve and activate.
+            </p>
           </div>
 
           {!signupEnabled ? (
@@ -121,7 +122,7 @@ const Register = () => {
                 New account registration is currently disabled by the administrator. Please check back later or contact support.
               </p>
               <Link to="/login">
-                <Button variant="outline" className="mt-4 glass border-white/[0.08] hover:bg-white/[0.06]">
+                <Button variant="outline" className="mt-4 bg-white/[0.02] border-white/[0.08] hover:bg-white/[0.06]">
                   Back to Login
                 </Button>
               </Link>
@@ -230,15 +231,16 @@ const Register = () => {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-gradient-to-r from-neon-magenta via-primary to-neon-cyan text-primary-foreground font-semibold hover:opacity-90 transition-all border-0 text-sm tracking-wide relative overflow-hidden group"
+                  className="w-full h-12 bg-gradient-brand text-primary-foreground font-semibold hover:opacity-95 transition-all border-0 text-sm tracking-wide relative overflow-hidden group shadow-glow-cyan"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   ) : (
                     <>
                       <UserPlus className="w-4 h-4 mr-2" />
                       Create Account
+                      <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-0.5" />
                     </>
                   )}
                 </Button>
@@ -264,11 +266,9 @@ const Register = () => {
             </p>
           </motion.div>
 
-          <div className="mt-4 pt-3 border-t border-white/[0.04] text-center">
-            <p className="text-[10px] text-muted-foreground/40 font-mono">
-              Nexus X {APP_VERSION} — Premium IPRN Platform
-            </p>
-          </div>
+          <p className="mt-6 text-center text-[11px] text-muted-foreground/60 font-mono">
+            Nexus X {APP_VERSION}
+          </p>
         </div>
       </motion.div>
     </div>

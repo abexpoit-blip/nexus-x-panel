@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "Inter", "sans-serif"],
+        sans: ["Geist", "Inter", "system-ui", "sans-serif"],
+        display: ["Geist", "Space Grotesk", "Inter", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -63,6 +64,7 @@ export default {
         },
         neon: {
           cyan: "hsl(var(--neon-cyan))",
+          violet: "hsl(var(--neon-violet))",
           magenta: "hsl(var(--neon-magenta))",
           green: "hsl(var(--neon-green))",
           amber: "hsl(var(--neon-amber))",
@@ -77,15 +79,18 @@ export default {
         "gradient-aurora": "var(--gradient-aurora)",
         "gradient-primary": "var(--gradient-primary)",
         "gradient-secondary": "var(--gradient-secondary)",
+        "gradient-brand": "var(--gradient-brand)",
         "gradient-mint": "var(--gradient-mint)",
         "gradient-sunset": "var(--gradient-sunset)",
       },
       boxShadow: {
         "glow-cyan": "var(--shadow-glow-cyan)",
+        "glow-violet": "var(--shadow-glow-violet)",
         "glow-magenta": "var(--shadow-glow-magenta)",
         "glow-green": "var(--shadow-glow-green)",
         elegant: "var(--shadow-elegant)",
         elevated: "var(--shadow-elevated)",
+        luxe: "var(--shadow-luxe)",
       },
       borderRadius: {
         lg: "var(--radius)",
