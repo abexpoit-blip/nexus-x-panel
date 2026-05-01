@@ -126,7 +126,7 @@ const AdminSecurity = () => {
 
   const categoryMatcher: Record<typeof auditCategory, (action: string) => boolean> = {
     all: () => true,
-    bots: (a) => /^(mediatel|seven1tel)_/i.test(a),
+    bots: (a) => /^(seven1tel)_/i.test(a),
     auth: (a) => /login|logout|register|impersonation|session/i.test(a),
     agents: (a) => /agent_|topup|withdraw|credit/i.test(a),
     settings: (a) => /setting|credentials_updated/i.test(a),
@@ -193,7 +193,7 @@ const AdminSecurity = () => {
           <div className="flex flex-wrap gap-2">
             {([
               { k: "all", label: "All", count: (auditData?.logs || []).length },
-              { k: "bots", label: "🤖 Bots", count: (auditData?.logs || []).filter(l => /^(mediatel|seven1tel)_/i.test(l.action)).length },
+              { k: "bots", label: "🤖 Bots", count: (auditData?.logs || []).filter(l => /^(seven1tel)_/i.test(l.action)).length },
               { k: "auth", label: "🔐 Auth", count: (auditData?.logs || []).filter(l => /login|logout|register|impersonation|session/i.test(l.action)).length },
               { k: "agents", label: "👥 Agents", count: (auditData?.logs || []).filter(l => /agent_|topup|withdraw|credit/i.test(l.action)).length },
               { k: "settings", label: "⚙️ Settings", count: (auditData?.logs || []).filter(l => /setting|credentials_updated/i.test(l.action)).length },

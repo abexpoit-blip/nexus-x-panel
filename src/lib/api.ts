@@ -17,7 +17,7 @@ export const demoMode = {
   disable: () => localStorage.removeItem(DEMO_KEY),
 };
 
-// (Demo IMS bot state removed — fresh build only ships Mediatel + Seven1Tel)
+// (Demo IMS bot state removed — fresh build currently ships Seven1Tel only; XISORA pending.)
 
 async function request<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   let token = tokenStore.get();
@@ -88,11 +88,6 @@ function demoRoute(path: string, opts: RequestInit): any {
         path: "./data/nexus.db",
         last_backup: { name: "nexus-2025-04-17-0400.db.gz", size: 1_234_000, mtime: now - 3600 * 9 },
         backup_dir: "/opt/nexus/backups",
-      },
-      mediatel_bot: {
-        enabled: true, running: true, logged_in: true,
-        last_tick_at: now - 6, last_error: null, consec_fail: 0,
-        otps_delivered: 12, interval_sec: 8,
       },
       seven1tel_bot: {
         enabled: true, running: true, logged_in: true,
@@ -543,7 +538,6 @@ export interface SystemHealth {
     last_backup: { name: string; size: number; mtime: number } | null;
     backup_dir: string;
   };
-  mediatel_bot: ProviderBotStatus | null;
   seven1tel_bot: ProviderBotStatus | null;
   counts: {
     pending_withdrawals: number;

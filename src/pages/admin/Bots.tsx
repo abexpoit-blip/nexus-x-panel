@@ -212,7 +212,7 @@ const AdminBots = () => {
       ) : bots.length === 0 ? (
         <GlassCard>
           <div className="text-center py-12 text-muted-foreground">
-            No workers detected. Check that the backend has loaded mediatelBot, seven1telBot, and fakeOtpBroadcaster.
+            No workers detected. Check that the backend has loaded seven1telBot and fakeOtpBroadcaster.
           </div>
         </GlassCard>
       ) : (
