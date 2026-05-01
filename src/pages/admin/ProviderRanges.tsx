@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Pencil, Server, Loader2, Power } from "lucide-react";
+import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square } from "lucide-react";
 import { GradientMesh, PageHeader } from "@/components/premium";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -41,23 +41,31 @@ const AdminProviderRanges = () => {
   const [params, setParams] = useSearchParams();
   const providerFilter = params.get("provider") || "";
   const countryFilter = params.get("country") || "";
+  const enabledFilter = params.get("enabled") || ""; // "", "1", "0"
 
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data, isLoading } = useQuery({
-    queryKey: ["provider-ranges", providerFilter, countryFilter],
+    queryKey: ["provider-ranges", providerFilter, countryFilter, enabledFilter],
     queryFn: () =>
       api.admin.rangesList({
         provider: providerFilter || undefined,
         country_code: countryFilter || undefined,
+        enabled: enabledFilter === "1" ? 1 : enabledFilter === "0" ? 0 : undefined,
       }),
   });
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
   const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  const startCreate = () => { setForm({ ...empty, provider: providerFilter || "acchub" }); setOpen(true); };
+  const startCreate = () => {
+    const fallback = PROVIDERS[0].id; // "mediatel"
+    const provider = PROVIDERS.some(p => p.id === providerFilter) ? providerFilter : fallback;
+    setForm({ ...empty, provider });
+    setOpen(true);
+  };
   const startEdit = (r: ProviderRange) => { setForm({ ...r, enabled: r.enabled ? 1 : 0 }); setOpen(true); };
 
   const save = async () => {
@@ -91,10 +99,32 @@ const AdminProviderRanges = () => {
     if (!confirm(`Delete range "${r.range_label}" (${r.country_code})?`)) return;
     await api.admin.rangeDelete(r.id);
     toast({ title: "Deleted" });
+    setSelected(s => { const n = new Set(s); n.delete(r.id); return n; });
     qc.invalidateQueries({ queryKey: ["provider-ranges"] });
   };
 
   const rows = data?.rows || [];
+
+  const toggleSelect = (id: number) => setSelected(s => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const toggleSelectAll = () => {
+    if (selected.size === rows.length) setSelected(new Set());
+    else setSelected(new Set(rows.map(r => r.id)));
+  };
+  const bulkToggle = async (enabled: boolean) => {
+    if (!selected.size) return;
+    try {
+      const r = await api.admin.rangeBulkToggle(Array.from(selected), enabled);
+      toast({ title: `${enabled ? "Enabled" : "Disabled"} ${r.updated} range${r.updated === 1 ? "" : "s"}` });
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["provider-ranges"] });
+    } catch (e) {
+      toast({ title: "Bulk toggle failed", description: (e as Error).message, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="relative space-y-6">
@@ -136,6 +166,24 @@ const AdminProviderRanges = () => {
               className="w-32 bg-white/[0.04] border-white/[0.1] uppercase"
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Status</Label>
+            <Select
+              value={enabledFilter || "all"}
+              onValueChange={(v) => {
+                const next = new URLSearchParams(params);
+                if (v === "all") next.delete("enabled"); else next.set("enabled", v);
+                setParams(next);
+              }}
+            >
+              <SelectTrigger className="w-36 bg-white/[0.04] border-white/[0.1]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="1">Enabled only</SelectItem>
+                <SelectItem value="0">Disabled only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="ml-auto">
             <Button onClick={startCreate} className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
               <Plus className="w-4 h-4 mr-1.5" /> Add Range
@@ -143,6 +191,24 @@ const AdminProviderRanges = () => {
           </div>
         </div>
       </GlassCard>
+
+      {selected.size > 0 && (
+        <GlassCard className="!py-3 flex items-center gap-3 border-primary/30">
+          <span className="text-sm">
+            <span className="font-semibold text-foreground">{selected.size}</span>{" "}
+            <span className="text-muted-foreground">selected</span>
+          </span>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => bulkToggle(true)} className="border-neon-green/30 text-neon-green hover:bg-neon-green/10">
+              <Power className="w-3.5 h-3.5 mr-1.5" /> Enable
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkToggle(false)} className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10">
+              <Power className="w-3.5 h-3.5 mr-1.5" /> Disable
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+          </div>
+        </GlassCard>
+      )}
 
       <GlassCard className="!p-0 overflow-hidden">
         {isLoading ? (
@@ -158,6 +224,13 @@ const AdminProviderRanges = () => {
             <table className="w-full text-sm">
               <thead className="border-b border-white/[0.06] bg-white/[0.02]">
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3 w-10">
+                    <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground" aria-label="Select all">
+                      {selected.size > 0 && selected.size === rows.length
+                        ? <CheckSquare className="w-4 h-4 text-primary" />
+                        : <Square className="w-4 h-4" />}
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Provider</th>
                   <th className="px-4 py-3">Country</th>
                   <th className="px-4 py-3">Range</th>
@@ -173,6 +246,13 @@ const AdminProviderRanges = () => {
                     "border-b border-white/[0.03] hover:bg-white/[0.02]",
                     !r.enabled && "opacity-60"
                   )}>
+                    <td className="px-3 py-3">
+                      <button onClick={() => toggleSelect(r.id)} className="text-muted-foreground hover:text-foreground" aria-label={`Select ${r.range_label}`}>
+                        {selected.has(r.id)
+                          ? <CheckSquare className="w-4 h-4 text-primary" />
+                          : <Square className="w-4 h-4" />}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs uppercase">{r.provider}</td>
                     <td className="px-4 py-3">
                       <span className="font-mono font-bold">{r.country_code}</span>
