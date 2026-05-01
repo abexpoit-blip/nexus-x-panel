@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +63,13 @@ const AdminSettings = () => {
 
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
+  // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
+  const [mediatelUser, setMediatelUser] = useState("");
+  const [mediatelPass, setMediatelPass] = useState("");
+  const [seven1User, setSeven1User] = useState("");
+  const [seven1Pass, setSeven1Pass] = useState("");
+  const [showPw, setShowPw] = useState(false);
+
   useEffect(() => {
     if (!s) return;
     setSignupOpen(bool(s, "signup_enabled"));
@@ -73,6 +80,10 @@ const AdminSettings = () => {
     setTgGroupChat(str(s, "tg_required_group_chat"));
     setTgOtpGroup(str(s, "tg_required_otp_group"));
     setTgOtpGroupChat(str(s, "tg_required_otp_group_chat"));
+    setMediatelUser(str(s, "mediatel_username"));
+    setMediatelPass(str(s, "mediatel_password"));
+    setSeven1User(str(s, "seven1tel_username"));
+    setSeven1Pass(str(s, "seven1tel_password"));
   }, [s]);
 
   useEffect(() => {
