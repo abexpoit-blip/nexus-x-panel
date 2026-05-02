@@ -352,15 +352,34 @@ router.post('/bots/:bot/:action', (req, res) => {
   if (!['start', 'stop', 'restart'].includes(action)) {
     return res.status(400).json({ error: 'action must be start | stop | restart' });
   }
+  // Map bot key → settings flag the worker reads on start().
+  // Clicking Start must persist enabled=true so the worker's internal
+  // `cfg.ENABLED` check passes; Stop must persist enabled=false so it
+  // does not auto-resume on next tick / restart.
+  const ENABLED_KEY = {
+    seven1tel: 'seven1tel_enabled',
+    xisora:    'xisora_enabled',
+    fake_otp:  'fake_otp_enabled',
+  }[bot];
+  const setFlag = (val) => {
+    if (!ENABLED_KEY) return;
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+    `).run(ENABLED_KEY, String(!!val));
+  };
   try {
     if (action === 'start') {
       if (typeof mod.start !== 'function') throw new Error('bot does not support start');
+      setFlag(true);
       mod.start();
     } else if (action === 'stop') {
       if (typeof mod.stop !== 'function') throw new Error('bot does not support stop');
+      setFlag(false);
       mod.stop();
     } else if (action === 'restart') {
       try { mod.stop?.(); } catch (_) {}
+      setFlag(true);
       // Small delay so the worker tick can drain before restarting.
       setTimeout(() => { try { mod.start?.(); } catch (_) {} }, 500);
     }
