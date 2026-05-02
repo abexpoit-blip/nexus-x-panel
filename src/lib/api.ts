@@ -122,32 +122,52 @@ export const api = {
   getNumber: (body: { range_id?: number; provider?: string; country_id?: number; operator_id?: number; country_code?: string; operator?: string; range?: string; count?: number }) =>
     request<{ allocated: any[]; errors: string[] }>("/numbers/get", { method: "POST", body: JSON.stringify(body) }),
   myNumbers: () => request<{ numbers: Allocation[]; recent_window_hours?: number; otp_expiry_sec?: number; server_now?: number }>("/numbers/my"),
-  numberHistory: (params: { page?: number; page_size?: number; q?: string; from?: string; to?: string } = {}) => {
+  numberHistory: (params: {
+    page?: number; page_size?: number; q?: string; from?: string; to?: string;
+    status?: string;       // comma-separated: billed,refunded
+    countries?: string;    // comma-separated country codes
+    operators?: string;    // comma-separated operator names
+    facets?: boolean;      // include distinct country/operator lists
+  } = {}) => {
     const qs = new URLSearchParams();
     if (params.page) qs.set("page", String(params.page));
     if (params.page_size) qs.set("page_size", String(params.page_size));
     if (params.q) qs.set("q", params.q);
     if (params.from) qs.set("from", params.from);
     if (params.to) qs.set("to", params.to);
+    if (params.status) qs.set("status", params.status);
+    if (params.countries) qs.set("countries", params.countries);
+    if (params.operators) qs.set("operators", params.operators);
+    if (params.facets) qs.set("facets", "1");
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<{
       rows: Array<{
         id: number; allocation_id: number | null; country_code: string | null;
         operator: string | null; phone_number: string; otp_code: string;
-        cli: string | null;
+        cli: string | null; status?: string;
         price_bdt: number; created_at: number;
       }>;
       page: number; page_size: number; total: number; total_pages: number;
       summary: { count: number; earnings_bdt: number };
+      facets?: {
+        countries: Array<{ value: string; count: number }>;
+        operators: Array<{ value: string; count: number }>;
+      };
     }>(`/numbers/history${suffix}`);
   },
   // CSV export — fetches with auth header, triggers browser download via Blob URL.
   // Returns the row count downloaded so the UI can toast it.
-  numberHistoryCsv: async (params: { q?: string; from?: string; to?: string } = {}) => {
+  numberHistoryCsv: async (params: {
+    q?: string; from?: string; to?: string;
+    status?: string; countries?: string; operators?: string;
+  } = {}) => {
     const qs = new URLSearchParams({ format: "csv" });
     if (params.q) qs.set("q", params.q);
     if (params.from) qs.set("from", params.from);
     if (params.to) qs.set("to", params.to);
+    if (params.status) qs.set("status", params.status);
+    if (params.countries) qs.set("countries", params.countries);
+    if (params.operators) qs.set("operators", params.operators);
     const token = tokenStore.get();
     const res = await fetch(`${BASE}/numbers/history?${qs.toString()}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

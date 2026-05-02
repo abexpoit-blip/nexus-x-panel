@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { api } from "@/lib/api";
@@ -10,11 +10,26 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   History as HistoryIcon, Search, ChevronLeft, ChevronRight,
-  Copy, Check, CalendarIcon, Download, X
+  Copy, Check, CalendarIcon, Download, X, Filter, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cliBadgeClass } from "@/lib/cliBadge";
 import { toast } from "sonner";
+
+// Country code → flag emoji.
+function flagEmoji(code: string): string {
+  if (!code) return "🌐";
+  const cc = code.toUpperCase();
+  if (cc.length !== 2) return "🌐";
+  const A = 0x1f1e6;
+  return String.fromCodePoint(A + cc.charCodeAt(0) - 65, A + cc.charCodeAt(1) - 65);
+}
+
+type StatusKey = "billed" | "refunded";
+const STATUS_OPTIONS: { key: StatusKey; label: string; tone: string }[] = [
+  { key: "billed", label: "Arrived", tone: "bg-neon-green/15 text-neon-green border-neon-green/30" },
+  { key: "refunded", label: "Refunded", tone: "bg-destructive/15 text-destructive border-destructive/30" },
+];
 
 // Permanent record of EVERY successful OTP this agent has ever delivered.
 // Sourced from the `cdr` table on the backend, so entries survive even after
@@ -27,21 +42,48 @@ const AgentHistory = () => {
   const [fromDate, setFromDate] = useState<Date | undefined>();
   const [toDate, setToDate] = useState<Date | undefined>();
   const [exporting, setExporting] = useState(false);
+  // New filters
+  const [statusSel, setStatusSel] = useState<Set<StatusKey>>(() => new Set(["billed"]));
+  const [countrySel, setCountrySel] = useState<Set<string>>(() => new Set());
+  const [operatorSel, setOperatorSel] = useState<Set<string>>(() => new Set());
+  const [countryQ, setCountryQ] = useState("");
+  const [operatorQ, setOperatorQ] = useState("");
   const PAGE_SIZE = 50;
 
   // Date filters convert to YYYY-MM-DD strings — backend treats `to` as
   // end-of-day inclusive so the user's intuition matches.
   const fromStr = fromDate ? format(fromDate, "yyyy-MM-dd") : undefined;
   const toStr = toDate ? format(toDate, "yyyy-MM-dd") : undefined;
+  const statusStr = useMemo(() => Array.from(statusSel).sort().join(",") || "billed", [statusSel]);
+  const countriesStr = useMemo(() => Array.from(countrySel).sort().join(","), [countrySel]);
+  const operatorsStr = useMemo(() => Array.from(operatorSel).sort().join(","), [operatorSel]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["otp-history", page, q, fromStr, toStr],
+    queryKey: ["otp-history", page, q, fromStr, toStr, statusStr, countriesStr, operatorsStr],
     queryFn: () => api.numberHistory({
       page, page_size: PAGE_SIZE,
       q: q || undefined, from: fromStr, to: toStr,
+      status: statusStr,
+      countries: countriesStr || undefined,
+      operators: operatorsStr || undefined,
+      facets: true,
     }),
     placeholderData: (prev) => prev,
   });
+
+  const facets = data?.facets;
+  const filteredCountryFacets = useMemo(() => {
+    const list = facets?.countries ?? [];
+    if (!countryQ) return list;
+    const needle = countryQ.toLowerCase();
+    return list.filter(c => c.value.toLowerCase().includes(needle));
+  }, [facets, countryQ]);
+  const filteredOperatorFacets = useMemo(() => {
+    const list = facets?.operators ?? [];
+    if (!operatorQ) return list;
+    const needle = operatorQ.toLowerCase();
+    return list.filter(o => o.value.toLowerCase().includes(needle));
+  }, [facets, operatorQ]);
 
   const copyOtp = async (id: number, otp: string) => {
     try {
@@ -60,16 +102,49 @@ const AgentHistory = () => {
     setQ(qInput.trim());
   };
 
+  const toggleStatus = (k: StatusKey) => {
+    setStatusSel(prev => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      // Never allow zero — fall back to "billed" so backend default kicks in cleanly.
+      if (next.size === 0) next.add("billed");
+      return next;
+    });
+    setPage(1);
+  };
+  const toggleSetValue = (
+    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+    value: string,
+  ) => {
+    setter(prev => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+    setPage(1);
+  };
+
   const clearFilters = () => {
     setQ(""); setQInput("");
     setFromDate(undefined); setToDate(undefined);
+    setStatusSel(new Set(["billed"]));
+    setCountrySel(new Set());
+    setOperatorSel(new Set());
+    setCountryQ(""); setOperatorQ("");
     setPage(1);
   };
 
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const { rows } = await api.numberHistoryCsv({ q: q || undefined, from: fromStr, to: toStr });
+      const { rows } = await api.numberHistoryCsv({
+        q: q || undefined, from: fromStr, to: toStr,
+        status: statusStr,
+        countries: countriesStr || undefined,
+        operators: operatorsStr || undefined,
+      });
       toast.success(`Exported ${rows} OTP records`);
     } catch (e) {
       toast.error("Export failed: " + (e as Error).message);
@@ -80,7 +155,8 @@ const AgentHistory = () => {
 
   const totalPages = data?.total_pages ?? 1;
   const summary = data?.summary;
-  const hasFilters = !!(q || fromStr || toStr);
+  const statusActive = !(statusSel.size === 1 && statusSel.has("billed"));
+  const hasFilters = !!(q || fromStr || toStr || statusActive || countrySel.size || operatorSel.size);
 
   return (
     <div className="space-y-6">
@@ -120,6 +196,154 @@ const AgentHistory = () => {
           </div>
           <Button type="submit" variant="outline">Search</Button>
         </form>
+
+        {/* Status pills */}
+        <div className="flex gap-2 flex-wrap items-center">
+          <span className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Filter className="w-3 h-3" /> Status:
+          </span>
+          {STATUS_OPTIONS.map(opt => {
+            const on = statusSel.has(opt.key);
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => toggleStatus(opt.key)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-colors",
+                  on ? opt.tone : "bg-white/[0.02] border-white/[0.08] text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+
+          <span className="mx-1 h-4 w-px bg-white/[0.08]" />
+
+          {/* Country multi-select */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="font-normal">
+                Country
+                {countrySel.size > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-mono">
+                    {countrySel.size}
+                  </span>
+                )}
+                <ChevronDown className="w-3 h-3 ml-1.5 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0 w-64" align="start">
+              <div className="p-2 border-b border-white/[0.08]">
+                <Input
+                  value={countryQ}
+                  onChange={(e) => setCountryQ(e.target.value)}
+                  placeholder="Search country code…"
+                  className="h-8 text-xs bg-white/[0.04] border-white/[0.08]"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto py-1">
+                {filteredCountryFacets.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    No countries in your history yet
+                  </div>
+                ) : filteredCountryFacets.map(c => {
+                  const on = countrySel.has(c.value);
+                  return (
+                    <button
+                      key={c.value}
+                      onClick={() => toggleSetValue(setCountrySel, c.value)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/[0.05] transition-colors",
+                        on && "bg-primary/10"
+                      )}
+                    >
+                      <span className="w-3 h-3 rounded border border-white/20 flex items-center justify-center shrink-0">
+                        {on && <Check className="w-2.5 h-2.5 text-primary" />}
+                      </span>
+                      <span className="text-base leading-none">{flagEmoji(c.value)}</span>
+                      <span className="flex-1 font-mono uppercase text-foreground">{c.value}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground">{c.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {countrySel.size > 0 && (
+                <div className="p-2 border-t border-white/[0.08]">
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => { setCountrySel(new Set()); setPage(1); }}
+                    className="w-full text-xs text-muted-foreground h-7"
+                  >
+                    Clear countries
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Operator multi-select */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="font-normal">
+                Operator
+                {operatorSel.size > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-mono">
+                    {operatorSel.size}
+                  </span>
+                )}
+                <ChevronDown className="w-3 h-3 ml-1.5 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0 w-64" align="start">
+              <div className="p-2 border-b border-white/[0.08]">
+                <Input
+                  value={operatorQ}
+                  onChange={(e) => setOperatorQ(e.target.value)}
+                  placeholder="Search operator…"
+                  className="h-8 text-xs bg-white/[0.04] border-white/[0.08]"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto py-1">
+                {filteredOperatorFacets.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    No operators in your history yet
+                  </div>
+                ) : filteredOperatorFacets.map(o => {
+                  const on = operatorSel.has(o.value);
+                  return (
+                    <button
+                      key={o.value}
+                      onClick={() => toggleSetValue(setOperatorSel, o.value)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/[0.05] transition-colors",
+                        on && "bg-primary/10"
+                      )}
+                    >
+                      <span className="w-3 h-3 rounded border border-white/20 flex items-center justify-center shrink-0">
+                        {on && <Check className="w-2.5 h-2.5 text-primary" />}
+                      </span>
+                      <span className="flex-1 text-foreground truncate">{o.value}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">{o.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {operatorSel.size > 0 && (
+                <div className="p-2 border-t border-white/[0.08]">
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => { setOperatorSel(new Set()); setPage(1); }}
+                    className="w-full text-xs text-muted-foreground h-7"
+                  >
+                    Clear operators
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* Date range + export */}
         <div className="flex gap-2 flex-wrap items-center">
@@ -250,6 +474,17 @@ const AgentHistory = () => {
                 {r.price_bdt > 0 ? `৳${r.price_bdt.toFixed(2)}` : "—"}
               </span>
             ),
+          },
+          {
+            key: "status",
+            header: "Status",
+            render: (r) => {
+              const s = (r.status || "billed").toLowerCase();
+              if (s === "refunded") {
+                return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30">Refunded</span>;
+              }
+              return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-neon-green/15 text-neon-green border border-neon-green/30">Arrived</span>;
+            },
           },
           {
             key: "created_at",
