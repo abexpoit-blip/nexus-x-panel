@@ -57,7 +57,7 @@ router.post('/register', (req, res) => {
     return res.status(400).json({ error: 'Username: 3-32 chars, alphanumeric + underscore only' });
   }
   if (password.length < 5 || password.length > 200) {
-    return res.status(400).json({ error: 'Password must be 8-200 characters' });
+    return res.status(400).json({ error: 'Password must be 5-200 characters' });
   }
   if (full_name && (typeof full_name !== 'string' || full_name.length > 120)) {
     return res.status(400).json({ error: 'Invalid full_name' });
@@ -132,8 +132,8 @@ router.post('/change-password', authRequired, (req, res) => {
   if (typeof current_password !== 'string' || typeof new_password !== 'string') {
     return res.status(400).json({ error: 'current_password and new_password required' });
   }
-  if (new_password.length < 8 || new_password.length > 200) {
-    return res.status(400).json({ error: 'New password must be 8-200 characters' });
+  if (new_password.length < 5 || new_password.length > 200) {
+    return res.status(400).json({ error: 'New password must be 5-200 characters' });
   }
   if (new_password === current_password) {
     return res.status(400).json({ error: 'New password must differ from current' });

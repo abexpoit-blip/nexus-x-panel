@@ -40,7 +40,7 @@ const Register = () => {
       toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
       return;
     }
-    if (form.password.length < 8) {
+    if (form.password.length < 5) {
       toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
       return;
     }
