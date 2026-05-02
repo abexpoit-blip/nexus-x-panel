@@ -317,12 +317,14 @@ router.post('/fake-otp/purge', (req, res) => {
 function loadBots() {
   const bots = {};
   try { bots.seven1tel = require('../workers/seven1telBot'); } catch (_) {}
+  try { bots.xisora    = require('../workers/xisoraBot'); } catch (_) {}
   try { bots.fake_otp = require('../workers/fakeOtpBroadcaster'); } catch (_) {}
   return bots;
 }
 
 const BOT_LABELS = {
   seven1tel: { name: 'Seven1Tel Bot',         desc: 'Scrapes seven1tel SMS portal for live OTPs' },
+  xisora:    { name: 'XISORA Bot',            desc: 'Polls XISORA REST API for live OTPs (token auth)' },
   fake_otp:  { name: 'Fake OTP Broadcaster',  desc: 'Synthetic CDR rows to keep the public feed warm' },
 };
 
