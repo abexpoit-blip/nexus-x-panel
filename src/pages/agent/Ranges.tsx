@@ -12,7 +12,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { GradientMesh, PageHeader } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap, Phone, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -160,14 +160,23 @@ const AgentRanges = () => {
   const canAllocate = !!selectedRange && free > 0;
 
   return (
-    <div className="relative space-y-4">
+    <div className="relative space-y-3 max-w-5xl mx-auto">
       <GradientMesh variant="default" />
-      <PageHeader
-        eyebrow="Get Number"
-        title="Get a Number"
-        description="Choose country, then a range, then how many numbers to grab."
-        icon={<Globe className="w-5 h-5 text-neon-cyan" />}
-      />
+      {/* Compact header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-neon-magenta/20 border border-primary/30 flex items-center justify-center">
+            <Globe className="w-4 h-4 text-neon-cyan" />
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground leading-none">Get Number</div>
+            <h1 className="font-display text-lg font-bold text-foreground leading-tight">Allocate Numbers</h1>
+          </div>
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          Pick country → range → amount
+        </div>
+      </div>
 
       {/* ── Empty state when no countries at all ── */}
       {!loadingCountries && allCountries.length === 0 ? (
@@ -179,34 +188,39 @@ const AgentRanges = () => {
           </div>
         </GlassCard>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {/* ── Country selector box ── */}
-          <GlassCard className="!p-3">
-            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">Step 1 — Country</div>
+          <GlassCard className="!p-2.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Country</div>
+              {selectedCountry && (
+                <div className="text-[9px] font-mono text-muted-foreground">{selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}</div>
+              )}
+            </div>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   disabled={loadingCountries}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
+                  className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <span className="text-2xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
+                        <span className="text-xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
                         <div className="min-w-0">
-                          <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono uppercase">{selectedCountry.country_code} · {selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}</div>
+                          <div className="font-display text-[13px] font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
+                          <div className="text-[9px] text-muted-foreground font-mono uppercase leading-tight">{selectedCountry.country_code}</div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Globe className="w-5 h-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">{loadingCountries ? "Loading countries…" : "Select country"}</div>
+                        <Globe className="w-4 h-4 text-muted-foreground" />
+                        <div className="text-[13px] text-muted-foreground">{loadingCountries ? "Loading…" : "Select country"}</div>
                       </>
                     )}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
@@ -253,47 +267,51 @@ const AgentRanges = () => {
           </GlassCard>
 
           {/* ── Range selector box ── */}
-          <GlassCard className={cn("!p-3", isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]")}>
-            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">Step 2 — Range</div>
+          <GlassCard className={cn("!p-2.5", isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]")}>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Range</div>
+              {selectedRange && (
+                <div className={cn("text-[9px] font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</div>
+              )}
+            </div>
             <Popover open={rangeOpen} onOpenChange={(v) => { if (country) setRangeOpen(v); }}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   disabled={!country || loadingRanges}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
+                    "w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
                     !country && "opacity-50 cursor-not-allowed"
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedRange ? (
                       <>
-                        <Hash className="w-5 h-5 text-neon-cyan shrink-0" />
+                        <Hash className="w-4 h-4 text-neon-cyan shrink-0" />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedRange.range_label}</div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="font-display text-[13px] font-semibold text-foreground truncate leading-tight">{selectedRange.range_label}</div>
                             {isHot && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
-                                <Flame className="w-3 h-3" /> Hot
+                              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-bold uppercase border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
+                                <Flame className="w-2.5 h-2.5" /> Hot
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {selectedRange.range_prefix && <span className="font-mono mr-2">{selectedRange.range_prefix}</span>}
-                            <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</span>
+                          <div className="text-[9px] text-muted-foreground leading-tight">
+                            {selectedRange.range_prefix && <span className="font-mono">{selectedRange.range_prefix}</span>}
                           </div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Hash className="w-5 h-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">
-                          {!country ? "Pick a country first" : loadingRanges ? "Loading ranges…" : "Select range"}
+                        <Hash className="w-4 h-4 text-muted-foreground" />
+                        <div className="text-[13px] text-muted-foreground">
+                          {!country ? "Pick country first" : loadingRanges ? "Loading…" : "Select range"}
                         </div>
                       </>
                     )}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
@@ -362,22 +380,21 @@ const AgentRanges = () => {
 
       {/* ── Get Number action panel ── */}
       {selectedRange && (
-        <GlassCard className="!p-4">
-          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-            <div>
-              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-0.5">Step 3 — Allocate</div>
-              <div className="font-display text-base font-bold text-foreground">How many numbers?</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                Per-request limit: <span className="font-mono text-foreground">{perReqLimit}</span> · Stock: <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free}</span>
+        <GlassCard className="!p-2.5">
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Allocate</div>
+              <div className="text-[11px] text-muted-foreground">
+                Limit <span className="font-mono text-foreground">{perReqLimit}</span> · Stock <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free}</span>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-[9px] uppercase text-muted-foreground tracking-wider">Earn / OTP</div>
-              <div className="text-lg font-display font-bold text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] uppercase text-muted-foreground tracking-wider">Earn</span>
+              <span className="text-sm font-display font-bold text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {baseOptions.map(n => {
               const disabled = !canAllocate || allocLoading !== null;
               const isThis = allocLoading === n;
@@ -387,42 +404,42 @@ const AgentRanges = () => {
                   disabled={disabled}
                   onClick={() => allocate(n)}
                   className={cn(
-                    "h-11 text-sm font-bold",
+                    "h-9 text-[13px] font-bold",
                     n === 1 && "bg-white/[0.06] hover:bg-white/[0.12] text-foreground border border-white/10",
                     n === 3 && "bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30",
                     n === 5 && "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 hover:opacity-90",
                   )}
                 >
-                  {isThis ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Zap className="w-3.5 h-3.5 mr-1" /> Get {n}×</>}
+                  {isThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Zap className="w-3 h-3 mr-1" /> Get {n}×</>}
                 </Button>
               );
             })}
           </div>
 
           {perReqLimit > 5 && (
-            <div className="mt-2 flex gap-2">
+            <div className="mt-1.5 flex gap-1.5">
               <Input
                 type="number"
                 min={1}
                 max={perReqLimit}
-                placeholder={`Custom amount (max ${perReqLimit})`}
+                placeholder={`Custom (max ${perReqLimit})`}
                 value={customCount || ""}
                 onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
-                className="bg-white/[0.04] border-white/[0.1] h-9 font-mono text-sm"
+                className="bg-white/[0.04] border-white/[0.1] h-8 font-mono text-[13px]"
               />
               <Button
                 variant="outline"
                 disabled={!customCount || !canAllocate || allocLoading !== null}
                 onClick={() => allocate(customCount)}
-                className="border-white/[0.1] h-9 px-5 text-sm"
+                className="border-white/[0.1] h-8 px-4 text-[13px]"
               >
-                {allocLoading === customCount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Get"}
+                {allocLoading === customCount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Get"}
               </Button>
             </div>
           )}
 
           {!canAllocate && (
-            <div className="mt-2 text-xs text-destructive text-center">
+            <div className="mt-1.5 text-[11px] text-destructive text-center">
               {free <= 0 ? "This range is out of stock right now." : ""}
             </div>
           )}
@@ -431,43 +448,71 @@ const AgentRanges = () => {
 
       {/* Allocation result dialog — copy single, copy all, download as TXT */}
       <Dialog open={!!allocated} onOpenChange={(v) => { if (!v) { setAllocated(null); setCustomCount(0); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Hash className="w-5 h-5 text-neon-cyan" />
-              {allocated?.length} number{allocated?.length === 1 ? "" : "s"} allocated
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-            {(allocated || []).map((a, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md bg-white/[0.04] border border-white/[0.08] hover:border-primary/40 transition-colors"
-              >
-                <span className="font-mono text-sm text-foreground select-all">{a.phone_number}</span>
-                <button
-                  onClick={() => copyOne(a.phone_number, i)}
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                  title="Copy this number"
-                >
-                  {copiedIdx === i ? <Check className="w-4 h-4 text-neon-green" /> : <Copy className="w-4 h-4" />}
-                </button>
+        <DialogContent className="max-w-lg p-0 overflow-hidden border-white/[0.08] bg-card">
+          {/* Gradient header */}
+          <div className="relative px-5 py-4 border-b border-white/[0.08] bg-gradient-to-br from-primary/15 via-transparent to-neon-magenta/15">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-neon-magenta flex items-center justify-center shadow-lg shadow-primary/30">
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
-            ))}
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="font-display text-base font-bold text-foreground">
+                  {allocated?.length} number{allocated?.length === 1 ? "" : "s"} ready
+                </DialogTitle>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                  {selectedCountry && <span className="text-base leading-none">{flagEmoji(selectedCountry.country_code)}</span>}
+                  <span>{selectedCountry?.country_name || ""}</span>
+                  {selectedRange && <span className="text-muted-foreground/60">·</span>}
+                  {selectedRange && <span className="truncate">{selectedRange.range_label}</span>}
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter className="!flex-col sm:!flex-row gap-2">
-            <Button variant="outline" onClick={copyAll} className="border-white/[0.1]">
-              {copiedAll ? <Check className="w-4 h-4 mr-1.5 text-neon-green" /> : <Copy className="w-4 h-4 mr-1.5" />}
-              Copy all
-            </Button>
-            <Button variant="outline" onClick={downloadTxt} className="border-white/[0.1]">
-              <Download className="w-4 h-4 mr-1.5" /> Download .txt
-            </Button>
+
+          {/* Numbers list */}
+          <div className="px-5 py-3">
+            <div className="space-y-1.5 max-h-[45vh] overflow-y-auto pr-1">
+              {(allocated || []).map((a, i) => (
+                <div
+                  key={i}
+                  className="group flex items-center gap-3 px-3 py-2 rounded-md bg-white/[0.03] border border-white/[0.06] hover:border-primary/40 hover:bg-white/[0.05] transition-all"
+                >
+                  <div className="w-6 h-6 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                    <Phone className="w-3 h-3 text-primary" />
+                  </div>
+                  <span className="font-mono text-[13px] text-foreground select-all flex-1 truncate">{a.phone_number}</span>
+                  <button
+                    onClick={() => copyOne(a.phone_number, i)}
+                    className={cn(
+                      "p-1.5 rounded-md transition-colors",
+                      copiedIdx === i ? "text-neon-green bg-neon-green/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    )}
+                    title="Copy this number"
+                  >
+                    {copiedIdx === i ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer actions */}
+          <DialogFooter className="!flex-row gap-1.5 px-5 py-3 border-t border-white/[0.08] bg-white/[0.02] !justify-between">
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="outline" onClick={copyAll} className="border-white/[0.1] h-8 text-[12px]">
+                {copiedAll ? <Check className="w-3.5 h-3.5 mr-1 text-neon-green" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+                Copy all
+              </Button>
+              <Button size="sm" variant="outline" onClick={downloadTxt} className="border-white/[0.1] h-8 text-[12px]">
+                <Download className="w-3.5 h-3.5 mr-1" /> .txt
+              </Button>
+            </div>
             <Button
+              size="sm"
               onClick={() => { setAllocated(null); navigate("/agent/my-numbers"); }}
-              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 sm:ml-auto"
+              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 h-8 text-[12px]"
             >
-              Open My Numbers
+              My Numbers →
             </Button>
           </DialogFooter>
         </DialogContent>
