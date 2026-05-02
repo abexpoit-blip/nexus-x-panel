@@ -130,4 +130,8 @@ app.listen(PORT, () => {
   // Start Fake OTP broadcaster (idles until fake_otp_enabled=true)
   try { require('./workers/fakeOtpBroadcaster').start(); }
   catch (e) { console.warn('fake-otp broadcaster start error:', e.message); }
+
+  // Allocation expiry sweeper — frees stale active allocations after otp_expiry_sec
+  try { require('./workers/allocationExpiry').start(); }
+  catch (e) { console.warn('allocation expiry start error:', e.message); }
 });

@@ -143,11 +143,24 @@ const AgentRanges = () => {
             });
           }, 30000);
         }
+        // Auto-copy allocated number(s) to clipboard
+        const phones = (r.allocated as any[]).map(a => a.phone_number).filter(Boolean);
+        let copied = false;
+        if (phones.length) {
+          try {
+            await navigator.clipboard.writeText(phones.join("\n"));
+            copied = true;
+          } catch { /* ignore — clipboard may be blocked */ }
+        }
         // Refresh allocated list immediately so they appear inline
         qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
         toast({
           title: `${r.allocated.length} number${r.allocated.length === 1 ? "" : "s"} allocated`,
-          description: r.errors?.length ? r.errors[0] : "Numbers ready below — waiting for OTP.",
+          description: r.errors?.length
+            ? r.errors[0]
+            : copied
+              ? `Copied ${phones.length === 1 ? phones[0] : `${phones.length} numbers`} to clipboard — waiting for OTP.`
+              : "Numbers ready below — waiting for OTP.",
         });
       } else {
         toast({ title: "No number available", description: r.errors?.[0] || "Pool is empty for this range", variant: "destructive" });
