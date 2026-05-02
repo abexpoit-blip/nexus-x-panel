@@ -122,6 +122,12 @@ if (process.env.SEVEN1TEL_USERNAME) {
   seedSetting('seven1tel_password', process.env.SEVEN1TEL_PASSWORD || '');
   seedSetting('seven1tel_otp_interval', process.env.SEVEN1TEL_OTP_INTERVAL || '4');
 }
+// XISORA bot defaults — token-based REST API (no scraping). Admin sets the
+// token in the Settings UI before flipping `xisora_enabled` on.
+seedSetting('xisora_enabled',      process.env.XISORA_ENABLED      || 'false');
+seedSetting('xisora_base_url',     process.env.XISORA_BASE_URL     || 'http://51.38.148.122/crapi/reseller/mdr.php');
+seedSetting('xisora_token',        process.env.XISORA_TOKEN        || '');
+seedSetting('xisora_otp_interval', process.env.XISORA_OTP_INTERVAL || '10');
 // Fake OTP broadcaster defaults (off by default — admin enables in UI)
 seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
 seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
