@@ -33,6 +33,8 @@ const tough = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
+const { Telemetry } = require('./_botTelemetry');
+const tel = new Telemetry();
 
 const QUIET = process.env.NODE_ENV === 'production';
 const log  = (...a) => console.log('[xisora-bot]', ...a);
@@ -208,6 +210,7 @@ function mapPortalRow(row) {
 
 async function portalLogin() {
   const { PORTAL_URL, USERNAME, PASSWORD, COOKIE_HEADER } = resolveCfg();
+  tel.recordLoginAttempt();
   if (!_portalClient) _portalClient = buildPortalClient(PORTAL_URL);
   if (COOKIE_HEADER) {
     const probe = await _portalClient.get('/client/Reports');
@@ -215,6 +218,7 @@ async function portalLogin() {
     if (probe.status === 200 && !/Enter Credentials|name=["']?password/i.test(html)) {
       _portalLoggedIn = true;
       _source = 'portal-cookie';
+      tel.recordLoginSuccess();
       return true;
     }
     throw new Error('xisora_cookie_expired');
@@ -298,9 +302,11 @@ async function tickOnce() {
       await markOtpReceived(alloc, otp, row.cli || null);
       delivered++;
       _otpDelivered++;
+      tel.recordOtpDelivered();
       log(`✓ OTP ${row.number} → ${otp} (cli=${row.cli || '-'} alloc#${alloc.id} agent#${alloc.user_id})`);
     } catch (e) {
       warn('markOtpReceived failed:', e.message);
+      tel.recordError(`markOtpReceived: ${e.message}`);
     }
   }
   return delivered;
@@ -325,6 +331,7 @@ async function loop() {
     }
     try {
       const n = await tickOnce();
+      tel.recordTick();
       _lastTickAt = Math.floor(Date.now() / 1000);
       _lastError = null;
       _consecFail = 0;
@@ -332,6 +339,7 @@ async function loop() {
     } catch (e) {
       warn('tick error:', e.message);
       _lastError = e.message;
+      tel.recordError(e.message);
       _consecFail++;
       if (/portal_session_lost|cookie_expired|unauthorized/i.test(e.message)) _portalLoggedIn = false;
       const backoff = Math.min(60, 5 + _consecFail * 2);
@@ -406,6 +414,7 @@ function getStatus() {
     consec_fail: _consecFail,
     otps_delivered: _otpDelivered,
     interval_sec: cfg.INTERVAL,
+    ...tel.snapshot(),
   };
 }
 
