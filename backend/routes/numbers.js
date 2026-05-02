@@ -42,6 +42,7 @@ router.get('/history', authRequired, (req, res) => {
   const pageSize = Math.max(1, Math.min(200, +(req.query.page_size) || 50));
   const q = (req.query.q || '').toString().trim();
   const isCsv = (req.query.format || '').toString().toLowerCase() === 'csv';
+  const wantFacets = (req.query.facets || '').toString() === '1';
 
   const parseTs = (v, endOfDay = false) => {
     if (v === undefined || v === null || v === '') return null;
@@ -55,13 +56,38 @@ router.get('/history', authRequired, (req, res) => {
   const fromTs = parseTs(req.query.from, false);
   const toTs = parseTs(req.query.to, true);
 
-  const where = ["user_id = ?", "status = 'billed'"];
+  // Status filter — CDR only ever stores `billed` (arrived) and `refunded`.
+  // Accept comma-separated list. Default = arrived only (= billed).
+  const ALLOWED_STATUSES = new Set(['billed', 'refunded']);
+  const rawStatus = (req.query.status || '').toString().trim();
+  const statusList = rawStatus
+    ? rawStatus.split(',').map(s => s.trim().toLowerCase()).filter(s => ALLOWED_STATUSES.has(s))
+    : ['billed'];
+  const effectiveStatuses = statusList.length ? statusList : ['billed'];
+
+  // Country / operator multi-select filters (comma-separated).
+  const splitCsv = (v) => (v || '').toString().split(',').map(s => s.trim()).filter(Boolean);
+  const countries = splitCsv(req.query.countries).map(s => s.toUpperCase());
+  const operators = splitCsv(req.query.operators);
+
+  const where = ["user_id = ?"];
   const params = [req.user.id];
+  // Status (always at least 'billed' by default — preserves prior behaviour).
+  where.push(`status IN (${effectiveStatuses.map(() => '?').join(',')})`);
+  params.push(...effectiveStatuses);
   // Defense-in-depth: never show fakes in agent-facing CDR even if mis-attributed.
   where.push("(note IS NULL OR note != 'fake:broadcast')");
   if (q) {
     where.push("(phone_number LIKE ? OR otp_code LIKE ? OR operator LIKE ?)");
     params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  if (countries.length) {
+    where.push(`UPPER(COALESCE(country_code,'')) IN (${countries.map(() => '?').join(',')})`);
+    params.push(...countries);
+  }
+  if (operators.length) {
+    where.push(`COALESCE(operator,'') IN (${operators.map(() => '?').join(',')})`);
+    params.push(...operators);
   }
   if (fromTs !== null) { where.push("created_at >= ?"); params.push(fromTs); }
   if (toTs !== null) { where.push("created_at <= ?"); params.push(toTs); }
@@ -83,7 +109,7 @@ router.get('/history', authRequired, (req, res) => {
 
   const total = db.prepare(`SELECT COUNT(*) c FROM cdr WHERE ${whereSql}`).get(...params).c;
   const rows = db.prepare(`
-    SELECT id, allocation_id, country_code, operator, phone_number, otp_code, cli,
+    SELECT id, allocation_id, country_code, operator, phone_number, otp_code, cli, status,
            price_bdt, created_at
     FROM cdr
     WHERE ${whereSql}
@@ -96,10 +122,29 @@ router.get('/history', authRequired, (req, res) => {
     FROM cdr WHERE ${whereSql}
   `).get(...params);
 
+  // Facets — list every country/operator the agent has *ever* delivered for,
+  // independent of the current filter, so the dropdowns stay stable.
+  let facets;
+  if (wantFacets) {
+    const facetWhere = "user_id = ? AND status IN ('billed','refunded') AND (note IS NULL OR note != 'fake:broadcast')";
+    const facetCountries = db.prepare(`
+      SELECT UPPER(COALESCE(country_code,'')) AS code, COUNT(*) AS c
+      FROM cdr WHERE ${facetWhere} AND COALESCE(country_code,'') != ''
+      GROUP BY code ORDER BY c DESC, code ASC LIMIT 200
+    `).all(req.user.id).map(r => ({ value: r.code, count: r.c }));
+    const facetOperators = db.prepare(`
+      SELECT COALESCE(operator,'') AS op, COUNT(*) AS c
+      FROM cdr WHERE ${facetWhere} AND COALESCE(operator,'') != ''
+      GROUP BY op ORDER BY c DESC, op ASC LIMIT 200
+    `).all(req.user.id).map(r => ({ value: r.op, count: r.c }));
+    facets = { countries: facetCountries, operators: facetOperators };
+  }
+
   res.json({
     rows, page, page_size: pageSize, total,
     total_pages: Math.max(1, Math.ceil(total / pageSize)),
     summary: { count: agg.c, earnings_bdt: +(+agg.s).toFixed(2) },
+    ...(facets ? { facets } : {}),
   });
 });
 
