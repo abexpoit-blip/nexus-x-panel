@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { cliBadgeClass } from "@/lib/cliBadge";
 import { usePagination } from "@/components/Pagination";
 
-// Shorten IMS range names like "Peru Bitel TF04" → "TF04"
+// Shorten provider range names like "Peru Bitel TF04" → "TF04"
 const shortRange = (operator?: string | null) => {
   if (!operator) return "";
   const parts = operator.trim().split(/\s+/);
@@ -43,13 +43,13 @@ const AgentConsole = () => {
   const hotRanges = useMemo(() => {
     const feed = data?.feed || [];
     const cutoff = Math.floor(Date.now() / 1000) - 3600;
-    const counts = new Map<string, { count: number; isIms: boolean }>();
+    const counts = new Map<string, { count: number; isSeven1Tel: boolean }>();
     for (const c of feed) {
       if (c.created_at < cutoff) continue;
-      const isIms = c.provider === "ims";
-      const key = isIms ? shortRange(c.operator) : (c.operator || c.country_code || "—");
+      const isSeven1Tel = c.provider === "seven1tel";
+      const key = isSeven1Tel ? shortRange(c.operator) : (c.operator || c.country_code || "—");
       if (!key) continue;
-      const cur = counts.get(key) || { count: 0, isIms };
+      const cur = counts.get(key) || { count: 0, isSeven1Tel };
       cur.count += 1;
       counts.set(key, cur);
     }
@@ -109,7 +109,7 @@ const AgentConsole = () => {
                   "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all",
                   idx === 0
                     ? "bg-neon-green/15 text-neon-green border border-neon-green/40"
-                    : r.isIms
+                    : r.isSeven1Tel
                       ? "bg-neon-magenta/10 text-neon-magenta hover:bg-neon-magenta/20"
                       : "bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20"
                 )}
@@ -125,12 +125,12 @@ const AgentConsole = () => {
 
       <div className="space-y-3">
         {pagedItems.map((c) => {
-          const isIms = c.provider === "ims";
-          const label = isIms ? shortRange(c.operator) : (c.operator || c.country_code || "—");
-          const fullDetail = isIms
+          const isSeven1Tel = c.provider === "seven1tel";
+          const label = isSeven1Tel ? shortRange(c.operator) : (c.operator || c.country_code || "—");
+          const fullDetail = isSeven1Tel
             ? (c.operator || label)
             : [c.operator, c.country_code].filter(Boolean).join(" · ");
-          const labelStyle = isIms
+          const labelStyle = isSeven1Tel
             ? "bg-neon-magenta/10 text-neon-magenta"
             : "bg-neon-cyan/10 text-neon-cyan";
           const otpMask = "X".repeat(c.otp_length || 6);
