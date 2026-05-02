@@ -119,6 +119,8 @@ router.get('/system-health', (req, res) => {
   // Provider bot snapshots
   let seven1tel = null;
   try { seven1tel = require('../workers/seven1telBot').getStatus?.() || null; } catch (_) {}
+  let xisora = null;
+  try { xisora = require('../workers/xisoraBot').getStatus?.() || null; } catch (_) {}
 
   const pendingWithdrawals = db.prepare("SELECT COUNT(*) c FROM withdrawals WHERE status='pending'").get().c;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE expires_at > strftime('%s','now')").get().c;
@@ -142,6 +144,7 @@ router.get('/system-health', (req, res) => {
       backup_dir: backupDir,
     },
     seven1tel_bot: seven1tel,
+    xisora_bot: xisora,
     counts: {
       pending_withdrawals: pendingWithdrawals,
       active_sessions: activeSessions,
