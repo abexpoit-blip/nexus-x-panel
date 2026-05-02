@@ -39,7 +39,7 @@ const AgentProfile = () => {
     }
     setPwLoading(true);
     try {
-      await api.auth.changePassword(currentPw, newPw);
+      await api.changePassword(currentPw, newPw);
       toast.success("Password updated. Use the new password next time you log in.");
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
     } catch (e: any) {
