@@ -311,8 +311,8 @@ async function loop() {
       log('disabled — stopping');
       return;
     }
-    if (!cfg.TOKEN) {
-      _lastError = 'token not set in admin Settings';
+    if (!cfg.TOKEN && !cfg.COOKIE_HEADER) {
+      _lastError = 'set XISORA API token or portal cookie in admin Settings';
       // soft-wait: re-check every 30s without spamming logs
       await new Promise(r => setTimeout(r, 30_000));
       continue;
@@ -327,6 +327,7 @@ async function loop() {
       warn('tick error:', e.message);
       _lastError = e.message;
       _consecFail++;
+      if (/portal_session_lost|cookie_expired|unauthorized/i.test(e.message)) _portalLoggedIn = false;
       const backoff = Math.min(60, 5 + _consecFail * 2);
       await new Promise(r => setTimeout(r, backoff * 1000));
     }
@@ -341,18 +342,20 @@ function start() {
   if (_running) { log('already running — skip start'); return; }
   _stopFlag = false;
   log('starting…  base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's',
-      'token=', cfg.TOKEN ? cfg.TOKEN.slice(0, 4) + '…' + cfg.TOKEN.slice(-3) : '(none)');
+      'source=', cfg.TOKEN ? 'api-token' : (cfg.COOKIE_HEADER ? 'portal-cookie' : 'not-configured'));
   loop().catch(e => warn('fatal:', e.message));
 }
-function stop() { _stopFlag = true; }
+function stop() { _stopFlag = true; _portalLoggedIn = false; }
 function getStatus() {
   const cfg = resolveCfg();
   return {
     enabled: cfg.ENABLED,
     running: _running,
-    logged_in: !!cfg.TOKEN,            // token-based: "logged in" = token present
+    logged_in: cfg.TOKEN ? true : _portalLoggedIn,
     base_url: cfg.BASE_URL,
-    username: cfg.TOKEN ? cfg.TOKEN.slice(0, 4) + '…' + cfg.TOKEN.slice(-3) : null,
+    username: cfg.TOKEN ? cfg.TOKEN.slice(0, 4) + '…' + cfg.TOKEN.slice(-3) : (cfg.USERNAME || null),
+    source: cfg.TOKEN ? 'api-token' : (cfg.COOKIE_HEADER ? 'portal-cookie' : _source),
+    portal_url: cfg.PORTAL_URL,
     last_tick_at: _lastTickAt,
     last_error: _lastError,
     consec_fail: _consecFail,
