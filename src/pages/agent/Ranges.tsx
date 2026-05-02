@@ -806,7 +806,7 @@ const AgentRanges = () => {
               You are about to request <span className="font-semibold text-foreground">{qty} numbers</span>
               {selectedRange ? (
                 <>
-                  {" "}from <span className="font-mono text-foreground">{selectedRange.label || selectedRange.country_code}</span>
+                  {" "}from <span className="font-mono text-foreground">{(selectedRange as any).label || selectedRange.country_code}</span>
                   {" "}at <span className="text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</span> per OTP.
                   {" "}Estimated total: <span className="text-neon-green font-mono">৳{(Number(selectedRange.price_bdt) * qty).toFixed(2)}</span>.
                 </>
