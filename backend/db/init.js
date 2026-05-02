@@ -5,7 +5,12 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = process.env.DB_PATH || './data/nexus.db';
+// Same default path used by backend/lib/db.js so the runtime backend and
+// init script always open the SAME file regardless of cwd (PM2 may launch
+// from /opt/nexus, /opt/nexus/backend, etc.).
+const DB_PATH = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.resolve(__dirname, '..', 'data', 'nexus.db');
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 

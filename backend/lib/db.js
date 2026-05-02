@@ -37,4 +37,56 @@ _ensureCol('cdr', 'note', 'TEXT');
 _ensureCol('cdr', 'cli', 'TEXT');
 _ensureCol('allocations', 'cli', 'TEXT');
 
+// --- Self-healing: ensure pool tables exist (idempotent) ---
+// Prevents "no such table: provider_ranges / pool_numbers" when the runtime
+// process opens a DB that pre-dates these features and `npm run init-db`
+// hasn't been run against THIS file. Safe to run on every boot.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_ranges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL,
+      country_code TEXT NOT NULL,
+      country_name TEXT,
+      range_label TEXT NOT NULL,
+      range_prefix TEXT,
+      operator TEXT,
+      price_bdt REAL NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      hot INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      UNIQUE(provider, country_code, range_label)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pranges_lookup ON provider_ranges(enabled, country_code);
+    CREATE INDEX IF NOT EXISTS idx_pranges_provider ON provider_ranges(provider, enabled);
+
+    CREATE TABLE IF NOT EXISTS pool_numbers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      range_id INTEGER NOT NULL,
+      msisdn TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'free',
+      allocated_user_id INTEGER,
+      allocated_at INTEGER,
+      last_otp_at INTEGER,
+      otp_count INTEGER NOT NULL DEFAULT 0,
+      note TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      UNIQUE(range_id, msisdn)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pool_range_status ON pool_numbers(range_id, status);
+    CREATE INDEX IF NOT EXISTS idx_pool_msisdn ON pool_numbers(msisdn);
+    CREATE INDEX IF NOT EXISTS idx_pool_alloc_user ON pool_numbers(allocated_user_id);
+  `);
+  _ensureCol('provider_ranges', 'hot', 'INTEGER NOT NULL DEFAULT 0');
+  _ensureCol('provider_ranges', 'country_name', 'TEXT');
+  _ensureCol('provider_ranges', 'range_prefix', 'TEXT');
+  _ensureCol('provider_ranges', 'operator', 'TEXT');
+  _ensureCol('provider_ranges', 'notes', 'TEXT');
+} catch (e) {
+  console.error('[db] pool tables self-heal failed:', e.message);
+}
+
 module.exports = db;
