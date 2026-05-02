@@ -71,6 +71,10 @@ const AdminSettings = () => {
   const [seven1Interval, setSeven1Interval] = useState<number>(4);
   const [xisoraUrl, setXisoraUrl] = useState("");
   const [xisoraToken, setXisoraToken] = useState("");
+  const [xisoraPortalUrl, setXisoraPortalUrl] = useState("");
+  const [xisoraUser, setXisoraUser] = useState("");
+  const [xisoraPass, setXisoraPass] = useState("");
+  const [xisoraCookie, setXisoraCookie] = useState("");
   const [xisoraInterval, setXisoraInterval] = useState<number>(10);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
@@ -92,6 +96,10 @@ const AdminSettings = () => {
     setSeven1Interval(Number(str(s, "seven1tel_otp_interval", "4")) || 4);
     setXisoraUrl(str(s, "xisora_base_url", "http://51.38.148.122/crapi/reseller/mdr.php"));
     setXisoraToken(str(s, "xisora_token"));
+    setXisoraPortalUrl(str(s, "xisora_portal_url", "http://94.23.31.29/sms"));
+    setXisoraUser(str(s, "xisora_username", "mamun33"));
+    setXisoraPass(str(s, "xisora_password", "mamun@12aa"));
+    setXisoraCookie(str(s, "xisora_cookie_header"));
     setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
   }, [s]);
 
