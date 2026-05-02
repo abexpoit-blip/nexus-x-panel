@@ -1,18 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { GradientMesh, PageHeader } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap, Phone, Sparkles, Layers, TrendingUp } from "lucide-react";
+import { GradientMesh } from "@/components/premium";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +28,7 @@ const LS_COUNTRY = "nx.getnum.country";
 const LS_RANGE = "nx.getnum.rangeId";
 
 const AgentRanges = () => {
+  const qc = useQueryClient();
   // Persisted selections — survive reload until user changes them.
   const [country, setCountry] = useState<string | null>(() => {
     try { return localStorage.getItem(LS_COUNTRY) || null; } catch { return null; }
@@ -50,11 +48,15 @@ const AgentRanges = () => {
   const { user } = useAuth();
   const perReqLimit = Math.min(500, Math.max(1, Number((user as any)?.per_request_limit) || 5));
 
-  const [allocated, setAllocated] = useState<{ phone_number: string }[] | null>(null);
   const [allocLoading, setAllocLoading] = useState<number | null>(null); // count being loaded
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [copiedOtp, setCopiedOtp] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [customCount, setCustomCount] = useState<number>(0);
+  // Highlight numbers from the most recent allocation batch.
+  const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "received" | "released" | "expired">("all");
+  const [searchQ, setSearchQ] = useState("");
 
   useEffect(() => {
     try {
@@ -115,11 +117,24 @@ const AgentRanges = () => {
     try {
       const r = await api.getNumber({ range_id: selectedRange.id, count });
       if (r.allocated?.length) {
-        setAllocated(r.allocated);
         bumpDaily(r.allocated.length);
+        // Mark these as fresh (yellow flash) for ~30s
+        const ids = new Set<number>((r.allocated as any[]).map(a => a.id).filter(Boolean));
+        if (ids.size) {
+          setFreshIds(prev => new Set([...prev, ...ids]));
+          setTimeout(() => {
+            setFreshIds(prev => {
+              const next = new Set(prev);
+              ids.forEach(id => next.delete(id));
+              return next;
+            });
+          }, 30000);
+        }
+        // Refresh allocated list immediately so they appear inline
+        qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
         toast({
           title: `${r.allocated.length} number${r.allocated.length === 1 ? "" : "s"} allocated`,
-          description: r.errors?.length ? r.errors[0] : "Numbers ready below.",
+          description: r.errors?.length ? r.errors[0] : "Numbers ready below — waiting for OTP.",
         });
       } else {
         toast({ title: "No number available", description: r.errors?.[0] || "Pool is empty for this range", variant: "destructive" });
@@ -138,17 +153,24 @@ const AgentRanges = () => {
       setTimeout(() => setCopiedIdx(null), 1200);
     } catch { toast({ title: "Copy failed", variant: "destructive" }); }
   };
-  const copyAll = async () => {
-    if (!allocated) return;
+  const copyOtp = async (text: string, idx: number) => {
     try {
-      await navigator.clipboard.writeText(allocated.map(a => a.phone_number).join("\n"));
+      await navigator.clipboard.writeText(text);
+      setCopiedOtp(idx);
+      setTimeout(() => setCopiedOtp(null), 1200);
+    } catch { toast({ title: "Copy failed", variant: "destructive" }); }
+  };
+  const copyAll = async (rows: { phone_number: string }[]) => {
+    if (!rows.length) return;
+    try {
+      await navigator.clipboard.writeText(rows.map(a => a.phone_number).join("\n"));
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 1500);
     } catch { toast({ title: "Copy failed", variant: "destructive" }); }
   };
-  const downloadTxt = () => {
-    if (!allocated) return;
-    const blob = new Blob([allocated.map(a => a.phone_number).join("\n") + "\n"], { type: "text/plain" });
+  const downloadTxt = (rows: { phone_number: string }[]) => {
+    if (!rows.length) return;
+    const blob = new Blob([rows.map(a => a.phone_number).join("\n") + "\n"], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -172,16 +194,71 @@ const AgentRanges = () => {
     try { localStorage.setItem(todayKey, String(next)); } catch { /* ignore */ }
   };
 
+  // ── Live allocated numbers list ──
+  const { data: myData, refetch: refetchMy } = useQuery({
+    queryKey: ["my-numbers-inline"],
+    queryFn: () => api.myNumbers(),
+    refetchInterval: 5000, // poll every 5s for inbound OTPs
+  });
+  const release = useMutation({
+    mutationFn: (id: number) => api.releaseNumber(id),
+    onSuccess: () => {
+      toast({ title: "Number released" });
+      qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
+    },
+    onError: (e: Error) => toast({ title: "Release failed", description: e.message, variant: "destructive" }),
+  });
+  const sync = useMutation({
+    mutationFn: () => api.syncOtp(),
+    onSuccess: (r: { updated: number }) => {
+      toast({ title: `Synced — ${r.updated || 0} updated` });
+      qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
+    },
+  });
+
+  // Tick to re-evaluate "NEW" highlight
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const allRows = (myData?.numbers || []) as any[];
+  const visibleRows = useMemo(() => {
+    return allRows
+      .filter(n => {
+        if (statusFilter !== "all" && n.status !== statusFilter) return false;
+        if (searchQ && !String(n.phone_number).toLowerCase().includes(searchQ.toLowerCase())) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.otp_received_at || a.allocated_at || 0;
+        const tb = b.otp_received_at || b.allocated_at || 0;
+        return tb - ta;
+      });
+  }, [allRows, statusFilter, searchQ]);
+
+  const activeCount = allRows.filter(r => r.status === "active").length;
+  const otpCount = allRows.filter(r => r.status === "received").length;
+
   return (
-    <div className="relative space-y-5 max-w-6xl mx-auto">
+    <div className="relative space-y-5 w-full">
       <GradientMesh variant="default" />
       {/* Header */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Pick a country and range — we'll grab the next available number from the pool.
+            Pick a country and range — your number and OTP appear right below.
           </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <div className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-muted-foreground">
+            Active: <span className="font-mono font-bold text-foreground">{activeCount}</span>
+          </div>
+          <div className="px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/20 text-neon-green">
+            OTPs: <span className="font-mono font-bold">{otpCount}</span>
+          </div>
         </div>
       </div>
 
@@ -196,9 +273,9 @@ const AgentRanges = () => {
         </GlassCard>
       ) : (
         <GlassCard className="!p-5 md:!p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* ── Country selector box ── */}
-          <div>
+          <div className="md:col-span-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-foreground/80">Country</label>
               {allCountries.length > 0 && (
