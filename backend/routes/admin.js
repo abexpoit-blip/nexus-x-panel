@@ -119,6 +119,8 @@ router.get('/system-health', (req, res) => {
   // Provider bot snapshots
   let seven1tel = null;
   try { seven1tel = require('../workers/seven1telBot').getStatus?.() || null; } catch (_) {}
+  let xisora = null;
+  try { xisora = require('../workers/xisoraBot').getStatus?.() || null; } catch (_) {}
 
   const pendingWithdrawals = db.prepare("SELECT COUNT(*) c FROM withdrawals WHERE status='pending'").get().c;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE expires_at > strftime('%s','now')").get().c;
@@ -142,6 +144,7 @@ router.get('/system-health', (req, res) => {
       backup_dir: backupDir,
     },
     seven1tel_bot: seven1tel,
+    xisora_bot: xisora,
     counts: {
       pending_withdrawals: pendingWithdrawals,
       active_sessions: activeSessions,
@@ -314,12 +317,14 @@ router.post('/fake-otp/purge', (req, res) => {
 function loadBots() {
   const bots = {};
   try { bots.seven1tel = require('../workers/seven1telBot'); } catch (_) {}
+  try { bots.xisora    = require('../workers/xisoraBot'); } catch (_) {}
   try { bots.fake_otp = require('../workers/fakeOtpBroadcaster'); } catch (_) {}
   return bots;
 }
 
 const BOT_LABELS = {
   seven1tel: { name: 'Seven1Tel Bot',         desc: 'Scrapes seven1tel SMS portal for live OTPs' },
+  xisora:    { name: 'XISORA Bot',            desc: 'Polls XISORA REST API for live OTPs (token auth)' },
   fake_otp:  { name: 'Fake OTP Broadcaster',  desc: 'Synthetic CDR rows to keep the public feed warm' },
 };
 

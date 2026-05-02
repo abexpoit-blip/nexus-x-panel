@@ -21,6 +21,7 @@ import { PoolDialog } from "@/components/admin/PoolDialog";
 
 const PROVIDERS = [
   { id: "seven1tel", name: "Seven1Tel" },
+  { id: "xisora",    name: "XISORA" },
 ];
 
 type Form = Partial<ProviderRange> & { id?: number };

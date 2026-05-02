@@ -69,6 +69,9 @@ const AdminSettings = () => {
   const [seven1Pass, setSeven1Pass] = useState("");
   const [seven1Cookie, setSeven1Cookie] = useState("");
   const [seven1Interval, setSeven1Interval] = useState<number>(4);
+  const [xisoraUrl, setXisoraUrl] = useState("");
+  const [xisoraToken, setXisoraToken] = useState("");
+  const [xisoraInterval, setXisoraInterval] = useState<number>(10);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
@@ -87,6 +90,9 @@ const AdminSettings = () => {
     setSeven1Pass(str(s, "seven1tel_password"));
     setSeven1Cookie(str(s, "seven1tel_cookie_header"));
     setSeven1Interval(Number(str(s, "seven1tel_otp_interval", "4")) || 4);
+    setXisoraUrl(str(s, "xisora_base_url", "http://51.38.148.122/crapi/reseller/mdr.php"));
+    setXisoraToken(str(s, "xisora_token"));
+    setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
   }, [s]);
 
   useEffect(() => {
@@ -540,6 +546,25 @@ const AdminSettings = () => {
             saving={savingKey?.startsWith("seven1tel_") || false}
           />
 
+          {/* ─── XISORA (REST API, token-based) ─── */}
+          <BotTokenCard
+            tone="cyan"
+            title="XISORA Bot"
+            subtitle="REST API · token-based · no captcha"
+            url={xisoraUrl} setUrl={setXisoraUrl}
+            token={xisoraToken} setToken={setXisoraToken}
+            interval={xisoraInterval} setInterval={setXisoraInterval}
+            showPw={showPw}
+            health={healthState["xisora"]}
+            onSave={async () => {
+              await setSetting("xisora_base_url", xisoraUrl);
+              await setSetting("xisora_token", xisoraToken);
+              await setSetting("xisora_otp_interval", String(xisoraInterval));
+            }}
+            onHealth={() => runHealth("xisora")}
+            saving={savingKey?.startsWith("xisora_") || false}
+          />
+
           <p className="text-[11px] text-muted-foreground">
             After saving, go to <span className="text-foreground">Bots Control</span> → <span className="text-neon-cyan">Restart</span> so changes take effect right away.
           </p>
@@ -661,6 +686,105 @@ function BotConfigCard(p: BotConfigCardProps) {
         <Button variant="outline" onClick={() => p.onClearCookies()}
           className="border-neon-amber/30 text-neon-amber hover:bg-neon-amber/10 ml-auto">
           <Cookie className="w-4 h-4 mr-1.5" /> Clear saved cookies
+        </Button>
+      </div>
+    </GlassCard>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// BotTokenCard — slim per-bot config for token-based REST APIs.
+// Used by XISORA (no username/password/cookie — just URL + bearer-style token).
+// ───────────────────────────────────────────────────────────────────────
+type BotTokenCardProps = {
+  tone: "cyan" | "magenta";
+  title: string;
+  subtitle?: string;
+  url: string; setUrl: (v: string) => void;
+  token: string; setToken: (v: string) => void;
+  interval: number; setInterval: (v: number) => void;
+  showPw: boolean;
+  health?: { ok: boolean; ms: number; error?: string } | "checking";
+  saving: boolean;
+  onSave: () => Promise<void> | void;
+  onHealth: () => void;
+};
+
+function BotTokenCard(p: BotTokenCardProps) {
+  const accent = p.tone === "cyan" ? "text-neon-cyan" : "text-neon-magenta";
+  const accentBg = p.tone === "cyan" ? "bg-neon-cyan/10 border-neon-cyan/20" : "bg-neon-magenta/10 border-neon-magenta/20";
+  const checking = p.health === "checking";
+  const result = typeof p.health === "object" ? p.health : null;
+
+  return (
+    <GlassCard>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-start gap-3">
+          <div className={cn("p-2 rounded-lg border mt-0.5", accentBg)}>
+            <Bot className={cn("w-4 h-4", accent)} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground">{p.title}</h3>
+            {p.subtitle && (
+              <p className="text-xs text-muted-foreground mt-0.5">{p.subtitle}</p>
+            )}
+          </div>
+        </div>
+
+        {result && (
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border",
+            result.ok
+              ? "bg-neon-green/10 border-neon-green/30 text-neon-green"
+              : "bg-destructive/10 border-destructive/30 text-destructive",
+          )}>
+            {result.ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+            {result.ok ? `Token OK · ${result.ms}ms` : (result.error || "Failed")}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5"><Link2 className="w-3 h-3" /> API endpoint</Label>
+          <Input value={p.url} onChange={(e) => p.setUrl(e.target.value)}
+            placeholder="http://host/crapi/reseller/mdr.php"
+            className="bg-white/[0.04] border-white/[0.1] font-mono text-xs" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-xs flex items-center gap-1.5"><KeyRound className="w-3 h-3" /> API token</Label>
+            <Input
+              type={p.showPw ? "text" : "password"}
+              value={p.token}
+              onChange={(e) => p.setToken(e.target.value)}
+              placeholder="QlBUQUNSfkJYUUYQS…"
+              className="bg-white/[0.04] border-white/[0.1] font-mono text-xs"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Generated by your XISORA admin. Sent as <code>?token=…</code> on every poll.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Poll interval (sec)</Label>
+            <Input type="number" min={5} max={120} value={p.interval}
+              onChange={(e) => p.setInterval(Math.max(5, Math.min(120, +e.target.value || 0)))}
+              className="bg-white/[0.04] border-white/[0.1] font-mono" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        <Button onClick={() => p.onSave()} disabled={p.saving}
+          className="bg-gradient-to-r from-primary to-neon-cyan text-primary-foreground border-0">
+          {p.saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+          Save all
+        </Button>
+        <Button variant="outline" onClick={p.onHealth} disabled={checking}
+          className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10">
+          {checking ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <HeartPulse className="w-4 h-4 mr-1.5" />}
+          {checking ? "Checking…" : "Health Check"}
         </Button>
       </div>
     </GlassCard>
