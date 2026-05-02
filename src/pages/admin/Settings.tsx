@@ -558,18 +558,31 @@ const AdminSettings = () => {
           <BotTokenCard
             tone="cyan"
             title="XISORA Bot"
-            subtitle="REST API · token-based · no captcha"
+            subtitle="Uses API token when available; otherwise uses portal cookie fallback."
             url={xisoraUrl} setUrl={setXisoraUrl}
             token={xisoraToken} setToken={setXisoraToken}
+            portalUrl={xisoraPortalUrl} setPortalUrl={setXisoraPortalUrl}
+            user={xisoraUser} setUser={setXisoraUser}
+            pass={xisoraPass} setPass={setXisoraPass}
+            cookie={xisoraCookie} setCookie={setXisoraCookie}
             interval={xisoraInterval} setInterval={setXisoraInterval}
             showPw={showPw}
             health={healthState["xisora"]}
             onSave={async () => {
               await setSetting("xisora_base_url", xisoraUrl);
               await setSetting("xisora_token", xisoraToken);
+              await setSetting("xisora_portal_url", xisoraPortalUrl);
+              await setSetting("xisora_username", xisoraUser);
+              await setSetting("xisora_password", xisoraPass);
+              await setSetting("xisora_cookie_header", xisoraCookie);
               await setSetting("xisora_otp_interval", String(xisoraInterval));
             }}
             onHealth={() => runHealth("xisora")}
+            onClearCookies={async () => {
+              if (!confirm("Clear saved XISORA portal session cookie?")) return;
+              await setSetting("xisora_session_cookie", "");
+              toast({ title: "XISORA session cleared" });
+            }}
             saving={savingKey?.startsWith("xisora_") || false}
           />
 
