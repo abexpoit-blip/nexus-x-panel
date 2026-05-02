@@ -374,6 +374,15 @@ export const api = {
           { method: "POST" }
         ),
     },
+
+    // ─── System health (JWT + CDR pulse + uptime) ────────────────
+    systemHealth: () => request<{
+      now: number;
+      jwt: { source: "env" | "settings" | "generated"; length: number; strong: boolean; error?: string };
+      cdr: { last_real_at: number | null; last_any_at: number | null; total_today: number; error?: string };
+      allocations: { active: number; error?: string };
+      process: { uptime_sec: number; node: string; pid: number; rss_mb: number };
+    }>("/admin/system/health"),
   },
 
   // ===== Agent v2 ranges =====
