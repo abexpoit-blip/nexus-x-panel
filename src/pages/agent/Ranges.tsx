@@ -51,6 +51,10 @@ const AgentRanges = () => {
   const [copiedOtp, setCopiedOtp] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [customCount, setCustomCount] = useState<number>(0);
+  // Quantity selector for the main "Get Number" button.
+  // Defaults to 1×; clicking 3×/5× only changes the selection — the actual
+  // allocation runs when the user presses "Get Number".
+  const [qty, setQty] = useState<number>(1);
   // Highlight numbers from the most recent allocation batch.
   const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "received" | "released" | "expired">("all");
@@ -182,6 +186,12 @@ const AgentRanges = () => {
 
   const baseOptions = [1, 3, 5].filter(n => n <= perReqLimit);
   const canAllocate = !!selectedRange && free > 0;
+
+  // Keep `qty` valid if the per-request limit drops below it (e.g. agent
+  // settings change while page is open).
+  useEffect(() => {
+    if (qty > perReqLimit) setQty(1);
+  }, [perReqLimit, qty]);
 
   // Today's allocation count (best-effort from localStorage; resets on day change).
   const todayKey = `nx.alloc.${new Date().toISOString().slice(0,10)}`;
@@ -488,7 +498,7 @@ const AgentRanges = () => {
             </div>
             <Button
               disabled={!canAllocate || allocLoading !== null}
-              onClick={() => allocate(1)}
+              onClick={() => allocate(qty)}
               className={cn(
                 "w-full flex-1 min-h-[52px] h-auto text-base font-bold rounded-lg border-0",
                 "bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground",
@@ -496,65 +506,62 @@ const AgentRanges = () => {
                 "disabled:opacity-40 disabled:cursor-not-allowed",
               )}
             >
-              {allocLoading === 1 ? (
+              {allocLoading !== null ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
                   <Hash className="w-5 h-5 mr-2" />
-                  Get Number
+                  Get {qty > 1 ? `${qty} Numbers` : "Number"}
                 </>
               )}
             </Button>
           </div>
         </div>
 
-        {/* ── Bulk request row ── */}
+        {/* ── Quantity selector row ── */}
         <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Layers className="w-4 h-4 text-neon-cyan" />
-            <span className="uppercase tracking-wider font-semibold text-foreground/80">Bulk request</span>
+            <span className="uppercase tracking-wider font-semibold text-foreground/80">Quantity</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {baseOptions.filter(n => n > 1).map(n => {
-              const disabled = !canAllocate || allocLoading !== null;
-              const isThis = allocLoading === n;
+            {baseOptions.map(n => {
+              const disabled = allocLoading !== null;
+              const selected = qty === n;
               return (
                 <Button
                   key={n}
                   size="sm"
                   disabled={disabled}
-                  onClick={() => allocate(n)}
+                  onClick={() => setQty(n)}
+                  type="button"
                   className={cn(
                     "h-8 px-4 text-xs font-bold rounded-md border",
-                    n === 5
-                      ? "bg-gradient-to-r from-primary/20 to-neon-magenta/20 border-primary/40 text-foreground hover:from-primary/30 hover:to-neon-magenta/30"
-                      : "bg-white/[0.04] border-white/10 text-foreground hover:bg-white/[0.08]",
+                    selected
+                      ? "bg-gradient-to-r from-primary/30 to-neon-magenta/30 border-primary/50 text-foreground shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)]"
+                      : "bg-white/[0.04] border-white/10 text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                   )}
                 >
-                  {isThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `${n}×`}
+                  {`${n}×`}
                 </Button>
               );
             })}
             {perReqLimit > 5 && (
               <>
+                <span className="mx-1 h-4 w-px bg-white/[0.08]" />
                 <Input
                   type="number"
                   min={1}
                   max={perReqLimit}
                   placeholder={`max ${perReqLimit}`}
                   value={customCount || ""}
-                  onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
+                  onChange={(e) => {
+                    const v = Math.max(0, Math.min(perReqLimit, +e.target.value || 0));
+                    setCustomCount(v);
+                    if (v >= 1) setQty(v); // sync selection so big button uses it
+                  }}
                   className="bg-white/[0.04] border-white/[0.1] h-8 w-24 font-mono text-xs"
                 />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!customCount || !canAllocate || allocLoading !== null}
-                  onClick={() => allocate(customCount)}
-                  className="border-white/[0.1] h-8 px-3 text-xs"
-                >
-                  {allocLoading === customCount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Go"}
-                </Button>
               </>
             )}
           </div>
