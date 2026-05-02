@@ -27,7 +27,7 @@ const agentItems: NavItem[] = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
   { label: "Get Number", path: "/agent/ranges", icon: Hash, hint: "Country → Range → Allocate" },
   { label: "Console", path: "/agent/console", icon: MessageSquare },
-  { label: "My Numbers", path: "/agent/my-numbers", icon: List },
+  { label: "OTP History", path: "/agent/history", icon: List },
   { label: "Summary", path: "/agent/summary", icon: BarChart3 },
   { label: "Leaderboard", path: "/agent/leaderboard", icon: Trophy },
   { label: "Payments", path: "/agent/payments", icon: Wallet },
