@@ -19,7 +19,7 @@ const AgentMyNumbers = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-numbers"],
     queryFn: () => api.myNumbers(),
-    refetchInterval: 10000,
+    refetchInterval: 20000,
   });
 
   const release = useMutation({

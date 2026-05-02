@@ -20,14 +20,14 @@ const AgentRanges = () => {
     queryKey: ["agent-v2-countries"],
     queryFn: () => api.v2Countries(),
     enabled: !country,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const { data: rangesData, isLoading: loadingRanges } = useQuery({
     queryKey: ["agent-v2-ranges", country],
     queryFn: () => api.v2Ranges(country!),
     enabled: !!country,
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
   });
 
   const countries = (countriesData?.countries || []).filter(c =>

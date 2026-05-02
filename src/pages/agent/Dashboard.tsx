@@ -12,8 +12,8 @@ import { useMemo } from "react";
 
 const AgentDashboard = () => {
   const { user } = useAuth();
-  const { data: summary } = useQuery({ queryKey: ["summary"], queryFn: () => api.numberSummary(), refetchInterval: 15000 });
-  const { data: nums } = useQuery({ queryKey: ["my-numbers"], queryFn: () => api.myNumbers(), refetchInterval: 10000 });
+  const { data: summary } = useQuery({ queryKey: ["summary"], queryFn: () => api.numberSummary(), refetchInterval: 30000 });
+  const { data: nums } = useQuery({ queryKey: ["my-numbers"], queryFn: () => api.myNumbers(), refetchInterval: 20000 });
 
   const s = summary || { today: { c: 0, s: 0 }, week: { c: 0, s: 0 }, month: { c: 0, s: 0 }, active: 0 };
   const recent = (nums?.numbers || []).slice(0, 8);

@@ -19,7 +19,7 @@ interface NavItem {
 
 const agentNav: NavItem[] = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-  { label: "Browse Ranges", path: "/agent/ranges", icon: Layers },
+  { label: "Get Number", path: "/agent/ranges", icon: Layers },
   { label: "Console", path: "/agent/console", icon: MessageSquare },
   { label: "My Numbers", path: "/agent/my-numbers", icon: List },
   { label: "OTP History", path: "/agent/history", icon: History },
