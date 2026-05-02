@@ -7,6 +7,16 @@ import { Input } from "@/components/ui/input";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { GradientMesh } from "@/components/premium";
 import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,6 +58,7 @@ const AgentRanges = () => {
 
   const [allocLoading, setAllocLoading] = useState<number | null>(null); // count being loaded
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [copiedOtp, setCopiedOtp] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [customCount, setCustomCount] = useState<number>(0);
@@ -498,7 +509,10 @@ const AgentRanges = () => {
             </div>
             <Button
               disabled={!canAllocate || allocLoading !== null}
-              onClick={() => allocate(qty)}
+              onClick={() => {
+                if (qty > 1) setConfirmOpen(true);
+                else allocate(qty);
+              }}
               className={cn(
                 "w-full flex-1 min-h-[52px] h-auto text-base font-bold rounded-lg border-0",
                 "bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground",
