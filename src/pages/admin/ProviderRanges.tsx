@@ -302,6 +302,11 @@ const AdminProviderRanges = () => {
                     <td className="px-4 py-3 font-medium">
                       {r.range_label}
                       {r.range_prefix && <span className="text-muted-foreground ml-2 font-mono text-xs">{r.range_prefix}</span>}
+                      {(r as any).hot ? (
+                        <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-orange-500/40 bg-orange-500/10 text-orange-400">
+                          🔥 Hot
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.operator || "—"}</td>
                     <td className="px-4 py-3 text-right font-mono">{Number(r.price_bdt).toFixed(2)}</td>
