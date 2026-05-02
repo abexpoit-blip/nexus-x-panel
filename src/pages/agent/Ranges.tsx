@@ -1,18 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { GradientMesh, PageHeader } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap, Phone, Sparkles, Layers, TrendingUp } from "lucide-react";
+import { GradientMesh } from "@/components/premium";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +27,7 @@ const LS_COUNTRY = "nx.getnum.country";
 const LS_RANGE = "nx.getnum.rangeId";
 
 const AgentRanges = () => {
+  const qc = useQueryClient();
   // Persisted selections — survive reload until user changes them.
   const [country, setCountry] = useState<string | null>(() => {
     try { return localStorage.getItem(LS_COUNTRY) || null; } catch { return null; }
@@ -45,16 +42,19 @@ const AgentRanges = () => {
   const [rangeOpen, setRangeOpen] = useState(false);
   const [countryQ, setCountryQ] = useState("");
   const [rangeQ, setRangeQ] = useState("");
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const perReqLimit = Math.min(500, Math.max(1, Number((user as any)?.per_request_limit) || 5));
 
-  const [allocated, setAllocated] = useState<{ phone_number: string }[] | null>(null);
   const [allocLoading, setAllocLoading] = useState<number | null>(null); // count being loaded
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [copiedOtp, setCopiedOtp] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [customCount, setCustomCount] = useState<number>(0);
+  // Highlight numbers from the most recent allocation batch.
+  const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "received" | "released" | "expired">("all");
+  const [searchQ, setSearchQ] = useState("");
 
   useEffect(() => {
     try {
@@ -115,11 +115,24 @@ const AgentRanges = () => {
     try {
       const r = await api.getNumber({ range_id: selectedRange.id, count });
       if (r.allocated?.length) {
-        setAllocated(r.allocated);
         bumpDaily(r.allocated.length);
+        // Mark these as fresh (yellow flash) for ~30s
+        const ids = new Set<number>((r.allocated as any[]).map(a => a.id).filter(Boolean));
+        if (ids.size) {
+          setFreshIds(prev => new Set([...prev, ...ids]));
+          setTimeout(() => {
+            setFreshIds(prev => {
+              const next = new Set(prev);
+              ids.forEach(id => next.delete(id));
+              return next;
+            });
+          }, 30000);
+        }
+        // Refresh allocated list immediately so they appear inline
+        qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
         toast({
           title: `${r.allocated.length} number${r.allocated.length === 1 ? "" : "s"} allocated`,
-          description: r.errors?.length ? r.errors[0] : "Numbers ready below.",
+          description: r.errors?.length ? r.errors[0] : "Numbers ready below — waiting for OTP.",
         });
       } else {
         toast({ title: "No number available", description: r.errors?.[0] || "Pool is empty for this range", variant: "destructive" });
@@ -138,17 +151,24 @@ const AgentRanges = () => {
       setTimeout(() => setCopiedIdx(null), 1200);
     } catch { toast({ title: "Copy failed", variant: "destructive" }); }
   };
-  const copyAll = async () => {
-    if (!allocated) return;
+  const copyOtp = async (text: string, idx: number) => {
     try {
-      await navigator.clipboard.writeText(allocated.map(a => a.phone_number).join("\n"));
+      await navigator.clipboard.writeText(text);
+      setCopiedOtp(idx);
+      setTimeout(() => setCopiedOtp(null), 1200);
+    } catch { toast({ title: "Copy failed", variant: "destructive" }); }
+  };
+  const copyAll = async (rows: { phone_number: string }[]) => {
+    if (!rows.length) return;
+    try {
+      await navigator.clipboard.writeText(rows.map(a => a.phone_number).join("\n"));
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 1500);
     } catch { toast({ title: "Copy failed", variant: "destructive" }); }
   };
-  const downloadTxt = () => {
-    if (!allocated) return;
-    const blob = new Blob([allocated.map(a => a.phone_number).join("\n") + "\n"], { type: "text/plain" });
+  const downloadTxt = (rows: { phone_number: string }[]) => {
+    if (!rows.length) return;
+    const blob = new Blob([rows.map(a => a.phone_number).join("\n") + "\n"], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -172,16 +192,71 @@ const AgentRanges = () => {
     try { localStorage.setItem(todayKey, String(next)); } catch { /* ignore */ }
   };
 
+  // ── Live allocated numbers list ──
+  const { data: myData, refetch: refetchMy } = useQuery({
+    queryKey: ["my-numbers-inline"],
+    queryFn: () => api.myNumbers(),
+    refetchInterval: 5000, // poll every 5s for inbound OTPs
+  });
+  const release = useMutation({
+    mutationFn: (id: number) => api.releaseNumber(id),
+    onSuccess: () => {
+      toast({ title: "Number released" });
+      qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
+    },
+    onError: (e: Error) => toast({ title: "Release failed", description: e.message, variant: "destructive" }),
+  });
+  const sync = useMutation({
+    mutationFn: () => api.syncOtp(),
+    onSuccess: (r: { updated: number }) => {
+      toast({ title: `Synced — ${r.updated || 0} updated` });
+      qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
+    },
+  });
+
+  // Tick to re-evaluate "NEW" highlight
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const allRows = (myData?.numbers || []) as any[];
+  const visibleRows = useMemo(() => {
+    return allRows
+      .filter(n => {
+        if (statusFilter !== "all" && n.status !== statusFilter) return false;
+        if (searchQ && !String(n.phone_number).toLowerCase().includes(searchQ.toLowerCase())) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.otp_received_at || a.allocated_at || 0;
+        const tb = b.otp_received_at || b.allocated_at || 0;
+        return tb - ta;
+      });
+  }, [allRows, statusFilter, searchQ]);
+
+  const activeCount = allRows.filter(r => r.status === "active").length;
+  const otpCount = allRows.filter(r => r.status === "received").length;
+
   return (
-    <div className="relative space-y-5 max-w-6xl mx-auto">
+    <div className="relative space-y-5 w-full">
       <GradientMesh variant="default" />
       {/* Header */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Pick a country and range — we'll grab the next available number from the pool.
+            Pick a country and range — your number and OTP appear right below.
           </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <div className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-muted-foreground">
+            Active: <span className="font-mono font-bold text-foreground">{activeCount}</span>
+          </div>
+          <div className="px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/20 text-neon-green">
+            OTPs: <span className="font-mono font-bold">{otpCount}</span>
+          </div>
         </div>
       </div>
 
@@ -196,9 +271,9 @@ const AgentRanges = () => {
         </GlassCard>
       ) : (
         <GlassCard className="!p-5 md:!p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* ── Country selector box ── */}
-          <div>
+          <div className="md:col-span-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-foreground/80">Country</label>
               {allCountries.length > 0 && (
@@ -282,7 +357,7 @@ const AgentRanges = () => {
           </div>
 
           {/* ── Range selector box ── */}
-          <div className={cn(isHot && "rounded-lg")}>
+          <div className={cn("md:col-span-5", isHot && "rounded-lg")}>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-foreground/80">Range</label>
               {ranges.length > 0 && (
@@ -397,29 +472,37 @@ const AgentRanges = () => {
               </PopoverContent>
             </Popover>
           </div>
-        </div>
 
-        {/* ── Big "Get Number" CTA ── */}
-        <div className="mt-5">
-          <Button
-            disabled={!canAllocate || allocLoading !== null}
-            onClick={() => allocate(1)}
-            className={cn(
-              "w-full h-14 text-base font-bold rounded-xl border-0",
-              "bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground",
-              "hover:opacity-95 hover:shadow-[0_10px_40px_-10px_hsl(var(--primary)/0.6)] transition-all",
-              "disabled:opacity-40 disabled:cursor-not-allowed",
-            )}
-          >
-            {allocLoading === 1 ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Hash className="w-5 h-5 mr-2" />
-                Get Number
-              </>
-            )}
-          </Button>
+          {/* ── Inline Get Number CTA (3rd column on desktop) ── */}
+          <div className="md:col-span-3 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-foreground/80 invisible md:visible">Action</label>
+              {selectedRange && (
+                <span className="text-[10px] font-mono text-neon-green hidden md:inline">
+                  ৳{Number(selectedRange.price_bdt).toFixed(2)} / OTP
+                </span>
+              )}
+            </div>
+            <Button
+              disabled={!canAllocate || allocLoading !== null}
+              onClick={() => allocate(1)}
+              className={cn(
+                "w-full flex-1 min-h-[52px] h-auto text-base font-bold rounded-lg border-0",
+                "bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground",
+                "hover:opacity-95 hover:shadow-[0_10px_40px_-10px_hsl(var(--primary)/0.6)] transition-all",
+                "disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+            >
+              {allocLoading === 1 ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Hash className="w-5 h-5 mr-2" />
+                  Get Number
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* ── Bulk request row ── */}
@@ -500,77 +583,194 @@ const AgentRanges = () => {
         </GlassCard>
       )}
 
-      {/* Allocation result dialog — copy single, copy all, download as TXT */}
-      <Dialog open={!!allocated} onOpenChange={(v) => { if (!v) { setAllocated(null); setCustomCount(0); } }}>
-        <DialogContent className="max-w-lg p-0 overflow-hidden border-white/[0.08] bg-card">
-          {/* Gradient header */}
-          <div className="relative px-5 py-4 border-b border-white/[0.08] bg-gradient-to-br from-primary/15 via-transparent to-neon-magenta/15">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-neon-magenta flex items-center justify-center shadow-lg shadow-primary/30">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="font-display text-base font-bold text-foreground">
-                  {allocated?.length} number{allocated?.length === 1 ? "" : "s"} ready
-                </DialogTitle>
-                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                  {selectedCountry && <span className="text-base leading-none">{flagEmoji(selectedCountry.country_code)}</span>}
-                  <span>{selectedCountry?.country_name || ""}</span>
-                  {selectedRange && <span className="text-muted-foreground/60">·</span>}
-                  {selectedRange && <span className="truncate">{selectedRange.range_label}</span>}
-                </div>
-              </div>
-            </div>
+      {/* ── Inline allocated numbers + OTPs panel (full page) ── */}
+      <GlassCard className="!p-0 overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-neon-cyan" />
+            <h2 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">
+              Allocated Numbers &amp; OTPs
+            </h2>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {allRows.length} total
+            </span>
           </div>
-
-          {/* Numbers list */}
-          <div className="px-5 py-3">
-            <div className="space-y-1.5 max-h-[45vh] overflow-y-auto pr-1">
-              {(allocated || []).map((a, i) => (
-                <div
-                  key={i}
-                  className="group flex items-center gap-3 px-3 py-2 rounded-md bg-white/[0.03] border border-white/[0.06] hover:border-primary/40 hover:bg-white/[0.05] transition-all"
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="Search number…"
+                className="pl-8 h-8 w-44 text-xs bg-white/[0.04] border-white/[0.08]"
+              />
+            </div>
+            <div className="flex gap-1">
+              {(["all", "active", "received", "released", "expired"] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors",
+                    statusFilter === s
+                      ? "bg-primary/20 border-primary/40 text-primary"
+                      : "bg-white/[0.02] border-white/[0.08] text-muted-foreground hover:text-foreground"
+                  )}
                 >
-                  <div className="w-6 h-6 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                    <Phone className="w-3 h-3 text-primary" />
-                  </div>
-                  <span className="font-mono text-[13px] text-foreground select-all flex-1 truncate">{a.phone_number}</span>
-                  <button
-                    onClick={() => copyOne(a.phone_number, i)}
-                    className={cn(
-                      "p-1.5 rounded-md transition-colors",
-                      copiedIdx === i ? "text-neon-green bg-neon-green/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                    )}
-                    title="Copy this number"
-                  >
-                    {copiedIdx === i ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
+                  {s}
+                </button>
               ))}
-            </div>
-          </div>
-
-          {/* Footer actions */}
-          <DialogFooter className="!flex-row gap-1.5 px-5 py-3 border-t border-white/[0.08] bg-white/[0.02] !justify-between">
-            <div className="flex gap-1.5">
-              <Button size="sm" variant="outline" onClick={copyAll} className="border-white/[0.1] h-8 text-[12px]">
-                {copiedAll ? <Check className="w-3.5 h-3.5 mr-1 text-neon-green" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
-                Copy all
-              </Button>
-              <Button size="sm" variant="outline" onClick={downloadTxt} className="border-white/[0.1] h-8 text-[12px]">
-                <Download className="w-3.5 h-3.5 mr-1" /> .txt
-              </Button>
             </div>
             <Button
               size="sm"
-              onClick={() => { setAllocated(null); navigate("/agent/my-numbers"); }}
-              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 h-8 text-[12px]"
+              variant="outline"
+              onClick={() => sync.mutate()}
+              disabled={sync.isPending}
+              className="border-white/[0.1] h-8 px-3 text-[11px]"
             >
-              My Numbers →
+              <RefreshCw className={cn("w-3 h-3 mr-1", sync.isPending && "animate-spin")} /> Sync
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => copyAll(visibleRows)}
+              disabled={!visibleRows.length}
+              className="border-white/[0.1] h-8 px-3 text-[11px]"
+            >
+              {copiedAll ? <Check className="w-3 h-3 mr-1 text-neon-green" /> : <Copy className="w-3 h-3 mr-1" />}
+              Copy all
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => downloadTxt(visibleRows)}
+              disabled={!visibleRows.length}
+              className="border-white/[0.1] h-8 px-3 text-[11px]"
+            >
+              <Download className="w-3 h-3 mr-1" /> .txt
+            </Button>
+          </div>
+        </div>
+
+        {/* Table */}
+        {visibleRows.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Inbox className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <div className="text-sm font-medium text-foreground">No numbers yet</div>
+            <div className="text-xs mt-1">Use Get Number above to allocate — your OTPs arrive here automatically.</div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-white/[0.06]">
+                  <th className="text-left px-5 py-2.5 font-semibold w-10">#</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Number</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Country / Operator</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">OTP</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Status</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Time</th>
+                  <th className="text-right px-5 py-2.5 font-semibold"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((r, idx) => {
+                  const recv = r.otp_received_at as number | undefined;
+                  const isFresh = (!!recv && now - recv < 60) || freshIds.has(r.id);
+                  return (
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        "border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors",
+                        isFresh && "bg-neon-green/[0.04]"
+                      )}
+                    >
+                      <td className="px-5 py-3 text-[11px] font-mono text-muted-foreground">{idx + 1}</td>
+                      <td className="px-3 py-3">
+                        <button
+                          onClick={() => copyOne(r.phone_number, r.id)}
+                          className="font-mono text-[13px] text-foreground hover:text-primary inline-flex items-center gap-2 group"
+                        >
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            r.status === "received" ? "bg-neon-green" :
+                            r.status === "active" ? "bg-neon-amber animate-pulse" :
+                            "bg-muted-foreground/40"
+                          )} />
+                          {r.phone_number}
+                          {copiedIdx === r.id
+                            ? <Check className="w-3 h-3 text-neon-green" />
+                            : <Copy className="w-3 h-3 opacity-0 group-hover:opacity-100 text-muted-foreground" />}
+                          {isFresh && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-neon-green/15 text-neon-green border border-neon-green/30 animate-pulse">
+                              NEW
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2 text-[12px]">
+                          {r.country_code && <span className="text-base leading-none">{flagEmoji(r.country_code)}</span>}
+                          <div className="min-w-0">
+                            <div className="text-foreground truncate">{r.country_code || "—"}</div>
+                            <div className="text-[10px] text-muted-foreground truncate">{r.operator || "—"}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        {r.otp ? (
+                          <button
+                            onClick={() => copyOtp(r.otp, r.id)}
+                            className={cn(
+                              "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
+                              "bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 transition-colors",
+                              isFresh && "ring-2 ring-neon-green/50 shadow-[0_0_12px_-2px_hsl(var(--neon-green)/0.6)]"
+                            )}
+                          >
+                            {r.otp}
+                            {copiedOtp === r.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3 opacity-70" />}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                            <Loader2 className="w-3 h-3 animate-spin" /> waiting…
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                          r.status === "received" && "bg-neon-green/15 text-neon-green",
+                          r.status === "active" && "bg-neon-amber/15 text-neon-amber",
+                          r.status === "released" && "bg-muted text-muted-foreground",
+                          r.status === "expired" && "bg-destructive/15 text-destructive"
+                        )}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-[11px] text-muted-foreground font-mono whitespace-nowrap">
+                        {new Date(((recv || r.allocated_at) as number) * 1000).toLocaleTimeString()}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        {r.status === "active" && (
+                          <button
+                            onClick={() => release.mutate(r.id)}
+                            disabled={release.isPending}
+                            className="text-[11px] text-destructive hover:underline inline-flex items-center gap-1"
+                            title="Release this number"
+                          >
+                            <X className="w-3 h-3" /> Release
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassCard>
     </div>
   );
 };
