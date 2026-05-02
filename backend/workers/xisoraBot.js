@@ -344,11 +344,50 @@ async function loop() {
 
 function start() {
   const cfg = resolveCfg();
-  if (!cfg.ENABLED) { log('disabled (xisora_enabled=false) — not starting'); return; }
+  // ── Startup validation banner ──────────────────────────────
+  const have = {
+    token:     !!cfg.TOKEN,
+    cookie:    !!cfg.COOKIE_HEADER,
+    username:  !!cfg.USERNAME,
+    password:  !!cfg.PASSWORD,
+    portalUrl: !!cfg.PORTAL_URL,
+    baseUrl:   !!cfg.BASE_URL,
+  };
+  const source = cfg.TOKEN ? 'api-token'
+               : cfg.COOKIE_HEADER ? 'portal-cookie'
+               : (cfg.USERNAME && cfg.PASSWORD) ? 'portal-login'
+               : 'NONE';
+
+  log('━━━━━━━━━━ XISORA bot config ━━━━━━━━━━');
+  log(`  enabled      : ${cfg.ENABLED}`);
+  log(`  base_url     : ${cfg.BASE_URL || '(missing)'}`);
+  log(`  portal_url   : ${cfg.PORTAL_URL || '(missing)'}`);
+  log(`  api_token    : ${have.token ? '✓ set' : '✗ missing'}`);
+  log(`  cookie_header: ${have.cookie ? '✓ set' : '✗ missing'}`);
+  log(`  portal_user  : ${have.username ? '✓ set' : '✗ missing'}`);
+  log(`  portal_pass  : ${have.password ? '✓ set' : '✗ missing'}`);
+  log(`  source       : ${source}`);
+  log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  if (!cfg.ENABLED) {
+    log('disabled (xisora_enabled=false) — not starting');
+    return;
+  }
   if (_running) { log('already running — skip start'); return; }
+
+  // ── Fail fast: enabled but no usable credentials ──────────
+  if (source === 'NONE') {
+    warn('REFUSING TO START — xisora_enabled=true but no credentials configured.');
+    warn('  Provide ONE of the following in /admin/settings → Bots:');
+    warn('    1) xisora_token                  (preferred — REST API)');
+    warn('    2) xisora_cookie_header          (PHPSESSID=... from browser)');
+    warn('    3) xisora_username + xisora_password (portal auto-login)');
+    _lastError = 'no credentials configured';
+    return;
+  }
+
   _stopFlag = false;
-  log('starting…  base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's',
-      'source=', cfg.TOKEN ? 'api-token' : (cfg.COOKIE_HEADER ? 'portal-cookie' : 'not-configured'));
+  log(`starting… source=${source} interval=${cfg.INTERVAL}s`);
   loop().catch(e => warn('fatal:', e.message));
 }
 function stop() { _stopFlag = true; _portalLoggedIn = false; }
