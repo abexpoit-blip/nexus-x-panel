@@ -235,10 +235,16 @@ async function fetchPortalRows() {
     sEcho: String(Date.now() % 100000),
     iColumns: '11', sColumns: ',,,,,,,,,,',
     iDisplayStart: '0', iDisplayLength: '100',
-    mDataProp_0: '0', sSearch_0: '', bRegex_0: 'false', bSearchable_0: 'true', bSortable_0: 'true',
     sSearch: '', bRegex: 'false', iSortCol_0: '0', sSortDir_0: 'desc', iSortingCols: '1',
     _: String(Date.now()),
   });
+  for (let i = 0; i < 11; i++) {
+    params.set(`mDataProp_${i}`, String(i));
+    params.set(`sSearch_${i}`, '');
+    params.set(`bRegex_${i}`, 'false');
+    params.set(`bSearchable_${i}`, 'true');
+    params.set(`bSortable_${i}`, 'true');
+  }
   const r = await _portalClient.get(`/client/ajax/dt_reports.php?${params.toString()}`, {
     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_portalClient.defaults.baseURL}/client/Reports`, 'Accept': 'application/json, text/javascript, */*; q=0.01' },
   });
