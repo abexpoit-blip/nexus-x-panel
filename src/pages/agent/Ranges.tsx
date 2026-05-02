@@ -12,7 +12,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { GradientMesh, PageHeader } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap, Phone, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -160,14 +160,23 @@ const AgentRanges = () => {
   const canAllocate = !!selectedRange && free > 0;
 
   return (
-    <div className="relative space-y-4">
+    <div className="relative space-y-3 max-w-5xl mx-auto">
       <GradientMesh variant="default" />
-      <PageHeader
-        eyebrow="Get Number"
-        title="Get a Number"
-        description="Choose country, then a range, then how many numbers to grab."
-        icon={<Globe className="w-5 h-5 text-neon-cyan" />}
-      />
+      {/* Compact header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-neon-magenta/20 border border-primary/30 flex items-center justify-center">
+            <Globe className="w-4 h-4 text-neon-cyan" />
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground leading-none">Get Number</div>
+            <h1 className="font-display text-lg font-bold text-foreground leading-tight">Allocate Numbers</h1>
+          </div>
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          Pick country → range → amount
+        </div>
+      </div>
 
       {/* ── Empty state when no countries at all ── */}
       {!loadingCountries && allCountries.length === 0 ? (
@@ -179,34 +188,39 @@ const AgentRanges = () => {
           </div>
         </GlassCard>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {/* ── Country selector box ── */}
-          <GlassCard className="!p-3">
-            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">Step 1 — Country</div>
+          <GlassCard className="!p-2.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Country</div>
+              {selectedCountry && (
+                <div className="text-[9px] font-mono text-muted-foreground">{selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}</div>
+              )}
+            </div>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   disabled={loadingCountries}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
+                  className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <span className="text-2xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
+                        <span className="text-xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
                         <div className="min-w-0">
-                          <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono uppercase">{selectedCountry.country_code} · {selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}</div>
+                          <div className="font-display text-[13px] font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
+                          <div className="text-[9px] text-muted-foreground font-mono uppercase leading-tight">{selectedCountry.country_code}</div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Globe className="w-5 h-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">{loadingCountries ? "Loading countries…" : "Select country"}</div>
+                        <Globe className="w-4 h-4 text-muted-foreground" />
+                        <div className="text-[13px] text-muted-foreground">{loadingCountries ? "Loading…" : "Select country"}</div>
                       </>
                     )}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
@@ -253,47 +267,51 @@ const AgentRanges = () => {
           </GlassCard>
 
           {/* ── Range selector box ── */}
-          <GlassCard className={cn("!p-3", isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]")}>
-            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">Step 2 — Range</div>
+          <GlassCard className={cn("!p-2.5", isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]")}>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Range</div>
+              {selectedRange && (
+                <div className={cn("text-[9px] font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</div>
+              )}
+            </div>
             <Popover open={rangeOpen} onOpenChange={(v) => { if (country) setRangeOpen(v); }}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   disabled={!country || loadingRanges}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
+                    "w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
                     !country && "opacity-50 cursor-not-allowed"
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedRange ? (
                       <>
-                        <Hash className="w-5 h-5 text-neon-cyan shrink-0" />
+                        <Hash className="w-4 h-4 text-neon-cyan shrink-0" />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedRange.range_label}</div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="font-display text-[13px] font-semibold text-foreground truncate leading-tight">{selectedRange.range_label}</div>
                             {isHot && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
-                                <Flame className="w-3 h-3" /> Hot
+                              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-bold uppercase border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
+                                <Flame className="w-2.5 h-2.5" /> Hot
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {selectedRange.range_prefix && <span className="font-mono mr-2">{selectedRange.range_prefix}</span>}
-                            <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</span>
+                          <div className="text-[9px] text-muted-foreground leading-tight">
+                            {selectedRange.range_prefix && <span className="font-mono">{selectedRange.range_prefix}</span>}
                           </div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Hash className="w-5 h-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">
-                          {!country ? "Pick a country first" : loadingRanges ? "Loading ranges…" : "Select range"}
+                        <Hash className="w-4 h-4 text-muted-foreground" />
+                        <div className="text-[13px] text-muted-foreground">
+                          {!country ? "Pick country first" : loadingRanges ? "Loading…" : "Select range"}
                         </div>
                       </>
                     )}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
