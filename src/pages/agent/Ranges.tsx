@@ -310,7 +310,11 @@ const AgentRanges = () => {
                   </div>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
-                  {filteredRanges.length === 0 ? (
+                  {rangesError ? (
+                    <div className="p-6 text-center text-sm text-destructive">
+                      Error loading ranges: {(rangesError as Error).message}
+                    </div>
+                  ) : filteredRanges.length === 0 ? (
                     <div className="p-6 text-center text-sm text-muted-foreground">
                       {ranges.length === 0 ? "No enabled ranges for this country" : "No matches"}
                     </div>
