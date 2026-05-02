@@ -1,4 +1,4 @@
-// XISORA Bot — REST API poller (no scraping, no Puppeteer, no captcha).
+// XISORA Bot — REST API poller with portal-cookie fallback.
 //
 // Provider exposes a token-authenticated MDR endpoint:
 //   GET http://51.38.148.122/crapi/reseller/mdr.php
@@ -17,6 +17,8 @@
 //   xisora_enabled        true|false
 //   xisora_base_url       http://51.38.148.122/crapi/reseller/mdr.php
 //   xisora_token          (the long token from your XISORA admin)
+//   xisora_portal_url     http://94.23.31.29/sms
+//   xisora_cookie_header  PHPSESSID=...  (fallback when token is unavailable)
 //   xisora_otp_interval   10  (sec between polls — min 5)
 //
 // Flow:
@@ -27,6 +29,8 @@
 // No login, no cookie persistence. The token IS the credential.
 
 const axios = require('axios');
+const tough = require('tough-cookie');
+const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 
@@ -40,11 +44,27 @@ function readSetting(key) {
   try { return db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value || null; }
   catch (_) { return null; }
 }
+function writeSetting(key, value) {
+  try {
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+    `).run(key, String(value));
+  } catch (e) { warn('writeSetting failed:', e.message); }
+}
 function normalizeBase(raw) {
   const fb = 'http://51.38.148.122/crapi/reseller/mdr.php';
   if (!raw) return fb;
   let s = String(raw).trim();
   if (!/^https?:\/\//i.test(s)) s = `http://${s}`;
+  return s;
+}
+function normalizePortalBase(raw) {
+  const fb = 'http://94.23.31.29/sms';
+  if (!raw) return fb;
+  let s = String(raw).trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(s)) s = `http://${s}`;
+  s = s.replace(/\/client(?:\/.*)?$/i, '').replace(/\/SignIn$/i, '');
   return s;
 }
 function resolveCfg() {
@@ -54,6 +74,10 @@ function resolveCfg() {
               .toString().toLowerCase() === 'true',
     BASE_URL: normalizeBase(readSetting('xisora_base_url') || process.env.XISORA_BASE_URL),
     TOKEN:    readSetting('xisora_token') || process.env.XISORA_TOKEN || '',
+    PORTAL_URL: normalizePortalBase(readSetting('xisora_portal_url') || process.env.XISORA_PORTAL_URL),
+    USERNAME: readSetting('xisora_username') || process.env.XISORA_USERNAME || '',
+    PASSWORD: readSetting('xisora_password') || process.env.XISORA_PASSWORD || '',
+    COOKIE_HEADER: readSetting('xisora_cookie_header') || process.env.XISORA_COOKIE_HEADER || '',
     INTERVAL: Math.max(5, +(readSetting('xisora_otp_interval') || process.env.XISORA_OTP_INTERVAL || 10)),
   };
 }
@@ -67,6 +91,10 @@ let _consecFail = 0;
 let _otpDelivered = 0;
 let _seenIds = new Set();   // de-dupe processed rows in-process
 const SEEN_MAX = 5000;
+let _portalClient = null;
+let _portalJar = null;
+let _portalLoggedIn = false;
+let _source = 'api';
 
 // ───────── helpers ─────────
 function fmtDate(d) {
