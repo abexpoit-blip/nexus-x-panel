@@ -130,10 +130,10 @@ async function api(pathname, { method = 'GET', token, body } = {}) {
   // 5. Agent reads
   try {
     const my = await api('/api/numbers/my', { token: agentToken });
-    if (!Array.isArray(my.allocations)) throw new Error('no allocations array');
+    if (!Array.isArray(my.numbers)) throw new Error('no numbers array');
     const summary = await api('/api/numbers/summary', { token: agentToken });
     if (!summary || typeof summary !== 'object') throw new Error('bad summary');
-    pass('agent reads /my + /summary', `(${my.allocations.length} live)`);
+    pass('agent reads /my + /summary', `(${my.numbers.length} live)`);
   } catch (e) { fail('agent reads', e.message); }
 
   // 6. Seed a fake allocation directly in SQLite
@@ -187,7 +187,7 @@ async function api(pathname, { method = 'GET', token, body } = {}) {
 
   // 8. Agent reads its own CDR
   try {
-    const r = await api('/api/numbers/cdr?page=1&page_size=10', { token: agentToken });
+    const r = await api('/api/numbers/history?page=1&page_size=10', { token: agentToken });
     const found = (r.rows || []).find(x => x.allocation_id === allocationId);
     if (!found) throw new Error('seeded CDR not visible to agent');
     if (found.otp_code !== '123456') throw new Error(`otp_code=${found.otp_code}`);
