@@ -161,18 +161,116 @@ async function fetchRows() {
   return rows;
 }
 
+function buildPortalClient(baseURL) {
+  _portalJar = new tough.CookieJar();
+  const manual = String(readSetting('xisora_cookie_header') || '').trim();
+  const saved = String(readSetting('xisora_session_cookie') || '').trim();
+  const cookieHeader = manual || saved;
+  if (cookieHeader) {
+    for (const part of cookieHeader.split(/;\s*/)) {
+      if (!part) continue;
+      try { _portalJar.setCookieSync(part + '; Path=/', baseURL); }
+      catch (e) { warn('portal cookie parse failed for', part.slice(0, 40), e.message); }
+    }
+    dlog(`loaded ${manual ? 'manual' : 'saved'} portal cookie`);
+  }
+  return wrapper(axios.create({
+    baseURL,
+    jar: _portalJar,
+    withCredentials: true,
+    timeout: 15000,
+    maxRedirects: 5,
+    validateStatus: (s) => s < 500,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  }));
+}
+
+async function persistPortalCookie() {
+  try {
+    const cookies = await _portalJar.getCookies(_portalClient.defaults.baseURL);
+    const sess = cookies.find(c => /^PHPSESSID/i.test(c.key));
+    if (sess) writeSetting('xisora_session_cookie', sess.cookieString());
+  } catch (e) { warn('persistPortalCookie failed:', e.message); }
+}
+
+function mapPortalRow(row) {
+  if (!Array.isArray(row)) return null;
+  const datetime = row[0] ? String(row[0]) : '';
+  const number = row[2] ? String(row[2]).replace(/\D/g, '') : '';
+  const cli = row[3] ? String(row[3]) : '';
+  const message = row[10] ? String(row[10]) : '';
+  if (!number || !message) return null;
+  return { datetime, number, cli, message };
+}
+
+async function portalLogin() {
+  const { PORTAL_URL, USERNAME, PASSWORD, COOKIE_HEADER } = resolveCfg();
+  if (!_portalClient) _portalClient = buildPortalClient(PORTAL_URL);
+  if (COOKIE_HEADER) {
+    const probe = await _portalClient.get('/client/Reports');
+    const html = String(probe.data || '');
+    if (probe.status === 200 && !/Enter Credentials|name=["']?password/i.test(html)) {
+      _portalLoggedIn = true;
+      _source = 'portal-cookie';
+      return true;
+    }
+    throw new Error('xisora_cookie_expired');
+  }
+  if (!USERNAME || !PASSWORD) throw new Error('xisora_token_or_cookie_missing');
+  throw new Error('xisora_captcha_login_manual_cookie_required');
+}
+
+async function fetchPortalRows() {
+  if (!_portalLoggedIn) await portalLogin();
+  const now = new Date();
+  const past = new Date(now.getTime() - 10 * 60_000);
+  const params = new URLSearchParams({
+    fdate1: fmtDate(past),
+    fdate2: fmtDate(now),
+    ftermination: '', fclient: '', fnum: '', fcli: '',
+    fgdate: '0', fgtermination: '0', fgclient: '0', fgnumber: '0', fgcli: '0', fg: '0',
+    sEcho: String(Date.now() % 100000),
+    iColumns: '11', sColumns: ',,,,,,,,,,',
+    iDisplayStart: '0', iDisplayLength: '100',
+    mDataProp_0: '0', sSearch_0: '', bRegex_0: 'false', bSearchable_0: 'true', bSortable_0: 'true',
+    sSearch: '', bRegex: 'false', iSortCol_0: '0', sSortDir_0: 'desc', iSortingCols: '1',
+    _: String(Date.now()),
+  });
+  const r = await _portalClient.get(`/client/ajax/dt_reports.php?${params.toString()}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_portalClient.defaults.baseURL}/client/Reports`, 'Accept': 'application/json, text/javascript, */*; q=0.01' },
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('xisora_portal_unauthorized');
+  if (typeof r.data === 'string' && /Enter Credentials|name=["']?password/i.test(r.data)) throw new Error('xisora_portal_session_lost');
+  await persistPortalCookie();
+  return (r.data?.aaData || []).map(mapPortalRow).filter(Boolean);
+}
+
+async function fetchAnyRows() {
+  const { TOKEN } = resolveCfg();
+  if (TOKEN) {
+    _source = 'api';
+    return fetchRows();
+  }
+  _source = 'portal-cookie';
+  return fetchPortalRows();
+}
+
 // Verify token is valid (used by Health Check button).
 async function login() {
   const { TOKEN, BASE_URL } = resolveCfg();
-  if (!TOKEN) throw new Error('token not configured');
-  const rows = await fetchRows();
-  log(`✓ token OK · ${rows.length} rows in last 10min @ ${BASE_URL}`);
+  const rows = await fetchAnyRows();
+  log(TOKEN
+    ? `✓ token OK · ${rows.length} rows in last 10min @ ${BASE_URL}`
+    : `✓ portal cookie OK · ${rows.length} rows in last 10min`);
   return true;
 }
 
 // ───────── tick ─────────
 async function tickOnce() {
-  const rows = await fetchRows();
+  const rows = await fetchAnyRows();
   let delivered = 0;
   for (const row of rows) {
     if (!row || !row.number || !row.message) continue;
