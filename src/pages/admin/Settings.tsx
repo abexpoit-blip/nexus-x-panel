@@ -546,6 +546,25 @@ const AdminSettings = () => {
             saving={savingKey?.startsWith("seven1tel_") || false}
           />
 
+          {/* ─── XISORA (REST API, token-based) ─── */}
+          <BotTokenCard
+            tone="cyan"
+            title="XISORA Bot"
+            subtitle="REST API · token-based · no captcha"
+            url={xisoraUrl} setUrl={setXisoraUrl}
+            token={xisoraToken} setToken={setXisoraToken}
+            interval={xisoraInterval} setInterval={setXisoraInterval}
+            showPw={showPw}
+            health={healthState["xisora"]}
+            onSave={async () => {
+              await setSetting("xisora_base_url", xisoraUrl);
+              await setSetting("xisora_token", xisoraToken);
+              await setSetting("xisora_otp_interval", String(xisoraInterval));
+            }}
+            onHealth={() => runHealth("xisora")}
+            saving={savingKey?.startsWith("xisora_") || false}
+          />
+
           <p className="text-[11px] text-muted-foreground">
             After saving, go to <span className="text-foreground">Bots Control</span> → <span className="text-neon-cyan">Restart</span> so changes take effect right away.
           </p>
