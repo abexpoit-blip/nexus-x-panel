@@ -17,6 +17,8 @@
 //   fake_otp_burst          1            (max fakes per tick, 1=single)
 
 const db = require('../lib/db');
+const { Telemetry } = require('./_botTelemetry');
+const tel = new Telemetry();
 
 const QUIET = process.env.NODE_ENV === 'production';
 const log  = (...a) => console.log('[fake-otp]', ...a);
@@ -151,10 +153,15 @@ async function loop() {
         if (insertOne()) {
           _totalFired++;
           _lastFireAt = Math.floor(Date.now() / 1000);
+          tel.recordOtpDelivered();
         }
         if (i < burst - 1) await new Promise(r => setTimeout(r, 600 + Math.random() * 1400));
       }
-    } catch (e) { warn('insertOne error:', e.message); }
+      tel.recordTick();
+    } catch (e) {
+      warn('insertOne error:', e.message);
+      tel.recordError(e.message);
+    }
 
     // Sleep a randomized interval in [min, max]
     const sleepSec = c.minSec + Math.random() * (c.maxSec - c.minSec);
@@ -180,6 +187,7 @@ function getStatus() {
     min_sec: c.minSec,
     max_sec: c.maxSec,
     burst: c.burst,
+    ...tel.snapshot(),
   };
 }
 
