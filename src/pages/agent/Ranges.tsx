@@ -796,6 +796,34 @@ const AgentRanges = () => {
         )}
       </GlassCard>
     </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Allocate {qty} numbers?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to request <span className="font-semibold text-foreground">{qty} numbers</span>
+              {selectedRange ? (
+                <>
+                  {" "}from <span className="font-mono text-foreground">{selectedRange.label || selectedRange.country_code}</span>
+                  {" "}at <span className="text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</span> per OTP.
+                  {" "}Estimated total: <span className="text-neon-green font-mono">৳{(Number(selectedRange.price_bdt) * qty).toFixed(2)}</span>.
+                </>
+              ) : "."}
+              {" "}You will only be charged for OTPs that arrive.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setConfirmOpen(false); allocate(qty); }}
+              className="bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground"
+            >
+              Yes, get {qty} numbers
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
   );
 };
 
