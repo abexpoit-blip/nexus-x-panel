@@ -12,7 +12,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { GradientMesh, PageHeader } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap, Phone, Sparkles } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap, Phone, Sparkles, Layers, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -159,22 +159,28 @@ const AgentRanges = () => {
   const baseOptions = [1, 3, 5].filter(n => n <= perReqLimit);
   const canAllocate = !!selectedRange && free > 0;
 
+  // Today's allocation count (best-effort from localStorage; resets on day change).
+  const todayKey = `nx.alloc.${new Date().toISOString().slice(0,10)}`;
+  const dailyCap = Math.min(1000, Math.max(perReqLimit, Number((user as any)?.daily_limit) || 100));
+  const [dailyCount, setDailyCount] = useState<number>(() => {
+    try { return Number(localStorage.getItem(todayKey)) || 0; } catch { return 0; }
+  });
+  const bumpDaily = (n: number) => {
+    const next = dailyCount + n;
+    setDailyCount(next);
+    try { localStorage.setItem(todayKey, String(next)); } catch { /* ignore */ }
+  };
+
   return (
-    <div className="relative space-y-3 max-w-5xl mx-auto">
+    <div className="relative space-y-5 max-w-6xl mx-auto">
       <GradientMesh variant="default" />
-      {/* Compact header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-neon-magenta/20 border border-primary/30 flex items-center justify-center">
-            <Globe className="w-4 h-4 text-neon-cyan" />
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground leading-none">Get Number</div>
-            <h1 className="font-display text-lg font-bold text-foreground leading-tight">Allocate Numbers</h1>
-          </div>
-        </div>
-        <div className="text-[11px] text-muted-foreground">
-          Pick country → range → amount
+      {/* Header */}
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Pick a country and range — we'll grab the next available number from the pool.
+          </p>
         </div>
       </div>
 
@@ -188,13 +194,16 @@ const AgentRanges = () => {
           </div>
         </GlassCard>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <GlassCard className="!p-5 md:!p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* ── Country selector box ── */}
-          <GlassCard className="!p-2.5">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Country</div>
-              {selectedCountry && (
-                <div className="text-[9px] font-mono text-muted-foreground">{selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}</div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-foreground/80">Country</label>
+              {allCountries.length > 0 && (
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  {allCountries.length} available
+                </span>
               )}
             </div>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
@@ -202,25 +211,30 @@ const AgentRanges = () => {
                 <button
                   type="button"
                   disabled={loadingCountries}
-                  className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
+                  className="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <span className="text-xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
+                        <span className="text-2xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
                         <div className="min-w-0">
-                          <div className="font-display text-[13px] font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
-                          <div className="text-[9px] text-muted-foreground font-mono uppercase leading-tight">{selectedCountry.country_code}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neon-green/10 text-neon-green font-mono">
+                              {selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono uppercase leading-tight">{selectedCountry.country_code}</div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Globe className="w-4 h-4 text-muted-foreground" />
-                        <div className="text-[13px] text-muted-foreground">{loadingCountries ? "Loading…" : "Select country"}</div>
+                        <Globe className="w-5 h-5 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">{loadingCountries ? "Loading…" : "Select country"}</div>
                       </>
                     )}
                   </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
@@ -264,14 +278,16 @@ const AgentRanges = () => {
                 </div>
               </PopoverContent>
             </Popover>
-          </GlassCard>
+          </div>
 
           {/* ── Range selector box ── */}
-          <GlassCard className={cn("!p-2.5", isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]")}>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Range</div>
-              {selectedRange && (
-                <div className={cn("text-[9px] font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</div>
+          <div className={cn(isHot && "rounded-lg")}>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-foreground/80">Range</label>
+              {ranges.length > 0 && (
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  {ranges.length} range{ranges.length === 1 ? "" : "s"}
+                </span>
               )}
             </div>
             <Popover open={rangeOpen} onOpenChange={(v) => { if (country) setRangeOpen(v); }}>
@@ -280,38 +296,43 @@ const AgentRanges = () => {
                   type="button"
                   disabled={!country || loadingRanges}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
-                    !country && "opacity-50 cursor-not-allowed"
+                    "w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
+                    !country && "opacity-50 cursor-not-allowed",
+                    isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]"
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedRange ? (
                       <>
-                        <Hash className="w-4 h-4 text-neon-cyan shrink-0" />
+                        {isHot ? <Flame className="w-5 h-5 text-orange-400 shrink-0" /> : <Hash className="w-5 h-5 text-neon-cyan shrink-0" />}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <div className="font-display text-[13px] font-semibold text-foreground truncate leading-tight">{selectedRange.range_label}</div>
+                            <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedRange.range_label}</div>
                             {isHot && (
-                              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-bold uppercase border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
                                 <Flame className="w-2.5 h-2.5" /> Hot
                               </span>
                             )}
+                            <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono", free > 0 ? "bg-neon-green/10 text-neon-green" : "bg-destructive/10 text-destructive")}>
+                              {free} avail
+                            </span>
                           </div>
-                          <div className="text-[9px] text-muted-foreground leading-tight">
-                            {selectedRange.range_prefix && <span className="font-mono">{selectedRange.range_prefix}</span>}
+                          <div className="text-[10px] text-muted-foreground leading-tight">
+                            {selectedRange.range_prefix && <span className="font-mono mr-2">{selectedRange.range_prefix}</span>}
+                            {selectedRange.operator && <span>{selectedRange.operator}</span>}
                           </div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Hash className="w-4 h-4 text-muted-foreground" />
-                        <div className="text-[13px] text-muted-foreground">
+                        <Hash className="w-5 h-5 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">
                           {!country ? "Pick country first" : loadingRanges ? "Loading…" : "Select range"}
                         </div>
                       </>
                     )}
                   </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
@@ -374,75 +395,107 @@ const AgentRanges = () => {
                 </div>
               </PopoverContent>
             </Popover>
-          </GlassCard>
-        </div>
-      )}
-
-      {/* ── Get Number action panel ── */}
-      {selectedRange && (
-        <GlassCard className="!p-2.5">
-          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Allocate</div>
-              <div className="text-[11px] text-muted-foreground">
-                Limit <span className="font-mono text-foreground">{perReqLimit}</span> · Stock <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase text-muted-foreground tracking-wider">Earn</span>
-              <span className="text-sm font-display font-bold text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</span>
-            </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-1.5">
-            {baseOptions.map(n => {
+        {/* ── Big "Get Number" CTA ── */}
+        <div className="mt-5">
+          <Button
+            disabled={!canAllocate || allocLoading !== null}
+            onClick={() => allocate(1)}
+            className={cn(
+              "w-full h-14 text-base font-bold rounded-xl border-0",
+              "bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground",
+              "hover:opacity-95 hover:shadow-[0_10px_40px_-10px_hsl(var(--primary)/0.6)] transition-all",
+              "disabled:opacity-40 disabled:cursor-not-allowed",
+            )}
+          >
+            {allocLoading === 1 ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <Hash className="w-5 h-5 mr-2" />
+                Get Number
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* ── Bulk request row ── */}
+        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Layers className="w-4 h-4 text-neon-cyan" />
+            <span className="uppercase tracking-wider font-semibold text-foreground/80">Bulk request</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {baseOptions.filter(n => n > 1).map(n => {
               const disabled = !canAllocate || allocLoading !== null;
               const isThis = allocLoading === n;
               return (
                 <Button
                   key={n}
+                  size="sm"
                   disabled={disabled}
                   onClick={() => allocate(n)}
                   className={cn(
-                    "h-9 text-[13px] font-bold",
-                    n === 1 && "bg-white/[0.06] hover:bg-white/[0.12] text-foreground border border-white/10",
-                    n === 3 && "bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30",
-                    n === 5 && "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 hover:opacity-90",
+                    "h-8 px-4 text-xs font-bold rounded-md border",
+                    n === 5
+                      ? "bg-gradient-to-r from-primary/20 to-neon-magenta/20 border-primary/40 text-foreground hover:from-primary/30 hover:to-neon-magenta/30"
+                      : "bg-white/[0.04] border-white/10 text-foreground hover:bg-white/[0.08]",
                   )}
                 >
-                  {isThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Zap className="w-3 h-3 mr-1" /> Get {n}×</>}
+                  {isThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `${n}×`}
                 </Button>
               );
             })}
+            {perReqLimit > 5 && (
+              <>
+                <Input
+                  type="number"
+                  min={1}
+                  max={perReqLimit}
+                  placeholder={`max ${perReqLimit}`}
+                  value={customCount || ""}
+                  onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
+                  className="bg-white/[0.04] border-white/[0.1] h-8 w-24 font-mono text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!customCount || !canAllocate || allocLoading !== null}
+                  onClick={() => allocate(customCount)}
+                  className="border-white/[0.1] h-8 px-3 text-xs"
+                >
+                  {allocLoading === customCount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Go"}
+                </Button>
+              </>
+            )}
           </div>
+        </div>
 
-          {perReqLimit > 5 && (
-            <div className="mt-1.5 flex gap-1.5">
-              <Input
-                type="number"
-                min={1}
-                max={perReqLimit}
-                placeholder={`Custom (max ${perReqLimit})`}
-                value={customCount || ""}
-                onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
-                className="bg-white/[0.04] border-white/[0.1] h-8 font-mono text-[13px]"
-              />
-              <Button
-                variant="outline"
-                disabled={!customCount || !canAllocate || allocLoading !== null}
-                onClick={() => allocate(customCount)}
-                className="border-white/[0.1] h-8 px-4 text-[13px]"
-              >
-                {allocLoading === customCount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Get"}
-              </Button>
+        {/* ── Footer meta strip ── */}
+        <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between gap-4 flex-wrap text-xs">
+          <div className="flex items-center gap-5 flex-wrap">
+            <div className="text-muted-foreground">
+              Per request: <span className="font-mono font-semibold text-foreground">{perReqLimit}</span>
+            </div>
+            <div className="text-muted-foreground">
+              Daily: <span className="font-mono font-semibold text-foreground">{dailyCount}</span>
+              <span className="text-muted-foreground/60"> / {dailyCap}</span>
+            </div>
+            {selectedRange && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <TrendingUp className="w-3.5 h-3.5 text-neon-green" />
+                Earn <span className="font-mono font-bold text-neon-green">৳{Number(selectedRange.price_bdt).toFixed(2)}</span> per OTP
+              </div>
+            )}
+          </div>
+          {!canAllocate && selectedRange && (
+            <div className="text-destructive font-medium">
+              {free <= 0 ? "Out of stock" : ""}
             </div>
           )}
-
-          {!canAllocate && (
-            <div className="mt-1.5 text-[11px] text-destructive text-center">
-              {free <= 0 ? "This range is out of stock right now." : ""}
-            </div>
-          )}
+        </div>
         </GlassCard>
       )}
 
