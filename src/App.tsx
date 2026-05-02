@@ -47,6 +47,8 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       retry: 1,
       refetchOnWindowFocus: false,
+      // Stop all polling while the tab is hidden — huge perf win.
+      refetchIntervalInBackground: false,
     },
   },
 });
