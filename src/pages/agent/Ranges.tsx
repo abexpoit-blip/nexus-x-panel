@@ -264,6 +264,7 @@ const AgentRanges = () => {
   const otpCount = allRows.filter(r => r.status === "received").length;
 
   return (
+    <>
     <div className="relative space-y-5 w-full">
       <GradientMesh variant="default" />
       {/* Header */}
