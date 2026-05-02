@@ -825,6 +825,7 @@ const AgentRanges = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
   );
 };
 
