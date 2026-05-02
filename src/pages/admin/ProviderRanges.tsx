@@ -455,6 +455,14 @@ const AdminProviderRanges = () => {
                 <span className="text-xs text-muted-foreground ml-auto">{form.enabled ? "ON" : "OFF"}</span>
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">🔥 Hot / Fire mode</Label>
+              <div className="h-10 flex items-center gap-2 px-3 rounded-md bg-white/[0.04] border border-white/[0.1]">
+                <span className="text-base">{(form as any).hot ? "🔥" : "💤"}</span>
+                <Switch checked={!!(form as any).hot} onCheckedChange={(v) => setForm({ ...form, hot: v ? 1 : 0 } as any)} />
+                <span className="text-xs text-muted-foreground ml-auto">{(form as any).hot ? "HOT" : "OFF"}</span>
+              </div>
+            </div>
             <div className="space-y-1.5 col-span-2">
               <Label className="text-xs">Notes</Label>
               <Input
