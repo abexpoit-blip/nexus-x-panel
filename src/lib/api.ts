@@ -433,6 +433,7 @@ export interface SystemHealth {
     backup_dir: string;
   };
   seven1tel_bot: ProviderBotStatus | null;
+  xisora_bot: ProviderBotStatus | null;
   counts: {
     pending_withdrawals: number;
     active_sessions: number;
