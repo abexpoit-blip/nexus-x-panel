@@ -451,6 +451,15 @@ export interface ProviderBotStatus {
   consec_fail?: number;
   otps_delivered?: number;
   interval_sec?: number;
+  // Telemetry (added in v2.0)
+  errors?: Array<{ at: number; message: string }>;
+  last_login_at?: number | null;
+  last_otp_at?: number | null;
+  total_ticks?: number;
+  total_login_attempts?: number;
+  total_login_successes?: number;
+  source?: string;
+  portal_url?: string;
 }
 
 export interface BotInfo {
