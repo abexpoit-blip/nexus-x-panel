@@ -324,7 +324,7 @@ function loadBots() {
 
 const BOT_LABELS = {
   seven1tel: { name: 'Seven1Tel Bot',         desc: 'Scrapes seven1tel SMS portal for live OTPs' },
-  xisora:    { name: 'XISORA Bot',            desc: 'Polls XISORA REST API for live OTPs (token auth)' },
+  xisora:    { name: 'XISORA Bot',            desc: 'Polls XISORA API or portal-cookie MDR fallback for live OTPs' },
   fake_otp:  { name: 'Fake OTP Broadcaster',  desc: 'Synthetic CDR rows to keep the public feed warm' },
 };
 
