@@ -90,6 +90,8 @@ export type ProviderRange = {
   operator?: string | null;
   price_bdt: number;
   enabled?: 0 | 1 | boolean;
+  hot?: 0 | 1 | boolean;
+  free_count?: number;
   notes?: string | null;
   created_at?: number;
   updated_at?: number;
