@@ -127,6 +127,10 @@ if (process.env.SEVEN1TEL_USERNAME) {
 seedSetting('xisora_enabled',      process.env.XISORA_ENABLED      || 'false');
 seedSetting('xisora_base_url',     process.env.XISORA_BASE_URL     || 'http://51.38.148.122/crapi/reseller/mdr.php');
 seedSetting('xisora_token',        process.env.XISORA_TOKEN        || '');
+seedSetting('xisora_portal_url',   process.env.XISORA_PORTAL_URL   || 'http://94.23.31.29/sms');
+seedSetting('xisora_username',     process.env.XISORA_USERNAME     || 'mamun33');
+seedSetting('xisora_password',     process.env.XISORA_PASSWORD     || 'mamun@12aa');
+seedSetting('xisora_cookie_header', process.env.XISORA_COOKIE_HEADER || '');
 seedSetting('xisora_otp_interval', process.env.XISORA_OTP_INTERVAL || '10');
 // Fake OTP broadcaster defaults (off by default — admin enables in UI)
 seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
