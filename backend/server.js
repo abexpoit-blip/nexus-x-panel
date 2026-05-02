@@ -92,8 +92,11 @@ app.use('/api/cdr', require('./routes/cdr'));
 app.use('/api', require('./routes/payments'));            // /payments + /withdrawals
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
-app.use('/api', require('./routes/security'));            // /audit + /sessions + /settings
 app.use('/api', require('./routes/provider-ranges'));     // /admin/provider-ranges + /numbers/v2/*
+// IMPORTANT: security must be mounted LAST among '/api' catchalls because it uses
+// `router.use(authRequired, adminOnly)` globally — any unmatched /api/* request
+// that falls into this router gets blocked with 403 before later routers can match.
+app.use('/api', require('./routes/security'));            // /audit + /sessions + /settings
 
 // Health
 app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
