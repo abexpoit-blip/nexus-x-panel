@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
-import { Trophy, Medal, Wallet, Crown, Award, Star } from "lucide-react";
+import { Trophy, Medal, Crown, Award, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Tiered badge based on OTPs delivered in the selected period
@@ -26,9 +26,13 @@ const AgentLeaderboard = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", period],
     queryFn: () => api.leaderboard(period),
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   const rows = data?.leaderboard || [];
+  const podium = rows.slice(0, 3);
+  const rest = rows.slice(3);
+  // Podium display order: 2nd, 1st, 3rd (classic stage layout)
+  const podiumOrdered = [podium[1], podium[0], podium[2]].filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -59,14 +63,65 @@ const AgentLeaderboard = () => {
         </div>
       </div>
 
-      <GlassCard className="p-2">
-        <div className="space-y-1">
-          {rows.map((r, i) => {
+      {/* PODIUM — Top 3 */}
+      {podium.length > 0 && (
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 items-end">
+          {podiumOrdered.map((r) => {
+            const realRank = rows.findIndex((x) => x.id === r.id);
+            const isFirst = realRank === 0;
+            const isSecond = realRank === 1;
             const isMe = r.id === user?.id;
-            const medal = i === 0 ? "text-neon-amber" : i === 1 ? "text-muted-foreground" : i === 2 ? "text-orange-400" : "text-muted-foreground/40";
             const tier = tierFor(r.otp_count);
             const TierIcon = tier.icon;
-            const isPodium = i < 3;
+            const heightClass = isFirst ? "h-44 sm:h-56" : isSecond ? "h-36 sm:h-48" : "h-32 sm:h-40";
+            const medalColor = isFirst ? "text-neon-amber" : isSecond ? "text-muted-foreground" : "text-orange-400";
+            const glowClass = isFirst
+              ? "border-neon-amber/40 shadow-[0_0_40px_-10px_hsl(var(--neon-amber)/0.4)]"
+              : isSecond
+                ? "border-white/15"
+                : "border-orange-500/30";
+            const RankIcon = isFirst ? Crown : Medal;
+            return (
+              <div key={r.id} className="flex flex-col items-center">
+                <div className="flex flex-col items-center mb-2 text-center px-1 min-w-0 w-full">
+                  <RankIcon className={cn("w-7 h-7 sm:w-9 sm:h-9 mb-1", medalColor)} />
+                  <p className="font-semibold text-sm sm:text-base text-foreground truncate max-w-full">
+                    {r.username}
+                    {isMe && <span className="text-[10px] text-primary ml-1">(You)</span>}
+                  </p>
+                  <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border mt-1", tier.className)}>
+                    <TierIcon className="w-2.5 h-2.5" /> {tier.label}
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    "w-full rounded-t-xl border-x border-t flex flex-col items-center justify-center gap-1 transition-all",
+                    heightClass,
+                    glowClass,
+                    isMe ? "bg-primary/10" : "bg-white/[0.03]"
+                  )}
+                >
+                  <p className={cn("font-display font-extrabold leading-none", isFirst ? "text-4xl sm:text-5xl text-neon-amber" : "text-3xl sm:text-4xl text-foreground")}>
+                    {r.otp_count.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">OTPs</p>
+                  <div className={cn("mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold", isFirst ? "bg-neon-amber/20 text-neon-amber" : isSecond ? "bg-white/10 text-foreground" : "bg-orange-500/20 text-orange-400")}>
+                    #{realRank + 1}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <GlassCard className="p-2">
+        <div className="space-y-1">
+          {rest.map((r, idx) => {
+            const i = idx + 3;
+            const isMe = r.id === user?.id;
+            const tier = tierFor(r.otp_count);
+            const TierIcon = tier.icon;
             return (
               <div
                 key={r.id}
@@ -74,18 +129,12 @@ const AgentLeaderboard = () => {
                   "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg transition-colors",
                   isMe
                     ? "bg-primary/10 border border-primary/30"
-                    : isPodium
-                      ? "bg-white/[0.03] hover:bg-white/[0.05]"
-                      : "hover:bg-white/[0.03]"
+                    : "hover:bg-white/[0.03]"
                 )}
               >
                 <div className="flex items-center gap-4 min-w-0 flex-1">
                   <div className="w-10 text-center shrink-0">
-                    {isPodium ? (
-                      <Medal className={cn("w-6 h-6 mx-auto", medal)} />
-                    ) : (
-                      <span className="font-mono text-muted-foreground text-sm">#{i + 1}</span>
-                    )}
+                    <span className="font-mono text-muted-foreground text-sm">#{i + 1}</span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -95,13 +144,6 @@ const AgentLeaderboard = () => {
                       <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border", tier.className)}>
                         <TierIcon className="w-3 h-3" /> {tier.label}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
-                      {(r.earnings_bdt ?? 0) > 0 && (
-                        <span className="inline-flex items-center gap-1 text-neon-green">
-                          <Wallet className="w-3 h-3" /> ৳{(+(r.earnings_bdt ?? 0)).toFixed(0)}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -121,6 +163,9 @@ const AgentLeaderboard = () => {
           )}
           {isLoading && rows.length === 0 && (
             <p className="text-center text-muted-foreground py-12 text-sm">Loading rankings…</p>
+          )}
+          {!isLoading && rows.length > 0 && rest.length === 0 && (
+            <p className="text-center text-muted-foreground/60 py-6 text-xs">More agents will appear here as they climb.</p>
           )}
         </div>
       </GlassCard>
