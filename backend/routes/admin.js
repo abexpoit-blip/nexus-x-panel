@@ -254,10 +254,13 @@ router.post('/agents', (req, res) => {
 
 router.patch('/agents/:id', (req, res) => {
   const id = +req.params.id;
-  const allowed = ['full_name', 'phone', 'telegram', 'daily_limit', 'per_request_limit', 'status'];
+  const allowed = ['full_name', 'phone', 'telegram', 'daily_limit', 'per_request_limit', 'status', 'balance'];
   const sets = [], vals = [];
   for (const k of allowed) {
-    if (k in req.body) { sets.push(`${k} = ?`); vals.push(req.body[k]); }
+    if (k in req.body) {
+      sets.push(`${k} = ?`);
+      vals.push(k === 'balance' ? +req.body[k] || 0 : req.body[k]);
+    }
   }
   if (req.body.password) {
     sets.push('password_hash = ?');
