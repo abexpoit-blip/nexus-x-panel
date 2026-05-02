@@ -116,6 +116,7 @@ const AgentRanges = () => {
       const r = await api.getNumber({ range_id: selectedRange.id, count });
       if (r.allocated?.length) {
         setAllocated(r.allocated);
+        bumpDaily(r.allocated.length);
         toast({
           title: `${r.allocated.length} number${r.allocated.length === 1 ? "" : "s"} allocated`,
           description: r.errors?.length ? r.errors[0] : "Numbers ready below.",
