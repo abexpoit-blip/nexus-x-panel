@@ -7,6 +7,16 @@ import { Input } from "@/components/ui/input";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { GradientMesh } from "@/components/premium";
 import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,6 +58,7 @@ const AgentRanges = () => {
 
   const [allocLoading, setAllocLoading] = useState<number | null>(null); // count being loaded
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [copiedOtp, setCopiedOtp] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [customCount, setCustomCount] = useState<number>(0);
@@ -253,6 +264,7 @@ const AgentRanges = () => {
   const otpCount = allRows.filter(r => r.status === "received").length;
 
   return (
+    <>
     <div className="relative space-y-5 w-full">
       <GradientMesh variant="default" />
       {/* Header */}
@@ -498,7 +510,10 @@ const AgentRanges = () => {
             </div>
             <Button
               disabled={!canAllocate || allocLoading !== null}
-              onClick={() => allocate(qty)}
+              onClick={() => {
+                if (qty > 1) setConfirmOpen(true);
+                else allocate(qty);
+              }}
               className={cn(
                 "w-full flex-1 min-h-[52px] h-auto text-base font-bold rounded-lg border-0",
                 "bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground",
@@ -782,6 +797,35 @@ const AgentRanges = () => {
         )}
       </GlassCard>
     </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Allocate {qty} numbers?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to request <span className="font-semibold text-foreground">{qty} numbers</span>
+              {selectedRange ? (
+                <>
+                  {" "}from <span className="font-mono text-foreground">{(selectedRange as any).label || selectedRange.country_code}</span>
+                  {" "}at <span className="text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</span> per OTP.
+                  {" "}Estimated total: <span className="text-neon-green font-mono">৳{(Number(selectedRange.price_bdt) * qty).toFixed(2)}</span>.
+                </>
+              ) : "."}
+              {" "}You will only be charged for OTPs that arrive.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setConfirmOpen(false); allocate(qty); }}
+              className="bg-gradient-to-r from-neon-cyan via-primary to-neon-magenta text-primary-foreground"
+            >
+              Yes, get {qty} numbers
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
