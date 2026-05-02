@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const AgentProfile = () => {
   const { user } = useAuth();
@@ -16,6 +18,36 @@ const AgentProfile = () => {
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const submitPasswordChange = async () => {
+    if (!currentPw || !newPw) {
+      toast.error("Fill in current and new password");
+      return;
+    }
+    if (newPw.length < 5) {
+      toast.error("New password must be at least 5 characters");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (newPw === currentPw) {
+      toast.error("New password must differ from current");
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await api.auth.changePassword(currentPw, newPw);
+      toast.success("Password updated. Use the new password next time you log in.");
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to change password");
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   const tabs = [
     { key: "info" as const, label: "Profile Info", icon: User },
@@ -114,9 +146,17 @@ const AgentProfile = () => {
               <label className="text-sm font-medium text-muted-foreground">Confirm Password</label>
               <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="bg-white/[0.04] border-white/[0.1] h-11" />
             </div>
-            <Button className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground font-semibold hover:opacity-90 border-0">
-              <Lock className="w-4 h-4 mr-2" /> Update Password
+            <Button
+              onClick={submitPasswordChange}
+              disabled={pwLoading}
+              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground font-semibold hover:opacity-90 border-0"
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              {pwLoading ? "Updating…" : "Update Password"}
             </Button>
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Minimum 5 characters. New password takes effect immediately — your current session stays logged in.
+            </p>
           </div>
         </GlassCard>
       )}
