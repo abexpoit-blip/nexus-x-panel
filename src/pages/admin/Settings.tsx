@@ -714,8 +714,7 @@ function BotConfigCard(p: BotConfigCardProps) {
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// BotTokenCard — slim per-bot config for token-based REST APIs.
-// Used by XISORA (no username/password/cookie — just URL + bearer-style token).
+// BotTokenCard — XISORA config for API token plus portal-cookie fallback.
 // ───────────────────────────────────────────────────────────────────────
 type BotTokenCardProps = {
   tone: "cyan" | "magenta";
@@ -765,7 +764,7 @@ function BotTokenCard(p: BotTokenCardProps) {
               : "bg-destructive/10 border-destructive/30 text-destructive",
           )}>
             {result.ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-            {result.ok ? `Token OK · ${result.ms}ms` : (result.error || "Failed")}
+            {result.ok ? `Login OK · ${result.ms}ms` : (result.error || "Failed")}
           </div>
         )}
       </div>
