@@ -90,6 +90,9 @@ const AdminSettings = () => {
     setSeven1Pass(str(s, "seven1tel_password"));
     setSeven1Cookie(str(s, "seven1tel_cookie_header"));
     setSeven1Interval(Number(str(s, "seven1tel_otp_interval", "4")) || 4);
+    setXisoraUrl(str(s, "xisora_base_url", "http://51.38.148.122/crapi/reseller/mdr.php"));
+    setXisoraToken(str(s, "xisora_token"));
+    setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
   }, [s]);
 
   useEffect(() => {
