@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS allocations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   provider TEXT NOT NULL,
-  provider_ref TEXT,                          -- upstream ID from AccHub/IMS
+  provider_ref TEXT,                          -- upstream provider reference, if any
   country_code TEXT,
   operator TEXT,
   phone_number TEXT NOT NULL,
