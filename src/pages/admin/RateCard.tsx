@@ -63,9 +63,13 @@ const AdminRateCard = () => {
             render: (r) => (
               <span className={cn(
                 "inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase",
-                r.provider === "seven1tel" ? "bg-neon-cyan/15 text-neon-cyan" : "bg-neon-magenta/15 text-neon-magenta"
+                r.provider === "seven1tel"
+                  ? "bg-neon-cyan/15 text-neon-cyan"
+                  : r.provider === "xisora"
+                    ? "bg-neon-amber/15 text-neon-amber"
+                    : "bg-neon-magenta/15 text-neon-magenta"
               )}>
-                {r.provider === "seven1tel" ? "Server A" : r.provider}
+                {r.provider === "seven1tel" ? "Server A" : r.provider === "xisora" ? "Server B" : r.provider}
               </span>
             ),
           },
@@ -140,6 +144,7 @@ const AdminRateCard = () => {
             <Field label="Provider">
               <select value={form.provider || "seven1tel"} onChange={(e) => setForm({ ...form, provider: e.target.value })} className="w-full h-10 px-3 rounded-md bg-white/[0.04] border border-white/[0.08]">
                 <option value="seven1tel">Server A (Seven1Tel)</option>
+                <option value="xisora">Server B (XISORA)</option>
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
