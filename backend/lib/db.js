@@ -3,7 +3,11 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = process.env.DB_PATH || './data/nexus.db';
+// Keep the runtime backend DB aligned with scripts/admin-reset.js regardless of
+// PM2 cwd (`/opt/nexus`, `/opt/nexus/backend`, etc.).
+const DB_PATH = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.resolve(__dirname, '..', 'data', 'nexus.db');
 
 // Auto-create data dir
 const dir = path.dirname(DB_PATH);
@@ -12,6 +16,8 @@ if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+console.log(`✓ Database ready at ${DB_PATH}`);
 
 // --- Self-healing migrations (run by EVERY process that opens the DB) ---
 function _ensureCol(table, col, ddl) {
