@@ -25,7 +25,7 @@ interface NavItem {
 
 const agentItems: NavItem[] = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-  { label: "Browse Ranges", path: "/agent/ranges", icon: Hash, hint: "Country → Range → Get Number" },
+  { label: "Get Number", path: "/agent/ranges", icon: Hash, hint: "Country → Range → Allocate" },
   { label: "Console", path: "/agent/console", icon: MessageSquare },
   { label: "My Numbers", path: "/agent/my-numbers", icon: List },
   { label: "Summary", path: "/agent/summary", icon: BarChart3 },
@@ -96,7 +96,7 @@ export const CommandPalette = () => {
           {user?.role === "agent" && (
             <CommandItem value="get number new request" onSelect={() => go("/agent/ranges")}>
               <Sparkles className="w-4 h-4 mr-2 text-neon-magenta" />
-              <span>Browse Ranges</span>
+              <span>Get Number</span>
             </CommandItem>
           )}
           {user?.role === "admin" && (
