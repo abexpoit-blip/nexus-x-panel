@@ -166,9 +166,12 @@ const AgentRanges = () => {
       setTimeout(() => setCopiedAll(false), 1500);
     } catch { toast({ title: "Copy failed", variant: "destructive" }); }
   };
-  const downloadTxt = (rows: { phone_number: string }[]) => {
+  // Download as `Number|OTP` (one row per line). Rows without OTP yet are
+  // included with an empty OTP so the file structure stays consistent.
+  const downloadTxt = (rows: { phone_number: string; otp?: string | null }[]) => {
     if (!rows.length) return;
-    const blob = new Blob([rows.map(a => a.phone_number).join("\n") + "\n"], { type: "text/plain" });
+    const lines = rows.map(a => `${a.phone_number}|${a.otp || ""}`);
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
