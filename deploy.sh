@@ -7,7 +7,8 @@ set -e
 
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;36m'; N='\033[0m'
 
-PROJECT_DIR="/opt/nexus"
+# Auto-detect project dir (where this script lives) so it works regardless of install path
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$PROJECT_DIR/backend"
 PM2_NAME="nexus-backend"
 
