@@ -476,6 +476,17 @@ const AgentHistory = () => {
             ),
           },
           {
+            key: "status",
+            header: "Status",
+            render: (r) => {
+              const s = (r.status || "billed").toLowerCase();
+              if (s === "refunded") {
+                return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30">Refunded</span>;
+              }
+              return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-neon-green/15 text-neon-green border border-neon-green/30">Arrived</span>;
+            },
+          },
+          {
             key: "created_at",
             header: "Time",
             render: (r) => (
