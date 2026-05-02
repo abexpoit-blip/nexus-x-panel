@@ -35,6 +35,7 @@ const empty: Form = {
   operator: "",
   price_bdt: 0,
   enabled: 1,
+  hot: 0,
   notes: "",
 };
 
@@ -114,6 +115,7 @@ const AdminProviderRanges = () => {
         operator: form.operator || null,
         price_bdt: Number(form.price_bdt) || 0,
         enabled: form.enabled ? 1 : 0,
+        hot: (form as any).hot ? 1 : 0,
         notes: form.notes || null,
       };
       if (form.id) await api.admin.rangeUpdate(form.id, body);
