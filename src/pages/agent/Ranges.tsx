@@ -75,7 +75,7 @@ const AgentRanges = () => {
     refetchInterval: 60_000,
   });
 
-  const { data: rangesData, isLoading: loadingRanges } = useQuery({
+  const { data: rangesData, isLoading: loadingRanges, error: rangesError } = useQuery({
     queryKey: ["agent-v2-ranges", country],
     queryFn: () => api.v2Ranges(country!),
     enabled: !!country,
