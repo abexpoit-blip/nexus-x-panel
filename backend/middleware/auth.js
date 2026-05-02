@@ -3,19 +3,43 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../lib/db');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+// ── JWT_SECRET resolution ────────────────────────────────────────────────
+// Priority:
+//   1) process.env.JWT_SECRET (when set AND >= 32 chars)         → use it
+//   2) settings.jwt_secret in SQLite (auto-generated, persisted) → use it
+//   3) Generate a new 96-char hex secret, persist it to settings → use it
+//
+// This means a fresh VPS deploy never needs a manual .env edit:
+// the backend self-heals on first boot and keeps the same secret across
+// restarts. JWT_SECRET in .env still wins if you want rotation control.
+function resolveJwtSecret() {
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return { secret: fromEnv, source: 'env' };
 
-// Hard-fail in production if JWT_SECRET is missing or weak
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('FATAL: JWT_SECRET must be set to a strong (>=32 char) value in production.');
-    process.exit(1);
-  } else {
-    console.warn('⚠️  JWT_SECRET is missing/weak — using dev fallback. NEVER deploy like this.');
+  let stored = null;
+  try {
+    stored = db.prepare("SELECT value FROM settings WHERE key='jwt_secret'").get()?.value || null;
+  } catch (_) { /* settings table may not exist yet on very first boot */ }
+
+  if (stored && stored.length >= 32) return { secret: stored, source: 'settings' };
+
+  const generated = crypto.randomBytes(48).toString('hex'); // 96 hex chars
+  try {
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at) VALUES ('jwt_secret', ?, strftime('%s','now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+    `).run(generated);
+    console.log('🔐 JWT_SECRET auto-generated and persisted to settings.jwt_secret');
+  } catch (e) {
+    console.error('⚠️  Could not persist auto-generated JWT_SECRET:', e.message);
   }
+  return { secret: generated, source: 'generated' };
 }
 
-const SECRET = JWT_SECRET || 'dev-only-fallback-secret-do-not-use-in-prod-xxxxxxxxxxxxxxxxxx';
+const { secret: SECRET, source: SECRET_SOURCE } = resolveJwtSecret();
+if (SECRET_SOURCE !== 'env') {
+  console.log(`🔐 JWT_SECRET source: ${SECRET_SOURCE} (length=${SECRET.length})`);
+}
 
 function hashToken(t) {
   return crypto.createHash('sha256').update(t).digest('hex');
