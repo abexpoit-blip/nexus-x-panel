@@ -358,7 +358,7 @@ const PaymentConfigCard = () => {
 
       <div className="flex items-center justify-between gap-3 px-1 flex-wrap">
         <p className="text-xs text-muted-foreground">
-          Changes apply immediately to agent withdrawal forms.
+          Changes apply right away to agent withdrawal forms.
         </p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => data && setDraft(data)} disabled={save.isPending}>

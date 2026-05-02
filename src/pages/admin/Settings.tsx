@@ -541,7 +541,7 @@ const AdminSettings = () => {
           />
 
           <p className="text-[11px] text-muted-foreground">
-            After saving, go to <span className="text-foreground">Bots Control</span> → <span className="text-neon-cyan">Restart</span> for changes to take effect immediately.
+            After saving, go to <span className="text-foreground">Bots Control</span> → <span className="text-neon-cyan">Restart</span> so changes take effect right away.
           </p>
         </TabsContent>
       </Tabs>

@@ -1,23 +1,13 @@
 // API client for nexus-backend
-import { DEMO_USERS, demoData } from "./demoData";
 
 const BASE = (import.meta.env.VITE_API_URL as string) || "https://api.nexus-x.site/api";
 const TOKEN_KEY = "nexus_token";
-const DEMO_KEY = "nexus_demo_mode";
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
-
-export const demoMode = {
-  enabled: () => localStorage.getItem(DEMO_KEY) === "true",
-  enable: () => localStorage.setItem(DEMO_KEY, "true"),
-  disable: () => localStorage.removeItem(DEMO_KEY),
-};
-
-// (Demo IMS bot state removed — fresh build currently ships Seven1Tel only; XISORA pending.)
 
 async function request<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   let token = tokenStore.get();
@@ -41,96 +31,6 @@ async function request<T = any>(path: string, opts: RequestInit = {}): Promise<T
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as any).error || `Request failed: ${res.status}`);
   return data as T;
-}
-
-/** Map an API path to a demo response. Returns undefined if no demo handler. */
-function demoRoute(path: string, opts: RequestInit): any {
-  const method = (opts.method || "GET").toUpperCase();
-  const body = opts.body ? JSON.parse(opts.body as string) : {};
-
-  if (path === "/auth/login" && method === "POST") {
-    const { username, password } = body;
-    const u = (DEMO_USERS as any)[username];
-    if (!u || u.password !== password) throw new Error("Invalid credentials (demo mode)");
-    return { token: `demo_${username}_${Date.now()}`, user: u.user };
-  }
-  if (path === "/auth/me") {
-    const t = tokenStore.get() || "";
-    const m = t.match(/^demo_(\w+)_/);
-    if (m) {
-      const u = (DEMO_USERS as any)[m[1]];
-      if (u) return { user: u.user };
-    }
-    return undefined;
-  }
-
-  if (path === "/admin/stats") return demoData.adminStats();
-  if (path === "/admin/leaderboard") return demoData.leaderboard();
-  if (path.startsWith("/admin/commission-trend")) return demoData.commissionTrend(14);
-  if (path === "/admin/allocations") return demoData.allocations();
-  if (path === "/admin/agents") return demoData.agents();
-  if (path === "/admin/impersonations") return { impersonations: [
-    { id: 1, created_at: Math.floor(Date.now()/1000) - 1800, action: "impersonation_start", admin_id: 1, agent_id: 2, admin_username: "admin", agent_username: "demo_agent", ip: "127.0.0.1", meta: '{"username":"demo_agent"}' },
-    { id: 2, created_at: Math.floor(Date.now()/1000) - 1500, action: "impersonation_end", admin_id: 1, agent_id: 2, admin_username: "admin", agent_username: "demo_agent", ip: "127.0.0.1" },
-  ] };
-  if (path === "/admin/system-health") {
-    const now = Math.floor(Date.now() / 1000);
-    return {
-      server: {
-        uptime_sec: 86400 + 3600 * 7,
-        node_version: "v20.11.1",
-        env: "production",
-        memory_mb: { rss: 142.3, heap_used: 68.7, heap_total: 95.4 },
-      },
-      database: {
-        size_bytes: 4_823_552,
-        size_mb: 4.6,
-        path: "./data/nexus.db",
-        last_backup: { name: "nexus-2025-04-17-0400.db.gz", size: 1_234_000, mtime: now - 3600 * 9 },
-        backup_dir: "/opt/nexus/backups",
-      },
-      seven1tel_bot: {
-        enabled: true, running: true, logged_in: true,
-        last_tick_at: now - 3, last_error: null, consec_fail: 0,
-        otps_delivered: 27, interval_sec: 4,
-      },
-      counts: { pending_withdrawals: 2, active_sessions: 5 },
-    };
-  }
-
-  if (path === "/rates") return demoData.rates();
-  if (path === "/cdr" || path === "/cdr/mine") return demoData.cdr();
-  if (path === "/payments" || path === "/payments/mine") return demoData.payments();
-  if (path === "/withdrawals" || path === "/withdrawals/pending" || path === "/withdrawals/mine") return demoData.withdrawals();
-
-  if (path === "/numbers/providers") return demoData.providers();
-  if (path === "/numbers/pricing") return demoData.pricing();
-  if (path.startsWith("/numbers/countries/")) return demoData.countries();
-  if (path.startsWith("/numbers/operators/")) {
-    const parts = path.split("/");
-    const cid = Number(parts[parts.length - 1]);
-    return demoData.operators(Number.isFinite(cid) ? cid : undefined);
-  }
-  if (path === "/numbers/get" && method === "POST") {
-    const b = (body || {}) as { country_id?: number; operator_id?: number; count?: number };
-    const count = Math.max(1, Math.min(b.count || 1, 15));
-    const allocated: any[] = [];
-    for (let i = 0; i < count; i++) allocated.push(...demoData.getNumber(b.country_id, b.operator_id).allocated);
-    return { allocated, errors: [] as string[] };
-  }
-  if (path === "/numbers/my") return demoData.myNumbers();
-  if (path === "/numbers/summary") return demoData.numberSummary();
-  if (path === "/numbers/sync" && method === "POST") return demoData.syncOtp();
-
-  if (path === "/notifications") return demoData.notifications();
-  if (path.startsWith("/audit")) return demoData.audit();
-  if (path === "/sessions/mine" || path === "/sessions") return demoData.sessions();
-
-  if (path === "/settings/public") return demoData.settings();
-  if (path === "/settings") return demoData.settingsAll();
-
-  if (method !== "GET") return { ok: true, id: Date.now() };
-  return undefined;
 }
 
 export type Agent = {
@@ -219,12 +119,6 @@ export const api = {
     request<{ operators: any[] }>(`/numbers/operators/${provider}/${countryId}`),
   getNumber: (body: { provider: string; country_id?: number; operator_id?: number; country_code?: string; operator?: string; range?: string; count?: number }) =>
     request<{ allocated: any[]; errors: string[] }>("/numbers/get", { method: "POST", body: JSON.stringify(body) }),
-  imsRanges: () => request<{ ranges: { name: string; count: number }[] }>("/numbers/ims/ranges"),
-  msiRanges: () => request<{ ranges: { name: string; count: number }[] }>("/numbers/msi/ranges"),
-  imsAddPool: (body: { numbers: string[]; range: string; country_code?: string }) =>
-    request<{ added: number; skipped: number; invalid: number; range: string }>("/numbers/ims/pool", { method: "POST", body: JSON.stringify(body) }),
-  msiAddPool: (body: { numbers: string[]; range: string; country_code?: string }) =>
-    request<{ added: number; skipped: number; invalid: number; range: string }>("/numbers/msi/pool", { method: "POST", body: JSON.stringify(body) }),
   myNumbers: () => request<{ numbers: Allocation[]; recent_window_hours?: number; otp_expiry_sec?: number; server_now?: number }>("/numbers/my"),
   numberHistory: (params: { page?: number; page_size?: number; q?: string; from?: string; to?: string } = {}) => {
     const qs = new URLSearchParams();

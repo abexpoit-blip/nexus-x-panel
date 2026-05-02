@@ -13,7 +13,7 @@ import { GradientMesh, PageHeader } from "@/components/premium";
 // Global default per provider — no country/operator. Backend commission lookup
 // will fall back to this row whenever a more specific match doesn't exist.
 const empty: Partial<Rate> & { agent_commission_percent?: number } = {
-  provider: "acchub", country_code: null as any, country_name: null as any,
+  provider: "seven1tel", country_code: null as any, country_name: null as any,
   operator: null as any, price_bdt: 0, active: 1, agent_commission_percent: 60,
 };
 
@@ -63,9 +63,9 @@ const AdminRateCard = () => {
             render: (r) => (
               <span className={cn(
                 "inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase",
-                r.provider === "acchub" ? "bg-neon-cyan/15 text-neon-cyan" : "bg-neon-magenta/15 text-neon-magenta"
+                r.provider === "seven1tel" ? "bg-neon-cyan/15 text-neon-cyan" : "bg-neon-magenta/15 text-neon-magenta"
               )}>
-                {r.provider === "acchub" ? "Server A" : r.provider === "ims" ? "Server B" : r.provider}
+                {r.provider === "seven1tel" ? "Server A" : r.provider}
               </span>
             ),
           },
@@ -138,9 +138,8 @@ const AdminRateCard = () => {
           <DialogHeader><DialogTitle>{form.id ? "Edit Rate" : "New Rate"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <Field label="Provider">
-              <select value={form.provider || "acchub"} onChange={(e) => setForm({ ...form, provider: e.target.value })} className="w-full h-10 px-3 rounded-md bg-white/[0.04] border border-white/[0.08]">
-                <option value="acchub">Server A (AccHub)</option>
-                <option value="ims">Server B (IMS)</option>
+              <select value={form.provider || "seven1tel"} onChange={(e) => setForm({ ...form, provider: e.target.value })} className="w-full h-10 px-3 rounded-md bg-white/[0.04] border border-white/[0.08]">
+                <option value="seven1tel">Server A (Seven1Tel)</option>
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
