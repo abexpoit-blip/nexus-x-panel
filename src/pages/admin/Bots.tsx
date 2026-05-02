@@ -4,7 +4,10 @@ import { GradientMesh, PageHeader } from "@/components/premium";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Play, Square, RotateCw, AlertTriangle, CheckCircle2, Activity, Loader2 } from "lucide-react";
+import {
+  Bot, Play, Square, RotateCw, AlertTriangle, CheckCircle2, Activity, Loader2,
+  Stethoscope, ShieldCheck, ShieldAlert, History, Clock,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -44,14 +47,17 @@ const StatusPill = ({ running, enabled }: { running?: boolean; enabled?: boolean
   );
 };
 
-const BotCard = ({ info, onAction, busy }: {
+const BotCard = ({ info, onAction, onHealth, busy, healthResult }: {
   info: BotInfo;
   onAction: (a: "start" | "stop" | "restart") => void;
+  onHealth: () => void;
   busy: string | null;
+  healthResult: { ok: boolean; ms: number; error?: string } | null;
 }) => {
   const s = info.status || {};
   const enabled = !!s.enabled;
   const running = !!s.running;
+  const errors = Array.isArray(s.errors) ? s.errors : [];
 
   return (
     <GlassCard className="!p-5 relative overflow-hidden">
@@ -78,13 +84,38 @@ const BotCard = ({ info, onAction, busy }: {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 relative">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 relative">
         <Stat label="Last tick"   value={fmtAgo(s.last_tick_at ?? s.last_fire_at)} />
         <Stat label="Logged in"   value={s.logged_in === undefined ? "—" : (s.logged_in ? "Yes" : "No")}
               tone={s.logged_in === undefined ? undefined : (s.logged_in ? "green" : "amber")} />
         <Stat label="Delivered"   value={String(s.otps_delivered ?? s.total_fired ?? 0)} mono />
         <Stat label="Interval"    value={s.interval_sec ? `${s.interval_sec}s` : (s.min_sec ? `${s.min_sec}-${s.max_sec}s` : "—")} mono />
       </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 relative">
+        <Stat label="Last login" value={fmtAgo(s.last_login_at)} />
+        <Stat label="Last OTP"   value={fmtAgo(s.last_otp_at ?? s.last_fire_at)}
+              tone={s.last_otp_at && (Date.now()/1000 - s.last_otp_at) < 600 ? "green" : undefined} />
+        <Stat label="Login OK"   value={`${s.total_login_successes ?? 0}/${s.total_login_attempts ?? 0}`} mono />
+        <Stat label="Ticks"      value={String(s.total_ticks ?? 0)} mono />
+      </div>
+
+      {/* Health probe result */}
+      {healthResult && (
+        <div className={cn(
+          "mb-3 p-2.5 rounded-lg border flex items-start gap-2 text-xs relative",
+          healthResult.ok ? "bg-neon-green/[0.06] border-neon-green/30" : "bg-destructive/[0.06] border-destructive/30",
+        )}>
+          <Stethoscope className={cn("w-3.5 h-3.5 mt-0.5 shrink-0", healthResult.ok ? "text-neon-green" : "text-destructive")} />
+          <div className="min-w-0">
+            <div className={cn("font-semibold", healthResult.ok ? "text-neon-green" : "text-destructive")}>
+              {healthResult.ok ? `Connection OK · ${healthResult.ms}ms` : `Connection failed · ${healthResult.ms}ms`}
+            </div>
+            {healthResult.error && (
+              <div className="text-[11px] font-mono text-foreground/80 mt-0.5 break-words">{healthResult.error}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Last error */}
       {s.last_error || s.error ? (
@@ -105,6 +136,27 @@ const BotCard = ({ info, onAction, busy }: {
           <CheckCircle2 className="w-3.5 h-3.5 text-neon-green" />
           <span className="text-xs text-foreground/80">No recent errors</span>
         </div>
+      )}
+
+      {/* Recent error timeline */}
+      {errors.length > 0 && (
+        <details className="mb-3 group relative">
+          <summary className="cursor-pointer text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground/80 flex items-center gap-1.5 select-none">
+            <History className="w-3 h-3" />
+            Recent errors ({errors.length})
+            <span className="text-foreground/40 group-open:hidden">▸ show</span>
+            <span className="text-foreground/40 hidden group-open:inline">▾ hide</span>
+          </summary>
+          <ul className="mt-2 max-h-40 overflow-y-auto space-y-1 text-[11px] font-mono">
+            {errors.map((e, i) => (
+              <li key={i} className="flex gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.04]">
+                <Clock className="w-3 h-3 text-muted-foreground/60 mt-0.5 shrink-0" />
+                <span className="text-muted-foreground shrink-0 w-16">{fmtAgo(e.at)}</span>
+                <span className="text-destructive/90 break-words min-w-0">{e.message}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {/* Actions */}
@@ -137,6 +189,18 @@ const BotCard = ({ info, onAction, busy }: {
           {busy === "restart" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5 mr-1.5" />}
           Restart
         </Button>
+        {info.key !== "fake_otp" && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onHealth}
+            disabled={busy !== null}
+            className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
+          >
+            {busy === "health" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Stethoscope className="w-3.5 h-3.5 mr-1.5" />}
+            Test
+          </Button>
+        )}
         {s.base_url && (
           <span className="ml-auto text-[10px] font-mono text-muted-foreground/60 self-center truncate max-w-[200px]">
             {s.base_url}
@@ -165,11 +229,18 @@ const AdminBots = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [busy, setBusy] = useState<{ key: string; action: string } | null>(null);
+  const [healthResults, setHealthResults] = useState<Record<string, { ok: boolean; ms: number; error?: string }>>({});
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-bots"],
     queryFn: () => api.admin.bots.list(),
     refetchInterval: 5000,
+  });
+
+  const { data: sysHealth } = useQuery({
+    queryKey: ["admin-system-health"],
+    queryFn: () => api.admin.systemHealth(),
+    refetchInterval: 15000,
   });
 
   const run = async (key: string, action: "start" | "stop" | "restart") => {
@@ -183,6 +254,25 @@ const AdminBots = () => {
       toast({ title: `${action} failed`, description: (e as Error).message, variant: "destructive" });
     } finally {
       setTimeout(() => setBusy(null), 800);
+    }
+  };
+
+  const runHealth = async (key: string) => {
+    setBusy({ key, action: "health" });
+    try {
+      const r = await api.admin.bots.health(key);
+      setHealthResults((prev) => ({ ...prev, [key]: { ok: r.ok, ms: r.ms, error: r.error } }));
+      toast({
+        title: r.ok ? "Connection OK" : "Connection failed",
+        description: r.ok ? `${data?.bots[key]?.label} · ${r.ms}ms` : (r.error || "unknown"),
+        variant: r.ok ? "default" : "destructive",
+      });
+    } catch (e) {
+      const msg = (e as Error).message;
+      setHealthResults((prev) => ({ ...prev, [key]: { ok: false, ms: 0, error: msg } }));
+      toast({ title: "Health check failed", description: msg, variant: "destructive" });
+    } finally {
+      setTimeout(() => setBusy(null), 400);
     }
   };
 
@@ -205,6 +295,56 @@ const AdminBots = () => {
         }
       />
 
+      {/* System health strip */}
+      {sysHealth && (
+        <GlassCard className="!p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="flex items-center gap-2.5">
+              {sysHealth.server.jwt?.strong ? (
+                <ShieldCheck className="w-4 h-4 text-neon-green shrink-0" />
+              ) : (
+                <ShieldAlert className="w-4 h-4 text-destructive shrink-0" />
+              )}
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">JWT secret</div>
+                <div className={cn("text-sm font-semibold", sysHealth.server.jwt?.strong ? "text-neon-green" : "text-destructive")}>
+                  {sysHealth.server.jwt?.strong
+                    ? `Strong (${sysHealth.server.jwt.source})`
+                    : "Weak — needs rotation"}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Activity className="w-4 h-4 text-neon-cyan shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Last real OTP</div>
+                <div className="text-sm font-semibold text-foreground">
+                  {fmtAgo(sysHealth.cdr_pulse?.last_real_at ?? null)}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-neon-green shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">OTPs today</div>
+                <div className="text-sm font-semibold text-foreground font-mono">
+                  {sysHealth.cdr_pulse?.total_today ?? 0}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Backend uptime</div>
+                <div className="text-sm font-semibold text-foreground font-mono">
+                  {Math.floor(sysHealth.server.uptime_sec / 3600)}h {Math.floor((sysHealth.server.uptime_sec % 3600) / 60)}m
+                </div>
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
       {isLoading ? (
         <div className="p-12 text-center text-muted-foreground">
           <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /> Loading bot status…
@@ -223,6 +363,8 @@ const AdminBots = () => {
               info={b}
               busy={busy?.key === b.key ? busy.action : null}
               onAction={(a) => run(b.key, a)}
+              onHealth={() => runHealth(b.key)}
+              healthResult={healthResults[b.key] || null}
             />
           ))}
         </div>

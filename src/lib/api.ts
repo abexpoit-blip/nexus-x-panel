@@ -424,6 +424,7 @@ export interface SystemHealth {
     node_version: string;
     env: string;
     memory_mb: { rss: number; heap_used: number; heap_total: number };
+    jwt?: { source: "env" | "settings" | "generated" | "unknown"; length: number; strong: boolean };
   };
   database: {
     size_bytes: number;
@@ -434,9 +435,12 @@ export interface SystemHealth {
   };
   seven1tel_bot: ProviderBotStatus | null;
   xisora_bot: ProviderBotStatus | null;
+  fake_otp_bot?: ProviderBotStatus | null;
+  cdr_pulse?: { last_real_at: number | null; last_any_at: number | null; total_today: number };
   counts: {
     pending_withdrawals: number;
     active_sessions: number;
+    active_allocations?: number;
   };
 }
 
@@ -451,6 +455,15 @@ export interface ProviderBotStatus {
   consec_fail?: number;
   otps_delivered?: number;
   interval_sec?: number;
+  // Telemetry (added in v2.0)
+  errors?: Array<{ at: number; message: string }>;
+  last_login_at?: number | null;
+  last_otp_at?: number | null;
+  total_ticks?: number;
+  total_login_attempts?: number;
+  total_login_successes?: number;
+  source?: string;
+  portal_url?: string;
 }
 
 export interface BotInfo {

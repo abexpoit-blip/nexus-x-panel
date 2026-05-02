@@ -26,6 +26,8 @@ const tough = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
+const { Telemetry } = require('./_botTelemetry');
+const tel = new Telemetry();
 
 const QUIET = process.env.NODE_ENV === 'production';
 const log  = (...a) => console.log('[seven1tel-bot]', ...a);
@@ -125,6 +127,7 @@ async function persistSessionCookie() {
 async function login() {
   const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
   if (!USERNAME || !PASSWORD) throw new Error('seven1tel creds missing');
+  tel.recordLoginAttempt();
 
   if (!_client) _client = buildClient(BASE_URL);
 
@@ -183,6 +186,7 @@ async function login() {
 
   await persistSessionCookie();
   _loggedIn = true;
+  tel.recordLoginSuccess();
   log('✓ login OK as', USERNAME);
   return true;
 }
@@ -295,9 +299,11 @@ async function tickOnce() {
       await markOtpReceived(alloc, r.otp, r.cli);
       delivered++;
       _otpDelivered++;
+      tel.recordOtpDelivered();
       log(`✓ OTP ${r.phone} → ${r.otp} (alloc#${alloc.id}, agent#${alloc.user_id})`);
     } catch (e) {
       warn('markOtpReceived failed:', e.message);
+      tel.recordError(`markOtpReceived: ${e.message}`);
     }
   }
   return delivered;
@@ -315,6 +321,7 @@ async function loop() {
     }
     try {
       const n = await tickOnce();
+      tel.recordTick();
       _lastTickAt = Math.floor(Date.now() / 1000);
       _lastError = null;
       _consecFail = 0;
@@ -322,6 +329,7 @@ async function loop() {
     } catch (e) {
       warn('tick error:', e.message);
       _lastError = e.message;
+      tel.recordError(e.message);
       _consecFail++;
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false;
@@ -357,6 +365,7 @@ function getStatus() {
     consec_fail: _consecFail,
     otps_delivered: _otpDelivered,
     interval_sec: cfg.INTERVAL,
+    ...tel.snapshot(),
   };
 }
 
