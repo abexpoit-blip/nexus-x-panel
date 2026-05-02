@@ -380,22 +380,21 @@ const AgentRanges = () => {
 
       {/* ── Get Number action panel ── */}
       {selectedRange && (
-        <GlassCard className="!p-4">
-          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-            <div>
-              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-0.5">Step 3 — Allocate</div>
-              <div className="font-display text-base font-bold text-foreground">How many numbers?</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                Per-request limit: <span className="font-mono text-foreground">{perReqLimit}</span> · Stock: <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free}</span>
+        <GlassCard className="!p-2.5">
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Allocate</div>
+              <div className="text-[11px] text-muted-foreground">
+                Limit <span className="font-mono text-foreground">{perReqLimit}</span> · Stock <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free}</span>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-[9px] uppercase text-muted-foreground tracking-wider">Earn / OTP</div>
-              <div className="text-lg font-display font-bold text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] uppercase text-muted-foreground tracking-wider">Earn</span>
+              <span className="text-sm font-display font-bold text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {baseOptions.map(n => {
               const disabled = !canAllocate || allocLoading !== null;
               const isThis = allocLoading === n;
@@ -405,42 +404,42 @@ const AgentRanges = () => {
                   disabled={disabled}
                   onClick={() => allocate(n)}
                   className={cn(
-                    "h-11 text-sm font-bold",
+                    "h-9 text-[13px] font-bold",
                     n === 1 && "bg-white/[0.06] hover:bg-white/[0.12] text-foreground border border-white/10",
                     n === 3 && "bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30",
                     n === 5 && "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 hover:opacity-90",
                   )}
                 >
-                  {isThis ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Zap className="w-3.5 h-3.5 mr-1" /> Get {n}×</>}
+                  {isThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Zap className="w-3 h-3 mr-1" /> Get {n}×</>}
                 </Button>
               );
             })}
           </div>
 
           {perReqLimit > 5 && (
-            <div className="mt-2 flex gap-2">
+            <div className="mt-1.5 flex gap-1.5">
               <Input
                 type="number"
                 min={1}
                 max={perReqLimit}
-                placeholder={`Custom amount (max ${perReqLimit})`}
+                placeholder={`Custom (max ${perReqLimit})`}
                 value={customCount || ""}
                 onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
-                className="bg-white/[0.04] border-white/[0.1] h-9 font-mono text-sm"
+                className="bg-white/[0.04] border-white/[0.1] h-8 font-mono text-[13px]"
               />
               <Button
                 variant="outline"
                 disabled={!customCount || !canAllocate || allocLoading !== null}
                 onClick={() => allocate(customCount)}
-                className="border-white/[0.1] h-9 px-5 text-sm"
+                className="border-white/[0.1] h-8 px-4 text-[13px]"
               >
-                {allocLoading === customCount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Get"}
+                {allocLoading === customCount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Get"}
               </Button>
             </div>
           )}
 
           {!canAllocate && (
-            <div className="mt-2 text-xs text-destructive text-center">
+            <div className="mt-1.5 text-[11px] text-destructive text-center">
               {free <= 0 ? "This range is out of stock right now." : ""}
             </div>
           )}
@@ -449,43 +448,71 @@ const AgentRanges = () => {
 
       {/* Allocation result dialog — copy single, copy all, download as TXT */}
       <Dialog open={!!allocated} onOpenChange={(v) => { if (!v) { setAllocated(null); setCustomCount(0); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Hash className="w-5 h-5 text-neon-cyan" />
-              {allocated?.length} number{allocated?.length === 1 ? "" : "s"} allocated
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-            {(allocated || []).map((a, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md bg-white/[0.04] border border-white/[0.08] hover:border-primary/40 transition-colors"
-              >
-                <span className="font-mono text-sm text-foreground select-all">{a.phone_number}</span>
-                <button
-                  onClick={() => copyOne(a.phone_number, i)}
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                  title="Copy this number"
-                >
-                  {copiedIdx === i ? <Check className="w-4 h-4 text-neon-green" /> : <Copy className="w-4 h-4" />}
-                </button>
+        <DialogContent className="max-w-lg p-0 overflow-hidden border-white/[0.08] bg-card">
+          {/* Gradient header */}
+          <div className="relative px-5 py-4 border-b border-white/[0.08] bg-gradient-to-br from-primary/15 via-transparent to-neon-magenta/15">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-neon-magenta flex items-center justify-center shadow-lg shadow-primary/30">
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
-            ))}
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="font-display text-base font-bold text-foreground">
+                  {allocated?.length} number{allocated?.length === 1 ? "" : "s"} ready
+                </DialogTitle>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                  {selectedCountry && <span className="text-base leading-none">{flagEmoji(selectedCountry.country_code)}</span>}
+                  <span>{selectedCountry?.country_name || ""}</span>
+                  {selectedRange && <span className="text-muted-foreground/60">·</span>}
+                  {selectedRange && <span className="truncate">{selectedRange.range_label}</span>}
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter className="!flex-col sm:!flex-row gap-2">
-            <Button variant="outline" onClick={copyAll} className="border-white/[0.1]">
-              {copiedAll ? <Check className="w-4 h-4 mr-1.5 text-neon-green" /> : <Copy className="w-4 h-4 mr-1.5" />}
-              Copy all
-            </Button>
-            <Button variant="outline" onClick={downloadTxt} className="border-white/[0.1]">
-              <Download className="w-4 h-4 mr-1.5" /> Download .txt
-            </Button>
+
+          {/* Numbers list */}
+          <div className="px-5 py-3">
+            <div className="space-y-1.5 max-h-[45vh] overflow-y-auto pr-1">
+              {(allocated || []).map((a, i) => (
+                <div
+                  key={i}
+                  className="group flex items-center gap-3 px-3 py-2 rounded-md bg-white/[0.03] border border-white/[0.06] hover:border-primary/40 hover:bg-white/[0.05] transition-all"
+                >
+                  <div className="w-6 h-6 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                    <Phone className="w-3 h-3 text-primary" />
+                  </div>
+                  <span className="font-mono text-[13px] text-foreground select-all flex-1 truncate">{a.phone_number}</span>
+                  <button
+                    onClick={() => copyOne(a.phone_number, i)}
+                    className={cn(
+                      "p-1.5 rounded-md transition-colors",
+                      copiedIdx === i ? "text-neon-green bg-neon-green/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    )}
+                    title="Copy this number"
+                  >
+                    {copiedIdx === i ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer actions */}
+          <DialogFooter className="!flex-row gap-1.5 px-5 py-3 border-t border-white/[0.08] bg-white/[0.02] !justify-between">
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="outline" onClick={copyAll} className="border-white/[0.1] h-8 text-[12px]">
+                {copiedAll ? <Check className="w-3.5 h-3.5 mr-1 text-neon-green" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+                Copy all
+              </Button>
+              <Button size="sm" variant="outline" onClick={downloadTxt} className="border-white/[0.1] h-8 text-[12px]">
+                <Download className="w-3.5 h-3.5 mr-1" /> .txt
+              </Button>
+            </div>
             <Button
+              size="sm"
               onClick={() => { setAllocated(null); navigate("/agent/my-numbers"); }}
-              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 sm:ml-auto"
+              className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 h-8 text-[12px]"
             >
-              Open My Numbers
+              My Numbers →
             </Button>
           </DialogFooter>
         </DialogContent>
