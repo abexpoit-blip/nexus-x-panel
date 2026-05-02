@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import { GradientMesh, PageHeader } from "@/components/premium";
-import { Globe, ChevronRight, ArrowLeft, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,24 +27,51 @@ function flagEmoji(code: string): string {
   return String.fromCodePoint(A + cc.charCodeAt(0) - 65, A + cc.charCodeAt(1) - 65);
 }
 
+const LS_COUNTRY = "nx.getnum.country";
+const LS_RANGE = "nx.getnum.rangeId";
+
 const AgentRanges = () => {
-  const [country, setCountry] = useState<string | null>(null);
-  const [q, setQ] = useState("");
+  // Persisted selections — survive reload until user changes them.
+  const [country, setCountry] = useState<string | null>(() => {
+    try { return localStorage.getItem(LS_COUNTRY) || null; } catch { return null; }
+  });
+  const [rangeId, setRangeId] = useState<number | null>(() => {
+    try {
+      const v = localStorage.getItem(LS_RANGE);
+      return v ? Number(v) : null;
+    } catch { return null; }
+  });
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [countryQ, setCountryQ] = useState("");
+  const [rangeQ, setRangeQ] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const perReqLimit = Math.min(500, Math.max(1, Number((user as any)?.per_request_limit) || 5));
 
   const [allocated, setAllocated] = useState<{ phone_number: string }[] | null>(null);
-  const [allocLoading, setAllocLoading] = useState<{ rangeId: number; count: number } | null>(null);
+  const [allocLoading, setAllocLoading] = useState<number | null>(null); // count being loaded
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [customCount, setCustomCount] = useState<number>(0);
 
+  useEffect(() => {
+    try {
+      if (country) localStorage.setItem(LS_COUNTRY, country);
+      else localStorage.removeItem(LS_COUNTRY);
+    } catch { /* ignore */ }
+  }, [country]);
+  useEffect(() => {
+    try {
+      if (rangeId != null) localStorage.setItem(LS_RANGE, String(rangeId));
+      else localStorage.removeItem(LS_RANGE);
+    } catch { /* ignore */ }
+  }, [rangeId]);
+
   const { data: countriesData, isLoading: loadingCountries } = useQuery({
     queryKey: ["agent-v2-countries"],
     queryFn: () => api.v2Countries(),
-    enabled: !country,
     refetchInterval: 60_000,
   });
 
@@ -52,17 +82,38 @@ const AgentRanges = () => {
     refetchInterval: 30_000,
   });
 
-  const countries = (countriesData?.countries || []).filter(c =>
-    !q || c.country_code.toLowerCase().includes(q.toLowerCase()) ||
-    (c.country_name || "").toLowerCase().includes(q.toLowerCase())
-  );
+  const allCountries = countriesData?.countries || [];
+  const filteredCountries = useMemo(() => allCountries.filter(c =>
+    !countryQ || c.country_code.toLowerCase().includes(countryQ.toLowerCase()) ||
+    (c.country_name || "").toLowerCase().includes(countryQ.toLowerCase())
+  ), [allCountries, countryQ]);
 
   const ranges = rangesData?.ranges || [];
+  const filteredRanges = useMemo(() => ranges.filter(r =>
+    !rangeQ ||
+    (r.range_label || "").toLowerCase().includes(rangeQ.toLowerCase()) ||
+    (r.range_prefix || "").toLowerCase().includes(rangeQ.toLowerCase()) ||
+    (r.operator || "").toLowerCase().includes(rangeQ.toLowerCase())
+  ), [ranges, rangeQ]);
 
-  const allocate = async (rangeId: number, count: number) => {
-    setAllocLoading({ rangeId, count });
+  const selectedCountry = allCountries.find(c => c.country_code === country);
+  const selectedRange = ranges.find(r => r.id === rangeId);
+
+  // If persisted range no longer matches current country's available ranges, clear it.
+  useEffect(() => {
+    if (rangeId != null && ranges.length > 0 && !ranges.some(r => r.id === rangeId)) {
+      setRangeId(null);
+    }
+  }, [rangeId, ranges]);
+
+  const free = Number((selectedRange as any)?.free_count ?? 0);
+  const isHot = !!(selectedRange as any)?.hot;
+
+  const allocate = async (count: number) => {
+    if (!selectedRange) return;
+    setAllocLoading(count);
     try {
-      const r = await api.getNumber({ range_id: rangeId, count });
+      const r = await api.getNumber({ range_id: selectedRange.id, count });
       if (r.allocated?.length) {
         setAllocated(r.allocated);
         toast({
@@ -105,183 +156,273 @@ const AgentRanges = () => {
     URL.revokeObjectURL(url);
   };
 
+  const baseOptions = [1, 3, 5].filter(n => n <= perReqLimit);
+  const canAllocate = !!selectedRange && free > 0;
+
   return (
     <div className="relative space-y-6">
       <GradientMesh variant="default" />
       <PageHeader
         eyebrow="Get Number"
-        title={country ? `Ranges — ${country}` : "Browse by Country"}
-        description={country ? "Pick a range to allocate a free number." : "Select a country to see available ranges."}
+        title="Get a Number"
+        description="Choose country, then a range, then how many numbers to grab."
         icon={<Globe className="w-5 h-5 text-neon-cyan" />}
       />
 
-      {!country && (
-        <>
-          <GlassCard>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search country…"
-                className="pl-9 bg-white/[0.04] border-white/[0.1]"
-              />
-            </div>
+      {/* ── Empty state when no countries at all ── */}
+      {!loadingCountries && allCountries.length === 0 ? (
+        <GlassCard>
+          <div className="text-center py-12 text-muted-foreground">
+            <Inbox className="w-10 h-10 mx-auto mb-3 opacity-50" />
+            <div className="font-medium text-foreground">No ranges available yet</div>
+            <div className="text-sm mt-1">An admin needs to add &amp; enable ranges for your account.</div>
+          </div>
+        </GlassCard>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* ── Country selector box ── */}
+          <GlassCard className="!p-5">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Step 1 — Country</div>
+            <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={loadingCountries}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {selectedCountry ? (
+                      <>
+                        <span className="text-3xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
+                        <div className="min-w-0">
+                          <div className="font-display font-semibold text-foreground truncate">{selectedCountry.country_name}</div>
+                          <div className="text-xs text-muted-foreground font-mono uppercase">{selectedCountry.country_code} · {selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}</div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-6 h-6 text-muted-foreground" />
+                        <div className="text-muted-foreground">{loadingCountries ? "Loading countries…" : "Select country"}</div>
+                      </>
+                    )}
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
+                <div className="p-2 border-b border-white/[0.08]">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={countryQ}
+                      onChange={(e) => setCountryQ(e.target.value)}
+                      placeholder="Search country…"
+                      className="pl-9 h-9 bg-white/[0.04] border-white/[0.1]"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {filteredCountries.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">No matches</div>
+                  ) : filteredCountries.map(c => (
+                    <button
+                      key={c.country_code}
+                      onClick={() => {
+                        if (c.country_code !== country) setRangeId(null);
+                        setCountry(c.country_code);
+                        setCountryOpen(false);
+                        setCountryQ("");
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.05] transition-colors text-left",
+                        country === c.country_code && "bg-primary/10"
+                      )}
+                    >
+                      <span className="text-2xl leading-none">{flagEmoji(c.country_code)}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-foreground truncate">{c.country_name}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono uppercase">{c.country_code}</div>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{c.range_count}</span>
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </GlassCard>
 
-          {loadingCountries ? (
-            <div className="p-12 text-center text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /> Loading countries…
-            </div>
-          ) : countries.length === 0 ? (
-            <GlassCard>
-              <div className="text-center py-12 text-muted-foreground">
-                <Inbox className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <div className="font-medium text-foreground">No ranges available yet</div>
-                <div className="text-sm mt-1">An admin needs to add &amp; enable ranges for your account to see options here.</div>
-              </div>
-            </GlassCard>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {countries.map((c) => (
+          {/* ── Range selector box ── */}
+          <GlassCard className={cn("!p-5", isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]")}>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Step 2 — Range</div>
+            <Popover open={rangeOpen} onOpenChange={(v) => { if (country) setRangeOpen(v); }}>
+              <PopoverTrigger asChild>
                 <button
-                  key={c.country_code}
-                  onClick={() => setCountry(c.country_code)}
-                  className="group text-left"
+                  type="button"
+                  disabled={!country || loadingRanges}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-lg bg-white/[0.04] border border-white/[0.1] hover:border-primary/40 transition-colors text-left",
+                    !country && "opacity-50 cursor-not-allowed"
+                  )}
                 >
-                  <GlassCard className="!p-5 hover:border-primary/40 transition-all hover:-translate-y-0.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl leading-none">{flagEmoji(c.country_code)}</span>
-                          <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{c.country_code}</div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {selectedRange ? (
+                      <>
+                        <Hash className="w-6 h-6 text-neon-cyan shrink-0" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="font-display font-semibold text-foreground truncate">{selectedRange.range_label}</div>
+                            {isHot && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
+                                <Flame className="w-3 h-3" /> Hot
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {selectedRange.range_prefix && <span className="font-mono mr-2">{selectedRange.range_prefix}</span>}
+                            <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</span>
+                          </div>
                         </div>
-                        <div className="font-display font-semibold text-foreground truncate text-lg mt-1">{c.country_name}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {c.range_count} range{c.range_count === 1 ? "" : "s"} available
+                      </>
+                    ) : (
+                      <>
+                        <Hash className="w-6 h-6 text-muted-foreground" />
+                        <div className="text-muted-foreground">
+                          {!country ? "Pick a country first" : loadingRanges ? "Loading ranges…" : "Select range"}
                         </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                    </div>
-                  </GlassCard>
+                      </>
+                    )}
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                 </button>
-              ))}
-            </div>
-          )}
-        </>
+              </PopoverTrigger>
+              <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-hidden" align="start">
+                <div className="p-2 border-b border-white/[0.08]">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={rangeQ}
+                      onChange={(e) => setRangeQ(e.target.value)}
+                      placeholder="Search range…"
+                      className="pl-9 h-9 bg-white/[0.04] border-white/[0.1]"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {filteredRanges.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      {ranges.length === 0 ? "No enabled ranges for this country" : "No matches"}
+                    </div>
+                  ) : filteredRanges.map(r => {
+                    const rHot = !!(r as any).hot;
+                    const rFree = Number((r as any).free_count ?? 0);
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          setRangeId(r.id);
+                          setRangeOpen(false);
+                          setRangeQ("");
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.05] transition-colors text-left",
+                          rangeId === r.id && "bg-primary/10"
+                        )}
+                      >
+                        <Hash className="w-4 h-4 text-neon-cyan shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-sm font-medium text-foreground truncate">{r.range_label}</div>
+                            {rHot && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-orange-500/50 bg-orange-500/15 text-orange-400">
+                                <Flame className="w-2.5 h-2.5" /> Hot
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {r.range_prefix && <span className="font-mono mr-2">{r.range_prefix}</span>}
+                            {r.operator && <span className="mr-2">{r.operator}</span>}
+                          </div>
+                        </div>
+                        <span className={cn("text-xs font-mono shrink-0", rFree > 0 ? "text-neon-green" : "text-destructive")}>{rFree}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </GlassCard>
+        </div>
       )}
 
-      {country && (
-        <>
-          <div className="flex items-center justify-between gap-3">
-            <Button variant="outline" onClick={() => setCountry(null)} className="border-white/[0.1]">
-              <ArrowLeft className="w-4 h-4 mr-1.5" /> All countries
-            </Button>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="text-2xl leading-none">{flagEmoji(country)}</span>
-              <span className="font-mono uppercase">{country}</span>
-              <span>•</span>
-              <span>Per-request limit: <span className="font-mono text-foreground">{perReqLimit}</span></span>
+      {/* ── Get Number action panel ── */}
+      {selectedRange && (
+        <GlassCard className="!p-6">
+          <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">Step 3 — Allocate</div>
+              <div className="font-display text-xl font-bold text-foreground">How many numbers?</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Per-request limit: <span className="font-mono text-foreground">{perReqLimit}</span> · Stock: <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Earn / OTP</div>
+              <div className="text-2xl font-display font-bold text-neon-green font-mono">৳{Number(selectedRange.price_bdt).toFixed(2)}</div>
             </div>
           </div>
 
-          {loadingRanges ? (
-            <div className="p-12 text-center text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /> Loading ranges…
-            </div>
-          ) : ranges.length === 0 ? (
-            <GlassCard>
-              <div className="text-center py-12 text-muted-foreground">
-                <Inbox className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <div>No enabled ranges for this country.</div>
-              </div>
-            </GlassCard>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {ranges.map((r) => {
-                const isHot = !!(r as any).hot;
-                const free = Number((r as any).free_count ?? 0);
-                // Default offers: 1x, 3x, 5x — capped to perReqLimit AND available stock.
-                const baseOptions = [1, 3, 5].filter(n => n <= perReqLimit);
-                const isLoadingThis = allocLoading?.rangeId === r.id;
-                return (
-                  <GlassCard
-                    key={r.id}
-                    className={cn(
-                      "!p-5",
-                      isHot && "border-orange-500/40 shadow-[0_0_30px_-8px_rgba(251,146,60,0.45)]"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <Hash className="w-4 h-4 text-neon-cyan" />
-                          <h3 className="font-display font-semibold text-foreground truncate">{r.range_label}</h3>
-                          {isHot && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-orange-500/50 bg-orange-500/15 text-orange-400 animate-pulse">
-                              <Flame className="w-3 h-3" /> Hot
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-0.5">
-                          <div>Provider: <span className="font-mono uppercase">{r.provider}</span></div>
-                          {r.operator && <div>Operator: {r.operator}</div>}
-                          {r.range_prefix && <div>Prefix: <span className="font-mono">{r.range_prefix}</span></div>}
-                          <div>Stock: <span className={cn("font-mono", free > 0 ? "text-neon-green" : "text-destructive")}>{free} free</span></div>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Earn / OTP</div>
-                        <div className="text-lg font-display font-bold text-neon-green font-mono">৳{Number(r.price_bdt).toFixed(2)}</div>
-                      </div>
-                    </div>
+          <div className="grid grid-cols-3 gap-3">
+            {baseOptions.map(n => {
+              const disabled = !canAllocate || allocLoading !== null;
+              const isThis = allocLoading === n;
+              return (
+                <Button
+                  key={n}
+                  disabled={disabled}
+                  onClick={() => allocate(n)}
+                  className={cn(
+                    "h-14 text-lg font-bold",
+                    n === 1 && "bg-white/[0.06] hover:bg-white/[0.12] text-foreground border border-white/10",
+                    n === 3 && "bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30",
+                    n === 5 && "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 hover:opacity-90",
+                  )}
+                >
+                  {isThis ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Zap className="w-4 h-4 mr-1.5" /> Get {n}×</>}
+                </Button>
+              );
+            })}
+          </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      {baseOptions.map(n => (
-                        <Button
-                          key={n}
-                          disabled={free <= 0 || isLoadingThis}
-                          onClick={() => allocate(r.id, n)}
-                          className={cn(
-                            "font-bold",
-                            n === 1 && "bg-white/[0.06] hover:bg-white/[0.12] text-foreground border border-white/10",
-                            n === 3 && "bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30",
-                            n === 5 && "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0 hover:opacity-90",
-                          )}
-                        >
-                          {isLoadingThis && allocLoading?.count === n
-                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                            : `${n}×`}
-                        </Button>
-                      ))}
-                    </div>
-                    {perReqLimit > 5 && (
-                      <div className="mt-2 flex gap-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={perReqLimit}
-                          placeholder={`Custom (max ${perReqLimit})`}
-                          value={customCount || ""}
-                          onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
-                          className="bg-white/[0.04] border-white/[0.1] h-9 font-mono"
-                        />
-                        <Button
-                          variant="outline"
-                          disabled={!customCount || free <= 0 || isLoadingThis}
-                          onClick={() => allocate(r.id, customCount)}
-                          className="border-white/[0.1] h-9"
-                        >
-                          Get
-                        </Button>
-                      </div>
-                    )}
-                  </GlassCard>
-                );
-              })}
+          {perReqLimit > 5 && (
+            <div className="mt-3 flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={perReqLimit}
+                placeholder={`Custom amount (max ${perReqLimit})`}
+                value={customCount || ""}
+                onChange={(e) => setCustomCount(Math.max(0, Math.min(perReqLimit, +e.target.value || 0)))}
+                className="bg-white/[0.04] border-white/[0.1] h-11 font-mono"
+              />
+              <Button
+                variant="outline"
+                disabled={!customCount || !canAllocate || allocLoading !== null}
+                onClick={() => allocate(customCount)}
+                className="border-white/[0.1] h-11 px-6"
+              >
+                {allocLoading === customCount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Get"}
+              </Button>
             </div>
           )}
-        </>
+
+          {!canAllocate && (
+            <div className="mt-3 text-xs text-destructive text-center">
+              {free <= 0 ? "This range is out of stock right now." : ""}
+            </div>
+          )}
+        </GlassCard>
       )}
 
       {/* Allocation result dialog — copy single, copy all, download as TXT */}
