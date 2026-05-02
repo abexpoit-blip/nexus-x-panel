@@ -69,6 +69,9 @@ const AdminSettings = () => {
   const [seven1Pass, setSeven1Pass] = useState("");
   const [seven1Cookie, setSeven1Cookie] = useState("");
   const [seven1Interval, setSeven1Interval] = useState<number>(4);
+  const [xisoraUrl, setXisoraUrl] = useState("");
+  const [xisoraToken, setXisoraToken] = useState("");
+  const [xisoraInterval, setXisoraInterval] = useState<number>(10);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
