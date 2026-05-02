@@ -116,11 +116,13 @@ app.listen(PORT, () => {
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS origin: ${corsOrigins ? corsOrigins.join(', ') : '(allow all — dev only)'}\n`);
 
-  // (Provider bots: Seven1Tel only for now; XISORA pending wire-up.)
-
   // Start Seven1Tel bot (no-op if seven1tel_enabled=false)
   try { require('./workers/seven1telBot').start(); }
   catch (e) { console.warn('seven1tel bot start error:', e.message); }
+
+  // Start XISORA bot (no-op if xisora_enabled=false or token missing)
+  try { require('./workers/xisoraBot').start(); }
+  catch (e) { console.warn('xisora bot start error:', e.message); }
 
   // Start Fake OTP broadcaster (idles until fake_otp_enabled=true)
   try { require('./workers/fakeOtpBroadcaster').start(); }
