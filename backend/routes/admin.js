@@ -125,6 +125,38 @@ router.get('/system-health', (req, res) => {
   const pendingWithdrawals = db.prepare("SELECT COUNT(*) c FROM withdrawals WHERE status='pending'").get().c;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE expires_at > strftime('%s','now')").get().c;
 
+  // JWT secret status (env / persisted-settings / generated)
+  let jwt_status = { source: 'unknown', length: 0, strong: false };
+  try {
+    const fromEnv = process.env.JWT_SECRET || '';
+    if (fromEnv && fromEnv.length >= 32) {
+      jwt_status = { source: 'env', length: fromEnv.length, strong: true };
+    } else {
+      const stored = db.prepare("SELECT value FROM settings WHERE key='jwt_secret'").get()?.value || '';
+      if (stored && stored.length >= 32) {
+        jwt_status = { source: 'settings', length: stored.length, strong: true };
+      }
+    }
+  } catch (_) {}
+
+  // CDR pulse — last real OTP, today's count
+  let cdr_pulse = { last_real_at: null, last_any_at: null, total_today: 0 };
+  try {
+    cdr_pulse.last_real_at = db.prepare(`
+      SELECT created_at FROM cdr WHERE COALESCE(note,'') NOT LIKE 'fake:%'
+      ORDER BY id DESC LIMIT 1
+    `).get()?.created_at || null;
+    cdr_pulse.last_any_at = db.prepare(`SELECT created_at FROM cdr ORDER BY id DESC LIMIT 1`).get()?.created_at || null;
+    cdr_pulse.total_today = db.prepare(`
+      SELECT COUNT(*) AS n FROM cdr
+      WHERE created_at >= strftime('%s', 'now', 'start of day')
+        AND COALESCE(note,'') NOT LIKE 'fake:%'
+    `).get()?.n || 0;
+  } catch (_) {}
+
+  let fake_otp = null;
+  try { fake_otp = require('../workers/fakeOtpBroadcaster').getStatus?.() || null; } catch (_) {}
+
   res.json({
     server: {
       uptime_sec,
@@ -135,6 +167,7 @@ router.get('/system-health', (req, res) => {
         heap_used: +(mem.heapUsed / 1048576).toFixed(1),
         heap_total: +(mem.heapTotal / 1048576).toFixed(1),
       },
+      jwt: jwt_status,
     },
     database: {
       size_bytes: db_size_bytes,
@@ -145,9 +178,12 @@ router.get('/system-health', (req, res) => {
     },
     seven1tel_bot: seven1tel,
     xisora_bot: xisora,
+    fake_otp_bot: fake_otp,
+    cdr_pulse,
     counts: {
       pending_withdrawals: pendingWithdrawals,
       active_sessions: activeSessions,
+      active_allocations: db.prepare(`SELECT COUNT(*) c FROM allocations WHERE status='active'`).get().c,
     },
   });
 });
