@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,6 @@ const AgentRanges = () => {
   const [rangeOpen, setRangeOpen] = useState(false);
   const [countryQ, setCountryQ] = useState("");
   const [rangeQ, setRangeQ] = useState("");
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const perReqLimit = Math.min(500, Math.max(1, Number((user as any)?.per_request_limit) || 5));
