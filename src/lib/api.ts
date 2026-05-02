@@ -90,6 +90,8 @@ export type ProviderRange = {
   operator?: string | null;
   price_bdt: number;
   enabled?: 0 | 1 | boolean;
+  hot?: 0 | 1 | boolean;
+  free_count?: number;
   notes?: string | null;
   created_at?: number;
   updated_at?: number;
@@ -117,7 +119,7 @@ export const api = {
   countries: (provider: string) => request<{ countries: any[] }>(`/numbers/countries/${provider}`),
   operators: (provider: string, countryId: number) =>
     request<{ operators: any[] }>(`/numbers/operators/${provider}/${countryId}`),
-  getNumber: (body: { provider: string; country_id?: number; operator_id?: number; country_code?: string; operator?: string; range?: string; count?: number }) =>
+  getNumber: (body: { range_id?: number; provider?: string; country_id?: number; operator_id?: number; country_code?: string; operator?: string; range?: string; count?: number }) =>
     request<{ allocated: any[]; errors: string[] }>("/numbers/get", { method: "POST", body: JSON.stringify(body) }),
   myNumbers: () => request<{ numbers: Allocation[]; recent_window_hours?: number; otp_expiry_sec?: number; server_now?: number }>("/numbers/my"),
   numberHistory: (params: { page?: number; page_size?: number; q?: string; from?: string; to?: string } = {}) => {

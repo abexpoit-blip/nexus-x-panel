@@ -35,6 +35,7 @@ const empty: Form = {
   operator: "",
   price_bdt: 0,
   enabled: 1,
+  hot: 0,
   notes: "",
 };
 
@@ -114,6 +115,7 @@ const AdminProviderRanges = () => {
         operator: form.operator || null,
         price_bdt: Number(form.price_bdt) || 0,
         enabled: form.enabled ? 1 : 0,
+        hot: (form as any).hot ? 1 : 0,
         notes: form.notes || null,
       };
       if (form.id) await api.admin.rangeUpdate(form.id, body);
@@ -300,6 +302,11 @@ const AdminProviderRanges = () => {
                     <td className="px-4 py-3 font-medium">
                       {r.range_label}
                       {r.range_prefix && <span className="text-muted-foreground ml-2 font-mono text-xs">{r.range_prefix}</span>}
+                      {(r as any).hot ? (
+                        <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-orange-500/40 bg-orange-500/10 text-orange-400">
+                          🔥 Hot
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.operator || "—"}</td>
                     <td className="px-4 py-3 text-right font-mono">{Number(r.price_bdt).toFixed(2)}</td>
@@ -453,6 +460,14 @@ const AdminProviderRanges = () => {
                 <Power className={cn("w-4 h-4", form.enabled ? "text-neon-green" : "text-muted-foreground")} />
                 <Switch checked={!!form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v ? 1 : 0 })} />
                 <span className="text-xs text-muted-foreground ml-auto">{form.enabled ? "ON" : "OFF"}</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">🔥 Hot / Fire mode</Label>
+              <div className="h-10 flex items-center gap-2 px-3 rounded-md bg-white/[0.04] border border-white/[0.1]">
+                <span className="text-base">{(form as any).hot ? "🔥" : "💤"}</span>
+                <Switch checked={!!(form as any).hot} onCheckedChange={(v) => setForm({ ...form, hot: v ? 1 : 0 } as any)} />
+                <span className="text-xs text-muted-foreground ml-auto">{(form as any).hot ? "HOT" : "OFF"}</span>
               </div>
             </div>
             <div className="space-y-1.5 col-span-2">

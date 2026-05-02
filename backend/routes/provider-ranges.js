@@ -43,6 +43,7 @@ function validate(body, partial = false) {
     out.price_bdt = p;
   }
   if (body.enabled !== undefined) out.enabled = body.enabled ? 1 : 0;
+  if (body.hot !== undefined) out.hot = body.hot ? 1 : 0;
   return out;
 }
 
@@ -62,12 +63,13 @@ router.post('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
   try {
     const v = validate(req.body || {});
     const r = db.prepare(`
-      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       v.provider, v.country_code, v.country_name || null, v.range_label,
       v.range_prefix || null, v.operator || null, v.price_bdt || 0,
-      v.enabled === undefined ? 1 : v.enabled, v.notes || null
+      v.enabled === undefined ? 1 : v.enabled, v.notes || null,
+      v.hot ? 1 : 0
     );
     logFromReq(req, 'range_create', { meta: { provider: v.provider, country: v.country_code, label: v.range_label } });
     res.json({ id: r.lastInsertRowid });
@@ -261,10 +263,11 @@ router.get('/numbers/v2/ranges', authRequired, (req, res) => {
   const cc = String(req.query.country || '').toUpperCase();
   if (!cc) return res.status(400).json({ error: 'country query param required' });
   const rows = db.prepare(`
-    SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
+    SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, hot,
+           (SELECT COUNT(*) FROM pool_numbers p WHERE p.range_id = provider_ranges.id AND p.status = 'free') AS free_count
     FROM provider_ranges
     WHERE enabled = 1 AND country_code = ?
-    ORDER BY provider, range_label
+    ORDER BY hot DESC, provider, range_label
   `).all(cc);
   res.json({ ranges: rows });
 });

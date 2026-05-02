@@ -63,6 +63,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_pranges_provider ON provider_ranges(provider, enabled);
 `);
 
+// Additive migration: hot flag (highlight as 🔥/HOT to agents)
+try {
+  const cols = db.prepare(`PRAGMA table_info(provider_ranges)`).all().map(c => c.name);
+  if (!cols.includes('hot')) {
+    db.exec(`ALTER TABLE provider_ranges ADD COLUMN hot INTEGER NOT NULL DEFAULT 0`);
+  }
+} catch (e) { /* noop */ }
+
 // ─────────────────────────────────────────────────────────────────────
 // pool_numbers — manually-pasted MSISDNs that belong to a range.
 // Status: free → allocated → used (or free again if released).
