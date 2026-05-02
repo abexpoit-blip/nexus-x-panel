@@ -19,7 +19,6 @@ import NotFound from "@/pages/NotFound";
 
 const AgentDashboard = Pages["/agent/dashboard"].L;
 const AgentConsole = Pages["/agent/console"].L;
-const AgentMyNumbers = Pages["/agent/my-numbers"].L;
 const AgentSummary = Pages["/agent/summary"].L;
 const AgentPayments = Pages["/agent/payments"].L;
 const AgentProfile = Pages["/agent/profile"].L;
@@ -100,8 +99,9 @@ const AppRoutes = () => {
           <Route element={<AppLayout requiredRole="agent" />}>
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
             <Route path="/agent/console" element={<AgentConsole />} />
-            <Route path="/agent/my-numbers" element={<AgentMyNumbers />} />
             <Route path="/agent/history" element={<AgentHistory />} />
+            {/* Legacy redirect — My Numbers is now merged into Get Number */}
+            <Route path="/agent/my-numbers" element={<Navigate to="/agent/ranges" replace />} />
             <Route path="/agent/summary" element={<AgentSummary />} />
             <Route path="/agent/payments" element={<AgentPayments />} />
             <Route path="/agent/profile" element={<AgentProfile />} />
