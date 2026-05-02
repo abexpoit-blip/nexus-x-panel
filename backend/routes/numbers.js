@@ -112,6 +112,73 @@ router.post('/release/:id', authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
+// =============================================================
+// POST /api/numbers/get — allocate one or more numbers from a range pool
+// Body: { range_id?, provider?, country_code?, range?, count? }
+// Honours per-agent per_request_limit (admin-controlled, 1..500).
+// =============================================================
+router.post('/get', authRequired, (req, res) => {
+  const u = req.user;
+  if (u.status && u.status !== 'active') {
+    return res.status(403).json({ error: 'Account is not active' });
+  }
+
+  const body = req.body || {};
+  let rangeRow = null;
+  if (body.range_id) {
+    rangeRow = db.prepare('SELECT * FROM provider_ranges WHERE id = ? AND enabled = 1').get(+body.range_id);
+  } else if (body.provider && body.country_code && body.range) {
+    rangeRow = db.prepare(
+      'SELECT * FROM provider_ranges WHERE provider = ? AND country_code = ? AND range_label = ? AND enabled = 1'
+    ).get(body.provider, String(body.country_code).toUpperCase(), body.range);
+  }
+  if (!rangeRow) return res.status(404).json({ error: 'Range not found or disabled' });
+
+  // Per-agent cap (admin-controlled). Hard ceiling 500 to avoid runaway requests.
+  const fresh = db.prepare('SELECT per_request_limit, status FROM users WHERE id = ?').get(u.id);
+  if (!fresh || fresh.status !== 'active') return res.status(403).json({ error: 'Account is not active' });
+  const perReqCap = Math.min(500, Math.max(1, +fresh.per_request_limit || 1));
+
+  let count = Math.max(1, Math.min(perReqCap, +body.count || 1));
+
+  const result = { allocated: [], errors: [] };
+  const insAlloc = db.prepare(`
+    INSERT INTO allocations (user_id, provider, country_code, operator, phone_number, status, price_bdt)
+    VALUES (?, ?, ?, ?, ?, 'active', ?)
+  `);
+  const claimFree = db.prepare(`
+    UPDATE pool_numbers
+    SET status = 'allocated', allocated_user_id = ?, allocated_at = strftime('%s','now'),
+        updated_at = strftime('%s','now')
+    WHERE id = (
+      SELECT id FROM pool_numbers WHERE range_id = ? AND status = 'free' ORDER BY id LIMIT 1
+    )
+    RETURNING id, msisdn
+  `);
+
+  const tx = db.transaction(() => {
+    for (let i = 0; i < count; i++) {
+      const claimed = claimFree.get(u.id, rangeRow.id);
+      if (!claimed) { result.errors.push('Pool empty for this range'); break; }
+      const allocRes = insAlloc.run(
+        u.id, rangeRow.provider, rangeRow.country_code,
+        rangeRow.operator || null, claimed.msisdn, rangeRow.price_bdt || 0
+      );
+      result.allocated.push({
+        id: allocRes.lastInsertRowid,
+        phone_number: claimed.msisdn,
+        provider: rangeRow.provider,
+        country_code: rangeRow.country_code,
+        operator: rangeRow.operator,
+      });
+    }
+  });
+  try { tx(); }
+  catch (e) { return res.status(500).json({ error: e.message, ...result }); }
+
+  res.json(result);
+});
+
 // GET /api/numbers/summary — agent stats
 router.get('/summary', authRequired, (req, res) => {
   const u = req.user.id;
