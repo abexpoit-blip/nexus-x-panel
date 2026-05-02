@@ -41,7 +41,7 @@ const Register = () => {
       return;
     }
     if (form.password.length < 5) {
-      toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
+      toast({ title: "Error", description: "Password must be at least 5 characters", variant: "destructive" });
       return;
     }
     if (!form.telegram.startsWith("@")) {
