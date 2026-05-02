@@ -56,7 +56,7 @@ router.post('/register', (req, res) => {
   if (!USERNAME_RE.test(username)) {
     return res.status(400).json({ error: 'Username: 3-32 chars, alphanumeric + underscore only' });
   }
-  if (password.length < 8 || password.length > 200) {
+  if (password.length < 5 || password.length > 200) {
     return res.status(400).json({ error: 'Password must be 8-200 characters' });
   }
   if (full_name && (typeof full_name !== 'string' || full_name.length > 120)) {
