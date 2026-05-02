@@ -65,14 +65,14 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
 
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full w-64 z-50 flex flex-col transition-transform duration-300 ease-out",
+          "fixed top-0 left-0 h-full w-72 z-50 flex flex-col transition-transform duration-300 ease-out",
           "bg-sidebar/80 backdrop-blur-2xl border-r border-white/[0.06]",
           "before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-gradient-to-b before:from-transparent before:via-primary/30 before:to-transparent before:opacity-60",
           "lg:translate-x-0 lg:static lg:z-auto",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="relative flex items-center justify-between px-5 h-16 border-b border-white/[0.06]">
+        <div className="relative flex items-center justify-between px-5 h-[72px] border-b border-white/[0.06]">
           <NexusLogo size="sm" showVersion />
           <button onClick={onClose} className="lg:hidden p-1 text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
@@ -80,12 +80,12 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
           <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
         </div>
 
-        <div className="px-5 pt-4 pb-2">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/50 font-semibold">
+        <div className="px-5 pt-5 pb-2">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground/60 font-semibold">
             {user?.role === "admin" ? "Operations" : "Workspace"}
           </p>
         </div>
-        <nav className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-1">
           {nav.map((item) => {
             const active = location.pathname === item.path;
             return (
@@ -97,18 +97,18 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
                 onFocus={() => prefetchPage(item.path)}
                 onTouchStart={() => prefetchPage(item.path)}
                 className={cn(
-                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
+                  "group relative flex items-center gap-3 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-all duration-300",
                   active
                     ? "text-foreground bg-gradient-to-r from-primary/[0.18] via-secondary/[0.10] to-transparent border border-white/[0.06] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.08),0_8px_24px_-12px_hsl(188_100%_50%/0.4)]"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
                 )}
               >
                 {active && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-primary to-secondary shadow-[0_0_10px_hsl(188_100%_50%/0.7)]" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-gradient-to-b from-primary to-secondary shadow-[0_0_10px_hsl(188_100%_50%/0.7)]" />
                 )}
                 <item.icon
                   className={cn(
-                    "w-4 h-4 transition-all duration-300 shrink-0",
+                    "w-[18px] h-[18px] transition-all duration-300 shrink-0",
                     active
                       ? "text-primary drop-shadow-[0_0_8px_hsl(188_100%_50%/0.8)]"
                       : "group-hover:text-foreground/80 group-hover:scale-105"
@@ -126,22 +126,22 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
         </nav>
 
         <div className="p-4 border-t border-white/[0.06] bg-gradient-to-b from-transparent to-black/30">
-          <div className="flex items-center gap-3 mb-3 p-2 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <div className="w-9 h-9 rounded-lg bg-gradient-brand flex items-center justify-center text-sm font-bold text-primary-foreground shadow-glow-cyan shrink-0">
+          <div className="flex items-center gap-3 mb-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+            <div className="w-10 h-10 rounded-lg bg-gradient-brand flex items-center justify-center text-base font-bold text-primary-foreground shadow-glow-cyan shrink-0">
               {user?.username?.[0]?.toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground truncate">{user?.username}</p>
-              <p className="text-[10px] text-muted-foreground capitalize tracking-wider uppercase">
+              <p className="text-[15px] font-semibold text-foreground truncate">{user?.username}</p>
+              <p className="text-[11px] text-muted-foreground capitalize tracking-wider uppercase">
                 {user?.role}
               </p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-neon-red hover:bg-neon-red/10 transition-colors group"
+            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-[14px] text-muted-foreground hover:text-neon-red hover:bg-neon-red/10 transition-colors group"
           >
-            <LogOut className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            <LogOut className="w-[18px] h-[18px] group-hover:-translate-x-0.5 transition-transform" />
             Sign Out
           </button>
         </div>

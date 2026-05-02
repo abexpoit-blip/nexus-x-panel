@@ -266,7 +266,7 @@ router.get('/numbers/v2/ranges', authRequired, (req, res) => {
     SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, hot,
            (SELECT COUNT(*) FROM pool_numbers p WHERE p.range_id = provider_ranges.id AND p.status = 'free') AS free_count
     FROM provider_ranges
-    WHERE enabled = 1 AND country_code = ?
+    WHERE enabled = 1 AND UPPER(TRIM(country_code)) = ?
     ORDER BY hot DESC, provider, range_label
   `).all(cc);
   res.json({ ranges: rows });
