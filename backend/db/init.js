@@ -42,6 +42,8 @@ addColIfMissing('withdrawals', 'reviewed_at', 'INTEGER');
 addColIfMissing('allocations', 'cli', 'TEXT');
 addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
+addColIfMissing('allocations', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
+addColIfMissing('cdr',         'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
 
 // ─────────────────────────────────────────────────────────────────────
 // Generic provider_ranges table — provider-agnostic, admin-managed ranges.
