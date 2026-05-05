@@ -217,7 +217,8 @@ seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocat
 
 // Default OTP-arrival sound profile (agents can override locally).
 // Options: 'chime' (default cyber) | 'fanfare' (Faaaah) | 'ding' | 'doublebeep' | 'pop'
-seedSetting('otp_sound_default', 'chime');
+// Premium single-sound mode — every agent gets the viral "Faaaah" horn.
+seedSetting('otp_sound_default', 'faaaah');
 
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
