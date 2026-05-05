@@ -120,7 +120,7 @@ async function run() {
   await call('GET', '/numbers/history', { expect: 200 });
   await call('GET', '/numbers/summary', { expect: 200 });
   await call('GET', '/numbers/v2/countries', { expect: 200 });
-  await call('GET', '/numbers/v2/ranges', { expect: 200 });
+  await call('GET', '/numbers/v2/ranges?country=BD', { expect: 200 });
   await call('POST', '/numbers/get', { body: {}, expect: [400, 404, 409, 422] });
 
   // --- Provider ranges (admin) ---
