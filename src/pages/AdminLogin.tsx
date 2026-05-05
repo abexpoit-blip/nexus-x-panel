@@ -56,7 +56,7 @@ const AdminLogin = () => {
         className="relative z-10 w-full max-w-md"
       >
         <div className="flex justify-center mb-8">
-          <NexusLogo size="md" />
+          <NexusLogo size="md" showVersion />
         </div>
 
         <div className="glass-luxe p-8 sm:p-10 relative">
