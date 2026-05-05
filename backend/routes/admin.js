@@ -490,4 +490,28 @@ router.get('/bots/:bot/logs', (req, res) => {
   });
 });
 
+
+// =============================================================
+// GET /api/admin/otp-audit — end-to-end OTP audit log.
+// Query: ?source=ims&outcome=mismatch&phone=...&limit=200&offset=0
+// =============================================================
+router.get('/otp-audit', (req, res) => {
+  const limit  = Math.min(500, Math.max(1, +req.query.limit  || 100));
+  const offset = Math.max(0, +req.query.offset || 0);
+  const where = []; const args = [];
+  if (req.query.source)  { where.push('source = ?');         args.push(String(req.query.source)); }
+  if (req.query.outcome) { where.push('outcome = ?');        args.push(String(req.query.outcome)); }
+  if (req.query.phone)   { where.push('phone_number LIKE ?'); args.push(`%${String(req.query.phone).replace(/\D/g,'')}%`); }
+  if (req.query.since)   { where.push('created_at >= ?');    args.push(+req.query.since); }
+  const sql = `SELECT * FROM otp_audit_log
+               ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+               ORDER BY id DESC LIMIT ? OFFSET ?`;
+  const rows = db.prepare(sql).all(...args, limit, offset);
+  const counts = db.prepare(`
+    SELECT outcome, COUNT(*) AS n FROM otp_audit_log
+    WHERE created_at >= strftime('%s','now') - 86400 GROUP BY outcome
+  `).all();
+  res.json({ rows, counts_24h: counts, limit, offset });
+});
+
 module.exports = router;
