@@ -123,6 +123,33 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_logs(created_at);
 
+-- =============================================================
+-- OTP audit log — one row per scraped OTP across every bot.
+-- Captures: source provider, source_msg_id (bot's dedup key), the
+-- raw SMS text, the matched allocation (or NULL + miss_reason),
+-- and the final write outcome (billed | duplicate | resend | mismatch | error).
+-- =============================================================
+CREATE TABLE IF NOT EXISTS otp_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL,                -- 'ims' | 'xisora' | 'seven1tel' | ...
+  source_msg_id TEXT,                  -- bot dedup key / portal row id
+  phone_number TEXT,
+  cli TEXT,
+  otp_code TEXT,
+  sms_text TEXT,
+  allocation_id INTEGER REFERENCES allocations(id) ON DELETE SET NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  outcome TEXT NOT NULL,               -- billed | duplicate | resend | mismatch | error
+  miss_reason TEXT,                    -- populated when outcome != billed
+  amount_bdt REAL,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_otp_audit_time ON otp_audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_otp_audit_source ON otp_audit_log(source, created_at);
+CREATE INDEX IF NOT EXISTS idx_otp_audit_outcome ON otp_audit_log(outcome, created_at);
+CREATE INDEX IF NOT EXISTS idx_otp_audit_phone ON otp_audit_log(phone_number);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_otp_audit_src_msg ON otp_audit_log(source, source_msg_id);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

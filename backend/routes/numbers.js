@@ -329,10 +329,23 @@ router.get('/summary', authRequired, (req, res) => {
 // Helper: when an OTP is confirmed, write CDR + credit agent.
 // Used by provider bots (seven1telBot, etc.).
 // =============================================================
-async function markOtpReceived(allocation, otpCode, cli = null) {
-  // Last positional arg is the raw SMS text (optional). We sniff arguments to
-  // stay backward-compatible with old call sites that didn't pass it.
-  const smsText = (arguments.length > 3 && typeof arguments[3] === 'string') ? arguments[3] : null;
+async function markOtpReceived(allocation, otpCode, cli = null, smsTextArg = null, auditCtx = null) {
+  // Backward-compat: older callers passed only (alloc, otp, cli) or
+  // (alloc, otp, cli, smsText). New callers pass an auditCtx as 5th arg:
+  //   { source: 'ims'|'xisora'|..., source_msg_id: 'dedup_key' }
+  const smsText = (typeof smsTextArg === 'string') ? smsTextArg : null;
+  const audit = (auditCtx && typeof auditCtx === 'object') ? auditCtx : {};
+  const { logOtpAudit } = require('../lib/otpAudit');
+  const auditBase = {
+    source: audit.source || 'unknown',
+    source_msg_id: audit.source_msg_id || null,
+    phone_number: allocation.phone_number,
+    cli: cli || null,
+    otp_code: otpCode,
+    sms_text: smsText,
+    allocation_id: allocation.id,
+    user_id: allocation.user_id,
+  };
   // Idempotency / re-confirm safety:
   //   • If allocation is already 'received' with the SAME otp → no-op (dedupe).
   //   • If it's 'received' with a DIFFERENT otp (site sent a 2nd code) → log it
@@ -341,13 +354,19 @@ async function markOtpReceived(allocation, otpCode, cli = null) {
     `SELECT id, status, otp FROM allocations WHERE id = ?`
   ).get(allocation.id);
   if (fresh && fresh.status === 'received') {
-    if (fresh.otp === otpCode) return; // exact duplicate → silently drop
+    if (fresh.otp === otpCode) {
+      logOtpAudit({ ...auditBase, outcome: 'duplicate',
+        miss_reason: 'identical OTP already recorded for allocation' });
+      return;
+    }
     db.prepare(`UPDATE allocations SET otp = ?, otp_received_at = strftime('%s','now') WHERE id = ?`)
       .run(otpCode, allocation.id);
     db.prepare(`
       INSERT INTO notifications (user_id, title, message, type)
       VALUES (?, 'Additional OTP', ?, 'info')
     `).run(allocation.user_id, `${allocation.phone_number} → ${otpCode} (resend / 2nd code)`);
+    logOtpAudit({ ...auditBase, outcome: 'resend',
+      miss_reason: '2nd OTP after allocation already billed (no re-bill)' });
     return;
   }
 
@@ -396,7 +415,14 @@ async function markOtpReceived(allocation, otpCode, cli = null) {
       VALUES (?, ?, ?, 'success')
     `).run(allocation.user_id, 'OTP received', notifMsg);
   });
-  tx();
+  try {
+    tx();
+    logOtpAudit({ ...auditBase, outcome: 'billed', amount_bdt: agent_amount });
+  } catch (e) {
+    logOtpAudit({ ...auditBase, outcome: 'error',
+      miss_reason: `tx failed: ${e.message}` });
+    throw e;
+  }
 }
 
 module.exports = router;

@@ -64,7 +64,7 @@ const AdminSettings = () => {
 
   const [rlPerMin, setRlPerMin] = useState<number>(12);
   const [rlConcurrent, setRlConcurrent] = useState<number>(5);
-  const [otpSound, setOtpSound] = useState<OtpSoundId>("chime");
+  const [otpSound, setOtpSound] = useState<OtpSoundId>("faaaah");
 
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
@@ -118,7 +118,8 @@ const AdminSettings = () => {
     setImsInterval(Number(str(s, "ims_otp_interval", "18")) || 18);
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
-    setOtpSound((str(s, "otp_sound_default", "chime") as OtpSoundId) || "chime");
+    // Sound is now a single premium "Faaaah" — legacy stored values collapse.
+    setOtpSound("faaaah");
   }, [s]);
 
   useEffect(() => {
