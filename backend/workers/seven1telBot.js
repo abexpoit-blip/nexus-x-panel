@@ -283,7 +283,7 @@ function findActiveAllocation(phone) {
   const cutoffExpired  = cutoffActive - GRACE_SEC;
   const cutoffReceived = cutoffActive - RESEND_SEC;
   return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, status, allocated_at
+    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
       AND (
