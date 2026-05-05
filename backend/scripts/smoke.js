@@ -66,7 +66,7 @@ async function call(method, p, { body, expect, useCookie = true } = {}) {
   return { status: res.status, body: json, raw: text };
 }
 
-async function waitReady(timeoutMs = 15000) {
+async function waitReady(timeoutMs = 30000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
