@@ -1,4 +1,4 @@
-import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer } from "lucide-react";
+import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer, Copy, CheckCircle2, History } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { GlassCard } from "@/components/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,8 @@ import { OtpLine, SuccessGauge } from "@/components/charts/Charts";
 import { AvgOtpWaitTime } from "@/components/AvgOtpWaitTime";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const AgentDashboard = () => {
   const { user } = useAuth();
@@ -40,6 +42,31 @@ const AgentDashboard = () => {
   }, [allNums, now]);
   const arrivedCount = activeWindow.filter((n: any) => n.otp).length;
   const waitingCount = activeWindow.length - arrivedCount;
+
+  // Delivered history (last 24h) — arrived OTPs only
+  const DAY_SEC = 24 * 60 * 60;
+  const delivered24h = useMemo(() => {
+    return allNums
+      .filter((n: any) => {
+        if (!n.otp) return false;
+        const ts = n.otp_received_at || n.allocated_at || 0;
+        return now - ts < DAY_SEC;
+      })
+      .sort((a: any, b: any) => (b.otp_received_at || b.allocated_at || 0) - (a.otp_received_at || a.allocated_at || 0));
+  }, [allNums, now]);
+
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const copyPair = async (item: any) => {
+    const text = item.otp ? `${item.phone_number}|${item.otp}` : item.phone_number;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(item.id);
+      toast.success(item.otp ? "Copied number|OTP" : "Copied number");
+      setTimeout(() => setCopiedId((id) => (id === item.id ? null : id)), 1500);
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
 
   // Build 7-day OTP delivery series from my numbers
   const otpSeries = useMemo(() => {
@@ -189,6 +216,72 @@ const AgentDashboard = () => {
                     <Timer className="w-3 h-3" />
                     {mm}:{ss}
                   </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => copyPair(item)}
+                    title={arrived ? "Copy number|OTP" : "Copy number"}
+                  >
+                    {copiedId === item.id ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-neon-green" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-6">
+        <h3 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
+          <History className="w-4 h-4 text-neon-green" /> Delivered OTPs — Last 24h
+          <Badge variant="outline" className="ml-auto border-neon-green/40 text-neon-green text-xs">
+            {delivered24h.length} delivered
+          </Badge>
+        </h3>
+        {!delivered24h.length && (
+          <p className="text-sm text-muted-foreground/60 text-center py-8">
+            No OTPs delivered in the last 24 hours
+          </p>
+        )}
+        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+          {delivered24h.map((item: any) => {
+            const ts = (item.otp_received_at || item.allocated_at) * 1000;
+            return (
+              <div
+                key={item.id}
+                className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04]"
+              >
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-4 h-4 text-neon-green" />
+                  <div>
+                    <p className="text-sm font-mono text-foreground">{item.phone_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.operator || "—"} · {new Date(ts).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge className="bg-neon-green/20 text-neon-green border border-neon-green/40 hover:bg-neon-green/20 font-mono">
+                    {item.otp}
+                  </Badge>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => copyPair(item)}
+                    title="Copy number|OTP"
+                  >
+                    {copiedId === item.id ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-neon-green" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
                 </div>
               </div>
             );
