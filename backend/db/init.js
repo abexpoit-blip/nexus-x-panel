@@ -44,6 +44,10 @@ addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
 addColIfMissing('cdr', 'sms_text', 'TEXT');
 
+// Per-agent rate-limit overrides (NULL = use global setting).
+addColIfMissing('users', 'rl_per_min',     'INTEGER');
+addColIfMissing('users', 'rl_concurrent',  'INTEGER');
+
 // ─────────────────────────────────────────────────────────────────────
 // Generic provider_ranges table — provider-agnostic, admin-managed ranges.
 // Agents only see ranges where enabled=1. OTP wiring per provider is added
