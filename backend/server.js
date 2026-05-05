@@ -83,6 +83,11 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// Health — MUST be registered BEFORE the security catch-all router (which
+// mounts `router.use(authRequired, adminOnly)` on `/api`). Otherwise unauth
+// callers (smoke tests, uptime probes) get 401 here.
+app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
@@ -98,9 +103,6 @@ app.use('/api', require('./routes/services'));            // /services + /admin/
 // `router.use(authRequired, adminOnly)` globally — any unmatched /api/* request
 // that falls into this router gets blocked with 403 before later routers can match.
 app.use('/api', require('./routes/security'));            // /audit + /sessions + /settings
-
-// Health
-app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
 
 // 404
 app.use('/api', (_, res) => res.status(404).json({ error: 'Not found' }));
