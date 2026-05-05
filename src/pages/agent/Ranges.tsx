@@ -975,8 +975,8 @@ const AgentRanges = () => {
 
                   {/* Country / operator */}
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {r.country_code && <span className="text-sm leading-none">{flagEmoji(r.country_code)}</span>}
-                    <span className="truncate">{r.country_code || "—"} · {r.operator || "—"}</span>
+                    {r.country_code && <span className="text-base leading-none">{flagEmoji(r.country_code)}</span>}
+                    <span className="truncate">{r.operator || "—"}</span>
                   </div>
 
                   {/* OTP + countdown */}
@@ -1082,10 +1082,9 @@ const AgentRanges = () => {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2 text-[12px]">
-                          {r.country_code && <span className="text-base leading-none">{flagEmoji(r.country_code)}</span>}
+                          {r.country_code && <span className="text-xl leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">{flagEmoji(r.country_code)}</span>}
                           <div className="min-w-0">
-                            <div className="text-foreground truncate">{r.country_code || "—"}</div>
-                            <div className="text-[10px] text-muted-foreground truncate">{r.operator || "—"}</div>
+                            <div className="text-foreground truncate">{r.operator || "—"}</div>
                           </div>
                         </div>
                       </td>
