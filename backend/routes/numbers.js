@@ -19,14 +19,17 @@ router.get('/my', authRequired, (req, res) => {
   const recentHours = getRecentOtpHours();
   const cutoff = Math.floor(Date.now() / 1000) - recentHours * 3600;
   const numbers = db.prepare(`
-    SELECT id, phone_number, operator, country_code, otp, status, allocated_at, otp_received_at
-    FROM allocations
-    WHERE user_id = ?
+    SELECT a.id, a.phone_number, a.operator, a.country_code, a.otp, a.status,
+           a.allocated_at, a.otp_received_at,
+           s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
+    FROM allocations a
+    LEFT JOIN services s ON s.id = a.service_id
+    WHERE a.user_id = ?
       AND (
-        status = 'active'
-        OR (status = 'received' AND otp_received_at >= ?)
+        a.status = 'active'
+        OR (a.status = 'received' AND a.otp_received_at >= ?)
       )
-    ORDER BY allocated_at DESC LIMIT 200
+    ORDER BY a.allocated_at DESC LIMIT 200
   `).all(req.user.id, cutoff);
   res.json({
     numbers,
