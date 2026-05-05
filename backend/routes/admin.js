@@ -451,4 +451,32 @@ router.post('/bots/:bot/health', async (req, res) => {
   }
 });
 
+// GET /api/admin/bots/:bot/logs?level=error|warn|miss|all&limit=80
+// Returns the failure-only event ring captured by the bot's Telemetry.
+// Used by Provider Ranges → "Logs" dialog so admins can see *why* an OTP
+// from a specific provider didn't reach an agent (e.g. "no active alloc",
+// scrape errors, login failures) without trawling pm2 logs.
+router.get('/bots/:bot/logs', (req, res) => {
+  const { bot } = req.params;
+  const bots = loadBots();
+  const mod = bots[bot];
+  if (!mod) return res.status(404).json({ error: `Unknown bot: ${bot}` });
+  const status = (typeof mod.getStatus === 'function' ? mod.getStatus() : {}) || {};
+  const all = Array.isArray(status.events) ? status.events : [];
+  const level = String(req.query.level || 'all').toLowerCase();
+  const limit = Math.min(200, Math.max(1, +req.query.limit || 80));
+  const filtered = (level === 'all' ? all : all.filter(e => e.level === level)).slice(0, limit);
+  res.json({
+    bot,
+    events: filtered,
+    counters: {
+      total_misses: status.total_misses || 0,
+      total_delivered: status.total_delivered || 0,
+      consec_fail: status.consec_fail || 0,
+      last_otp_at: status.last_otp_at || null,
+      last_login_at: status.last_login_at || null,
+    },
+  });
+});
+
 module.exports = router;
