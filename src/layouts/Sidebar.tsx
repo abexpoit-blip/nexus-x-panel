@@ -73,7 +73,7 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
         )}
       >
         <div className="relative flex items-center justify-between px-5 h-[72px] border-b border-white/[0.06]">
-          <NexusLogo size="sm" showVersion />
+          <NexusLogo size="md" showVersion />
           <button onClick={onClose} className="lg:hidden p-1 text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
