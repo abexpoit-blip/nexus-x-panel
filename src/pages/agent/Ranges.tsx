@@ -18,8 +18,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { GradientMesh } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer, MessageSquare, History } from "lucide-react";
 import { BrandIcon } from "@/components/BrandIcon";
+import { OtpThreadDrawer } from "@/components/OtpThreadDrawer";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,6 +65,36 @@ async function safeCopy(text: string): Promise<boolean> {
 const LS_COUNTRY = "nx.getnum.country";
 const LS_RANGE = "nx.getnum.rangeId";
 const LS_SERVICE = "nx.getnum.serviceId";
+const LS_RECENT = "nx.getnum.recent"; // last-used [{serviceId, country, rangeId, label, country_name, ts}]
+const RECENT_MAX = 5;
+
+type RecentChip = {
+  serviceId: number | null;
+  country: string;
+  rangeId: number;
+  label: string;
+  country_name: string;
+  ts: number;
+};
+
+function loadRecent(): RecentChip[] {
+  try { return JSON.parse(localStorage.getItem(LS_RECENT) || "[]"); } catch { return []; }
+}
+function pushRecent(chip: RecentChip) {
+  try {
+    const cur = loadRecent().filter(c => !(c.rangeId === chip.rangeId && c.serviceId === chip.serviceId));
+    cur.unshift(chip);
+    localStorage.setItem(LS_RECENT, JSON.stringify(cur.slice(0, RECENT_MAX)));
+  } catch { /* ignore */ }
+}
+
+// Heatmap dot color from free count (relative to range stock).
+function heatColor(free: number): string {
+  if (free <= 0) return "bg-destructive/70";
+  if (free < 5)  return "bg-neon-amber/80";
+  if (free < 20) return "bg-neon-cyan/80";
+  return "bg-neon-green/80";
+}
 
 const AgentRanges = () => {
   const qc = useQueryClient();
@@ -120,6 +151,10 @@ const AgentRanges = () => {
   const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "received" | "released" | "expired">("all");
   const [searchQ, setSearchQ] = useState("");
+  // OTP thread drawer state
+  const [threadAllocId, setThreadAllocId] = useState<number | null>(null);
+  // last-used chips (re-read on mount + after each successful allocation)
+  const [recentChips, setRecentChips] = useState<RecentChip[]>(() => loadRecent());
 
   useEffect(() => {
     try {
@@ -182,6 +217,18 @@ const AgentRanges = () => {
       const r = await api.getNumber({ range_id: selectedRange.id, count });
       if (r.allocated?.length) {
         bumpDaily(r.allocated.length);
+        // Remember this country+range for one-click reuse next time.
+        if (selectedCountry && selectedRange) {
+          pushRecent({
+            serviceId: serviceId || null,
+            country: selectedCountry.country_code,
+            rangeId: selectedRange.id,
+            label: selectedRange.range_label,
+            country_name: selectedCountry.country_name || selectedCountry.country_code,
+            ts: Math.floor(Date.now() / 1000),
+          });
+          setRecentChips(loadRecent());
+        }
         // Mark these as fresh (yellow flash) for ~30s
         const ids = new Set<number>((r.allocated as any[]).map(a => a.id).filter(Boolean));
         if (ids.size) {
@@ -403,6 +450,36 @@ const AgentRanges = () => {
         </GlassCard>
       ) : (
         <GlassCard className="!p-5 md:!p-6">
+        {/* Last-used quick-pick chips — 1-click reload of recent country+range */}
+        {recentChips.filter(c => !serviceId || c.serviceId === serviceId).length > 0 && (
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+              <History className="w-3 h-3" /> Recent
+            </span>
+            {recentChips
+              .filter(c => !serviceId || c.serviceId === serviceId)
+              .slice(0, RECENT_MAX)
+              .map(c => {
+                const isActive = country === c.country && rangeId === c.rangeId;
+                return (
+                  <button
+                    key={`${c.serviceId}-${c.rangeId}`}
+                    onClick={() => { setCountry(c.country); setRangeId(c.rangeId); }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all inline-flex items-center gap-1.5",
+                      isActive
+                        ? "bg-primary/15 border-primary/40 text-primary"
+                        : "bg-white/[0.04] border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/20"
+                    )}
+                    title={`${c.country_name} · ${c.label}`}
+                  >
+                    <span className="text-sm leading-none">{flagEmoji(c.country)}</span>
+                    <span className="font-mono">{c.label}</span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* ── Country selector box ── */}
           <div className="md:col-span-4">
@@ -581,7 +658,7 @@ const AgentRanges = () => {
                           rangeId === r.id && "bg-primary/10"
                         )}
                       >
-                        <Hash className="w-4 h-4 text-neon-cyan shrink-0" />
+                        <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", heatColor(rFree))} title={`${rFree} free`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="text-sm font-medium text-foreground truncate">{r.range_label}</div>
@@ -645,6 +722,15 @@ const AgentRanges = () => {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Layers className="w-4 h-4 text-neon-cyan" />
             <span className="uppercase tracking-wider font-semibold text-foreground/80">Quantity</span>
+            {selectedRange && qty > 0 && (
+              <span className="ml-2 text-[11px] text-muted-foreground">
+                Max charge:{" "}
+                <span className="font-mono font-bold text-neon-green">
+                  ৳{(Number(selectedRange.price_bdt) * qty).toFixed(2)}
+                </span>
+                <span className="text-muted-foreground/60"> · only billed if OTP arrives</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             {baseOptions.map(n => {
@@ -717,6 +803,42 @@ const AgentRanges = () => {
 
       {/* ── Inline allocated numbers + OTPs panel (full page) ── */}
       <GlassCard className="!p-0 overflow-hidden">
+        {/* Sticky live-active bar — visible when ≥1 number is still ticking */}
+        {(() => {
+          const liveRows = allRows.filter(r => r.status === "active");
+          if (!liveRows.length) return null;
+          return (
+            <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-white/[0.06] bg-background/95 backdrop-blur-md overflow-x-auto">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-neon-amber shrink-0 flex items-center gap-1">
+                <Timer className="w-3 h-3" /> Live
+              </span>
+              {liveRows.slice(0, 8).map(r => {
+                const remaining = Math.max(0, WINDOW_SEC - (now - (r.allocated_at as number)));
+                const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+                const ss = String(remaining % 60).padStart(2, "0");
+                const low = remaining < 5 * 60;
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => copyOne(r.phone_number, r.id)}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-[11px] font-mono transition-colors",
+                      low ? "border-destructive/40 bg-destructive/10 text-destructive"
+                          : "border-neon-amber/30 bg-neon-amber/10 text-neon-amber hover:bg-neon-amber/20"
+                    )}
+                    title={`Copy ${r.phone_number}`}
+                  >
+                    <span className="font-semibold">{r.phone_number.slice(-6)}</span>
+                    <span className="opacity-80">{mm}:{ss}</span>
+                  </button>
+                );
+              })}
+              {liveRows.length > 8 && (
+                <span className="shrink-0 text-[11px] text-muted-foreground font-mono">+{liveRows.length - 8}</span>
+              )}
+            </div>
+          );
+        })()}
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
           <div className="flex items-center gap-2">
@@ -905,16 +1027,25 @@ const AgentRanges = () => {
                         })()}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        {r.status === "active" && (
+                        <div className="inline-flex items-center gap-3 justify-end">
                           <button
-                            onClick={() => release.mutate(r.id)}
-                            disabled={release.isPending}
-                            className="text-[11px] text-destructive hover:underline inline-flex items-center gap-1"
-                            title="Release this number"
+                            onClick={() => setThreadAllocId(r.id)}
+                            className="text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                            title="View full SMS thread"
                           >
-                            <X className="w-3 h-3" /> Release
+                            <MessageSquare className="w-3 h-3" /> Thread
                           </button>
-                        )}
+                          {r.status === "active" && (
+                            <button
+                              onClick={() => release.mutate(r.id)}
+                              disabled={release.isPending}
+                              className="text-[11px] text-destructive hover:underline inline-flex items-center gap-1"
+                              title="Release this number"
+                            >
+                              <X className="w-3 h-3" /> Release
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -953,6 +1084,7 @@ const AgentRanges = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <OtpThreadDrawer allocationId={threadAllocId} onClose={() => setThreadAllocId(null)} />
     </>
   );
 };

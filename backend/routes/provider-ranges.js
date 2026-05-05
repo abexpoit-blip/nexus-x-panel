@@ -4,6 +4,8 @@ const express = require('express');
 const db = require('../lib/db');
 const { authRequired, adminOnly } = require('../middleware/auth');
 const { logFromReq } = require('../lib/audit');
+const rangeHealth = require('../workers/rangeHealth');
+const db_settings = require('../lib/db');
 
 const router = express.Router();
 
@@ -258,6 +260,32 @@ router.get('/admin/provider-ranges-stats', authRequired, adminOnly, (req, res) =
   const byId = {};
   for (const r of rows) byId[r.range_id] = r;
   res.json({ stats: byId });
+});
+
+// GET /admin/provider-ranges/health — score per range over last N min
+router.get('/admin/provider-ranges/health', authRequired, adminOnly, (req, res) => {
+  const c = rangeHealth.cfg();
+  const windowMin = +req.query.window_min || c.windowMin;
+  const stats = rangeHealth.computeAll(windowMin);
+  res.json({ stats, config: c, window_min: windowMin });
+});
+
+// GET/PUT /admin/range-autopause — settings for the auto-pause worker
+router.get('/admin/range-autopause', authRequired, adminOnly, (req, res) => {
+  res.json({ config: rangeHealth.cfg() });
+});
+router.put('/admin/range-autopause', authRequired, adminOnly, (req, res) => {
+  const { enabled, threshold, min_samples, window_min } = req.body || {};
+  const stmt = db_settings.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+  `);
+  if (enabled !== undefined)     stmt.run('range_autopause_enabled', enabled ? 'true' : 'false');
+  if (threshold !== undefined)   stmt.run('range_autopause_threshold', String(Math.max(0, Math.min(100, +threshold))));
+  if (min_samples !== undefined) stmt.run('range_autopause_min_samples', String(Math.max(3, +min_samples)));
+  if (window_min !== undefined)  stmt.run('range_health_window_min', String(Math.max(15, Math.min(720, +window_min))));
+  logFromReq(req, 'range_autopause_settings', { meta: req.body });
+  res.json({ ok: true, config: rangeHealth.cfg() });
 });
 
 // ============ AGENT ============
