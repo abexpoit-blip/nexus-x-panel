@@ -296,6 +296,7 @@ async function tickOnce() {
     const alloc = findActiveAllocation(r.phone);
     if (!alloc) {
       dlog('no active alloc for', r.phone, '→ skip');
+      tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);
       continue;
     }
     try {

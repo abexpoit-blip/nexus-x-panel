@@ -395,6 +395,18 @@ export const api = {
           `/admin/bots/${bot}/health`,
           { method: "POST" }
         ),
+      logs: (bot: string, level: "all" | "error" | "warn" | "miss" = "all", limit = 80) =>
+        request<{
+          bot: string;
+          events: Array<{ at: number; level: string; type: string; message: string; phone?: string }>;
+          counters: {
+            total_misses: number;
+            total_delivered: number;
+            consec_fail: number;
+            last_otp_at: number | null;
+            last_login_at: number | null;
+          };
+        }>(`/admin/bots/${bot}/logs?level=${level}&limit=${limit}`),
     },
   },
 
