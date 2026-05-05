@@ -513,6 +513,76 @@ const AdminProviderRanges = () => {
           qc.invalidateQueries({ queryKey: ["provider-ranges-stats"] });
         }}
       />
+
+      {/* Provider failure-logs viewer — surfaces "OTP arrived but no agent had this number",
+          scrape errors, and login failures from the live bot Telemetry ring. Auto-refreshes 5s. */}
+      <Dialog open={!!logsProvider} onOpenChange={(o) => { if (!o) setLogsProvider(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-neon-cyan" />
+              {logsProvider?.toUpperCase()} bot — failure logs
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-white/[0.06]">
+            {(["all", "error", "miss"] as const).map(lvl => (
+              <Button key={lvl} size="sm"
+                variant={logsLevel === lvl ? "default" : "outline"}
+                onClick={() => setLogsLevel(lvl)}
+                className={cn("h-7 text-xs capitalize",
+                  logsLevel === lvl && "bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0"
+                )}>
+                {lvl === "miss" ? "No-alloc misses" : lvl}
+              </Button>
+            ))}
+            <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+              <span>Delivered: <span className="text-neon-green font-mono">{logsData?.counters.total_delivered ?? 0}</span></span>
+              <span>Missed: <span className="text-neon-amber font-mono">{logsData?.counters.total_misses ?? 0}</span></span>
+              <span>Fails: <span className="text-destructive font-mono">{logsData?.counters.consec_fail ?? 0}</span></span>
+              <Button size="sm" variant="ghost" onClick={() => refetchLogs()} className="h-7 w-7 p-0" title="Refresh">
+                <RotateCw className={cn("w-3.5 h-3.5", logsFetching && "animate-spin")} />
+              </Button>
+            </div>
+          </div>
+
+          <div className="max-h-[55vh] overflow-y-auto -mx-6 px-6 py-2 space-y-1.5">
+            {!logsData ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" /> Loading logs…
+              </div>
+            ) : logsData.events.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8 text-sm">
+                No failures captured. The bot is healthy 🎉
+              </div>
+            ) : logsData.events.map((e, i) => (
+              <div key={i} className={cn(
+                "flex items-start gap-2 text-xs px-2 py-1.5 rounded border",
+                e.level === "error" && "border-destructive/30 bg-destructive/5",
+                e.level === "miss"  && "border-neon-amber/30 bg-neon-amber/5",
+                e.level === "warn"  && "border-white/10 bg-white/[0.02]",
+              )}>
+                <AlertTriangle className={cn("w-3.5 h-3.5 mt-0.5 shrink-0",
+                  e.level === "error" ? "text-destructive" :
+                  e.level === "miss"  ? "text-neon-amber" : "text-muted-foreground"
+                )} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {new Date(e.at * 1000).toLocaleTimeString()}
+                    </span>
+                    <span className="font-mono text-[10px] px-1.5 rounded bg-white/[0.05] text-foreground/80">
+                      {e.type}
+                    </span>
+                    {e.phone && <span className="font-mono text-[10px] text-neon-cyan">{e.phone}</span>}
+                  </div>
+                  <p className="font-mono text-xs text-foreground/90 break-all mt-0.5">{e.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
