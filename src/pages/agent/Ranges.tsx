@@ -62,6 +62,7 @@ async function safeCopy(text: string): Promise<boolean> {
 
 const LS_COUNTRY = "nx.getnum.country";
 const LS_RANGE = "nx.getnum.rangeId";
+const LS_SERVICE = "nx.getnum.serviceId";
 
 const AgentRanges = () => {
   const qc = useQueryClient();
@@ -75,6 +76,27 @@ const AgentRanges = () => {
       return v ? Number(v) : null;
     } catch { return null; }
   });
+  const [serviceId, setServiceId] = useState<number | null>(() => {
+    try { const v = localStorage.getItem(LS_SERVICE); return v ? Number(v) : null; } catch { return null; }
+  });
+  useEffect(() => {
+    try {
+      if (serviceId) localStorage.setItem(LS_SERVICE, String(serviceId));
+      else localStorage.removeItem(LS_SERVICE);
+    } catch { /* ignore */ }
+  }, [serviceId]);
+
+  const { data: servicesData } = useQuery({
+    queryKey: ["agent-services"],
+    queryFn: () => api.services(),
+    refetchInterval: 120_000,
+  });
+  const services = servicesData?.services || [];
+
+  // Auto-select first service on load when none chosen
+  useEffect(() => {
+    if (!serviceId && services.length) setServiceId(services[0].id);
+  }, [services, serviceId]);
   const [countryOpen, setCountryOpen] = useState(false);
   const [rangeOpen, setRangeOpen] = useState(false);
   const [countryQ, setCountryQ] = useState("");
@@ -112,15 +134,16 @@ const AgentRanges = () => {
   }, [rangeId]);
 
   const { data: countriesData, isLoading: loadingCountries } = useQuery({
-    queryKey: ["agent-v2-countries"],
-    queryFn: () => api.v2Countries(),
+    queryKey: ["agent-v2-countries", serviceId],
+    queryFn: () => api.v2Countries(serviceId || undefined),
+    enabled: !!serviceId,
     refetchInterval: 60_000,
   });
 
   const { data: rangesData, isLoading: loadingRanges, error: rangesError } = useQuery({
-    queryKey: ["agent-v2-ranges", country],
-    queryFn: () => api.v2Ranges(country!),
-    enabled: !!country,
+    queryKey: ["agent-v2-ranges", country, serviceId],
+    queryFn: () => api.v2Ranges(country!, serviceId || undefined),
+    enabled: !!country && !!serviceId,
     refetchInterval: 30_000,
   });
 
