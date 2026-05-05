@@ -7,7 +7,7 @@ const { getPaymentConfig, savePaymentConfig, ALL_METHODS } = require('../lib/set
 const router = express.Router();
 
 // GET /api/payments — admin sees all
-router.get('/', authRequired, adminOnly, (req, res) => {
+router.get('/payments', authRequired, adminOnly, (req, res) => {
   const payments = db.prepare(`
     SELECT p.*, u.username FROM payments p
     LEFT JOIN users u ON u.id = p.user_id
@@ -17,7 +17,7 @@ router.get('/', authRequired, adminOnly, (req, res) => {
 });
 
 // GET /api/payments/mine
-router.get('/mine', authRequired, (req, res) => {
+router.get('/payments/mine', authRequired, (req, res) => {
   const payments = db.prepare(
     'SELECT * FROM payments WHERE user_id = ? ORDER BY created_at DESC LIMIT 200'
   ).all(req.user.id);
@@ -25,7 +25,7 @@ router.get('/mine', authRequired, (req, res) => {
 });
 
 // POST /api/payments/topup — admin adds balance to agent
-router.post('/topup', authRequired, adminOnly, (req, res) => {
+router.post('/payments/topup', authRequired, adminOnly, (req, res) => {
   const { user_id, amount_bdt, method = 'admin', reference, note } = req.body || {};
   const amt = +amount_bdt;
   if (!user_id || !amt || amt <= 0) return res.status(400).json({ error: 'user_id and positive amount_bdt required' });
