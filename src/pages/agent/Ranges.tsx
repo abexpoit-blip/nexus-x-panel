@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GradientMesh } from "@/components/premium";
 import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer } from "lucide-react";
+import { BrandIcon } from "@/components/BrandIcon";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -378,7 +379,7 @@ const AgentRanges = () => {
                   boxShadow: `0 4px 20px -8px ${s.color}80`,
                 } : undefined}
               >
-                <span className="text-lg leading-none">{s.icon}</span>
+                <BrandIcon slug={s.slug} fallback={s.icon} size={18} color={s.color} />
                 <span>{s.name}</span>
                 {(s.free_count ?? 0) > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold"

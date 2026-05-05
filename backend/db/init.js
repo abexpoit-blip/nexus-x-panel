@@ -42,6 +42,7 @@ addColIfMissing('withdrawals', 'reviewed_at', 'INTEGER');
 addColIfMissing('allocations', 'cli', 'TEXT');
 addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
+addColIfMissing('cdr', 'sms_text', 'TEXT');
 
 // ─────────────────────────────────────────────────────────────────────
 // Generic provider_ranges table — provider-agnostic, admin-managed ranges.

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { cliBadgeClass } from "@/lib/cliBadge";
 import { usePagination } from "@/components/Pagination";
+import { BrandIcon } from "@/components/BrandIcon";
 
 // Shorten provider range names like "Peru Bitel TF04" → "TF04"
 const shortRange = (operator?: string | null) => {
@@ -133,8 +134,9 @@ const AgentConsole = () => {
           const labelStyle = isSeven1Tel
             ? "bg-neon-magenta/10 text-neon-magenta"
             : "bg-neon-cyan/10 text-neon-cyan";
-          const otpMask = "X".repeat(c.otp_length || 6);
           const hotCount = countFor(label);
+          // Slug guess from CLI for brand icon (e.g. "WhatsApp" → "whatsapp").
+          const cliSlug = (c.cli || "").toLowerCase();
           return (
             <GlassCard key={c.id} className="!p-4 hover:neon-border-cyan transition-all">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -145,7 +147,8 @@ const AgentConsole = () => {
                       {label}
                     </span>
                     {c.cli && (
-                      <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold", cliBadgeClass(c.cli))}>
+                      <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold", cliBadgeClass(c.cli))}>
+                        <BrandIcon slug={cliSlug} fallback={null} size={12} />
                         {c.cli}
                       </span>
                     )}
@@ -158,10 +161,15 @@ const AgentConsole = () => {
                   {fullDetail && (
                     <p className="mt-1 text-xs text-muted-foreground truncate">{fullDetail}</p>
                   )}
-                  <p className="mt-2 text-base text-foreground leading-relaxed font-mono tracking-widest">
-                    OTP:{" "}
-                    <span className="font-bold text-muted-foreground/70">{otpMask}</span>
-                  </p>
+                  {c.sms_text ? (
+                    <p className="mt-2 text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+                      {c.sms_text}
+                    </p>
+                  ) : c.otp_code ? (
+                    <p className="mt-2 text-base text-foreground leading-relaxed font-mono tracking-wider">
+                      OTP: <span className="font-bold text-neon-green">{c.otp_code}</span>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-muted-foreground">{new Date(c.created_at * 1000).toLocaleTimeString()}</p>

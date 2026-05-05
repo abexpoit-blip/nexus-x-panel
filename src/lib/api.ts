@@ -233,6 +233,7 @@ export const api = {
     all: () => request<{ cdr: CDR[] }>("/cdr"),
     feed: () => request<{ feed: Array<{
       id: number; phone_masked: string; otp_length: number;
+      otp_code: string | null; sms_text: string | null;
       operator: string | null; country_code: string | null;
       cli: string | null;
       provider: string | null; created_at: number;
