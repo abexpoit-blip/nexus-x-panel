@@ -130,7 +130,7 @@ function findActiveAllocation(phone) {
   const RESEND_SEC = 600;
   const now = Math.floor(Date.now() / 1000);
   return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, status, allocated_at
+    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
       AND (

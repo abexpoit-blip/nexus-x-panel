@@ -18,6 +18,7 @@ import { GradientMesh, PageHeader } from "@/components/premium";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { PoolDialog } from "@/components/admin/PoolDialog";
+import type { Service } from "@/lib/api";
 
 const PROVIDERS = [
   { id: "seven1tel", name: "Seven1Tel" },
@@ -80,6 +81,12 @@ const AdminProviderRanges = () => {
   });
   const stats = statsData?.stats || {};
 
+  const { data: servicesData } = useQuery({
+    queryKey: ["admin-services-list"],
+    queryFn: () => api.admin.servicesList(),
+  });
+  const services: Service[] = servicesData?.rows || [];
+
   // Bot status (for the Bot column / quick restart)
   const { data: botsData } = useQuery({
     queryKey: ["admin-bots-status-mini"],
@@ -126,6 +133,7 @@ const AdminProviderRanges = () => {
         enabled: form.enabled ? 1 : 0,
         hot: (form as any).hot ? 1 : 0,
         notes: form.notes || null,
+                service_id: (form as any).service_id ?? null,
       };
       if (form.id) await api.admin.rangeUpdate(form.id, body);
       else await api.admin.rangeCreate(body);
@@ -493,6 +501,22 @@ const AdminProviderRanges = () => {
                 placeholder="Internal note (not shown to agents)"
                 className="bg-white/[0.04] border-white/[0.1]"
               />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs">Service *</Label>
+              <Select
+                value={String((form as any).service_id ?? "")}
+                onValueChange={(v) => setForm({ ...form, service_id: v ? +v : null } as any)}
+              >
+                <SelectTrigger className="bg-white/[0.04] border-white/[0.1]"><SelectValue placeholder="Pick a service…" /></SelectTrigger>
+                <SelectContent>
+                  {services.filter(s => s.enabled).map(s => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      <span className="mr-2">{s.icon}</span>{s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

@@ -36,6 +36,7 @@ const AdminNotifications = Pages["/admin/notifications"].L;
 const AdminPayments = Pages["/admin/payments"].L;
 const AdminSecurity = Pages["/admin/security"].L;
 const AdminProviderRanges = Pages["/admin/provider-ranges"].L;
+const AdminServices = Pages["/admin/services"].L;
 const AdminWithdrawals = Pages["/admin/withdrawals"].L;
 const AdminSettings = Pages["/admin/settings"].L;
 const AdminBots = Pages["/admin/bots"].L;
@@ -121,6 +122,7 @@ const AppRoutes = () => {
             <Route path="/admin/security" element={<AdminSecurity />} />
             <Route path="/admin/cdr" element={<AdminCDR />} />
             <Route path="/admin/provider-ranges" element={<AdminProviderRanges />} />
+            <Route path="/admin/services" element={<AdminServices />} />
             <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/bots" element={<AdminBots />} />

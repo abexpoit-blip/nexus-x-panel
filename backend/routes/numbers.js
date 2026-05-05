@@ -19,14 +19,17 @@ router.get('/my', authRequired, (req, res) => {
   const recentHours = getRecentOtpHours();
   const cutoff = Math.floor(Date.now() / 1000) - recentHours * 3600;
   const numbers = db.prepare(`
-    SELECT id, phone_number, operator, country_code, otp, status, allocated_at, otp_received_at
-    FROM allocations
-    WHERE user_id = ?
+    SELECT a.id, a.phone_number, a.operator, a.country_code, a.otp, a.status,
+           a.allocated_at, a.otp_received_at,
+           s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
+    FROM allocations a
+    LEFT JOIN services s ON s.id = a.service_id
+    WHERE a.user_id = ?
       AND (
-        status = 'active'
-        OR (status = 'received' AND otp_received_at >= ?)
+        a.status = 'active'
+        OR (a.status = 'received' AND a.otp_received_at >= ?)
       )
-    ORDER BY allocated_at DESC LIMIT 200
+    ORDER BY a.allocated_at DESC LIMIT 200
   `).all(req.user.id, cutoff);
   res.json({
     numbers,
@@ -108,12 +111,15 @@ router.get('/history', authRequired, (req, res) => {
   }
 
   const total = db.prepare(`SELECT COUNT(*) c FROM cdr WHERE ${whereSql}`).get(...params).c;
+  // Note: `where` uses unprefixed cols; works fine with table alias because
+  // SQLite resolves unambiguous column names against the FROM table.
   const rows = db.prepare(`
-    SELECT id, allocation_id, country_code, operator, phone_number, otp_code, cli, status,
-           price_bdt, created_at
-    FROM cdr
+    SELECT cdr.id, cdr.allocation_id, cdr.country_code, cdr.operator, cdr.phone_number,
+           cdr.otp_code, cdr.cli, cdr.status, cdr.price_bdt, cdr.created_at,
+           s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
+    FROM cdr LEFT JOIN services s ON s.id = cdr.service_id
     WHERE ${whereSql}
-    ORDER BY created_at DESC
+    ORDER BY cdr.created_at DESC
     LIMIT ? OFFSET ?
   `).all(...params, pageSize, (page - 1) * pageSize);
 
@@ -188,8 +194,8 @@ router.post('/get', authRequired, (req, res) => {
 
   const result = { allocated: [], errors: [] };
   const insAlloc = db.prepare(`
-    INSERT INTO allocations (user_id, provider, country_code, operator, phone_number, status, price_bdt)
-    VALUES (?, ?, ?, ?, ?, 'active', ?)
+    INSERT INTO allocations (user_id, provider, country_code, operator, phone_number, status, price_bdt, service_id)
+    VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
   `);
   const claimFree = db.prepare(`
     UPDATE pool_numbers
@@ -207,7 +213,8 @@ router.post('/get', authRequired, (req, res) => {
       if (!claimed) { result.errors.push('Pool empty for this range'); break; }
       const allocRes = insAlloc.run(
         u.id, rangeRow.provider, rangeRow.country_code,
-        rangeRow.operator || null, claimed.msisdn, rangeRow.price_bdt || 0
+        rangeRow.operator || null, claimed.msisdn, rangeRow.price_bdt || 0,
+        rangeRow.service_id || null
       );
       result.allocated.push({
         id: allocRes.lastInsertRowid,
@@ -306,12 +313,12 @@ async function markOtpReceived(allocation, otpCode, cli = null) {
     `).run(otpCode, cli || null, allocation.id);
 
     db.prepare(`
-      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator, phone_number, otp_code, cli, price_bdt, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed')
+      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator, phone_number, otp_code, cli, price_bdt, status, service_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed', ?)
     `).run(
       allocation.user_id, allocation.id, allocation.provider,
       allocation.country_code, allocation.operator, allocation.phone_number,
-      otpCode, cli || null, agent_amount
+      otpCode, cli || null, agent_amount, allocation.service_id || null
     );
 
     if (agent_amount > 0) {

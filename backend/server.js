@@ -93,6 +93,7 @@ app.use('/api', require('./routes/payments'));            // /payments + /withdr
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api', require('./routes/provider-ranges'));     // /admin/provider-ranges + /numbers/v2/*
+app.use('/api', require('./routes/services'));            // /services + /admin/services
 // IMPORTANT: security must be mounted LAST among '/api' catchalls because it uses
 // `router.use(authRequired, adminOnly)` globally — any unmatched /api/* request
 // that falls into this router gets blocked with 403 before later routers can match.

@@ -95,6 +95,25 @@ export type ProviderRange = {
   notes?: string | null;
   created_at?: number;
   updated_at?: number;
+  service_id?: number | null;
+  service_slug?: string | null;
+  service_name?: string | null;
+  service_icon?: string | null;
+  service_color?: string | null;
+};
+
+export type Service = {
+  id: number;
+  slug: string;
+  name: string;
+  icon: string;
+  color: string;
+  enabled: 0 | 1;
+  sort_order: number;
+  range_count?: number;
+  free_count?: number;
+  created_at?: number;
+  updated_at?: number;
 };
 
 export const api = {
@@ -351,6 +370,15 @@ export const api = {
         method: "POST", body: JSON.stringify({ ids, enabled }),
       }),
 
+    // ─── Services (admin CRUD) ───────────────────────────────────
+    servicesList: () => request<{ rows: Service[] }>("/admin/services"),
+    serviceCreate: (body: Partial<Service>) =>
+      request<{ id: number }>("/admin/services", { method: "POST", body: JSON.stringify(body) }),
+    serviceUpdate: (id: number, body: Partial<Service>) =>
+      request<{ ok: boolean }>(`/admin/services/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    serviceDelete: (id: number, force = false) =>
+      request<{ ok: boolean }>(`/admin/services/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
+
     // ─── Range pool numbers (manual MSISDN stock) ────────────────
     rangesStats: () =>
       request<{ stats: Record<string, {
@@ -411,9 +439,17 @@ export const api = {
   },
 
   // ===== Agent v2 ranges =====
-  v2Countries: () => request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>("/numbers/v2/countries"),
-  v2Ranges: (countryCode: string) =>
-    request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges?country=${encodeURIComponent(countryCode)}`),
+  v2Countries: (serviceId?: number) => {
+    const qs = serviceId ? `?service_id=${serviceId}` : "";
+    return request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>(`/numbers/v2/countries${qs}`);
+  },
+  v2Ranges: (countryCode: string, serviceId?: number) => {
+    const qs = `?country=${encodeURIComponent(countryCode)}${serviceId ? `&service_id=${serviceId}` : ""}`;
+    return request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges${qs}`);
+  },
+
+  // ===== Services (catalog) =====
+  services: () => request<{ services: Service[] }>("/services"),
 
   // ===== Fake OTP Broadcaster (admin realism layer) =====
   fakeOtp: {

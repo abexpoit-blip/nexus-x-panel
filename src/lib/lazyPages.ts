@@ -30,6 +30,7 @@ export const Pages = {
   "/admin/security":          make(() => import("@/pages/admin/Security")),
   "/admin/cdr":               make(() => import("@/pages/admin/CDR")),
   "/admin/provider-ranges":   make(() => import("@/pages/admin/ProviderRanges")),
+  "/admin/services":          make(() => import("@/pages/admin/Services")),
   "/admin/notifications":     make(() => import("@/pages/admin/Notifications")),
   "/admin/settings":          make(() => import("@/pages/admin/Settings")),
   "/admin/bots":              make(() => import("@/pages/admin/Bots")),
