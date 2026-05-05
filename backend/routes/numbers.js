@@ -111,12 +111,15 @@ router.get('/history', authRequired, (req, res) => {
   }
 
   const total = db.prepare(`SELECT COUNT(*) c FROM cdr WHERE ${whereSql}`).get(...params).c;
+  // Note: `where` uses unprefixed cols; works fine with table alias because
+  // SQLite resolves unambiguous column names against the FROM table.
   const rows = db.prepare(`
-    SELECT id, allocation_id, country_code, operator, phone_number, otp_code, cli, status,
-           price_bdt, created_at
-    FROM cdr
+    SELECT cdr.id, cdr.allocation_id, cdr.country_code, cdr.operator, cdr.phone_number,
+           cdr.otp_code, cdr.cli, cdr.status, cdr.price_bdt, cdr.created_at,
+           s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
+    FROM cdr LEFT JOIN services s ON s.id = cdr.service_id
     WHERE ${whereSql}
-    ORDER BY created_at DESC
+    ORDER BY cdr.created_at DESC
     LIMIT ? OFFSET ?
   `).all(...params, pageSize, (page - 1) * pageSize);
 
