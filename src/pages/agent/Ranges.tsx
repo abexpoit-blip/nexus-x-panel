@@ -803,6 +803,42 @@ const AgentRanges = () => {
 
       {/* ── Inline allocated numbers + OTPs panel (full page) ── */}
       <GlassCard className="!p-0 overflow-hidden">
+        {/* Sticky live-active bar — visible when ≥1 number is still ticking */}
+        {(() => {
+          const liveRows = allRows.filter(r => r.status === "active");
+          if (!liveRows.length) return null;
+          return (
+            <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-white/[0.06] bg-background/95 backdrop-blur-md overflow-x-auto">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-neon-amber shrink-0 flex items-center gap-1">
+                <Timer className="w-3 h-3" /> Live
+              </span>
+              {liveRows.slice(0, 8).map(r => {
+                const remaining = Math.max(0, WINDOW_SEC - (now - (r.allocated_at as number)));
+                const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+                const ss = String(remaining % 60).padStart(2, "0");
+                const low = remaining < 5 * 60;
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => copyOne(r.phone_number, r.id)}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-[11px] font-mono transition-colors",
+                      low ? "border-destructive/40 bg-destructive/10 text-destructive"
+                          : "border-neon-amber/30 bg-neon-amber/10 text-neon-amber hover:bg-neon-amber/20"
+                    )}
+                    title={`Copy ${r.phone_number}`}
+                  >
+                    <span className="font-semibold">{r.phone_number.slice(-6)}</span>
+                    <span className="opacity-80">{mm}:{ss}</span>
+                  </button>
+                );
+              })}
+              {liveRows.length > 8 && (
+                <span className="shrink-0 text-[11px] text-muted-foreground font-mono">+{liveRows.length - 8}</span>
+              )}
+            </div>
+          );
+        })()}
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
           <div className="flex items-center gap-2">
@@ -991,16 +1027,25 @@ const AgentRanges = () => {
                         })()}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        {r.status === "active" && (
+                        <div className="inline-flex items-center gap-3 justify-end">
                           <button
-                            onClick={() => release.mutate(r.id)}
-                            disabled={release.isPending}
-                            className="text-[11px] text-destructive hover:underline inline-flex items-center gap-1"
-                            title="Release this number"
+                            onClick={() => setThreadAllocId(r.id)}
+                            className="text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                            title="View full SMS thread"
                           >
-                            <X className="w-3 h-3" /> Release
+                            <MessageSquare className="w-3 h-3" /> Thread
                           </button>
-                        )}
+                          {r.status === "active" && (
+                            <button
+                              onClick={() => release.mutate(r.id)}
+                              disabled={release.isPending}
+                              className="text-[11px] text-destructive hover:underline inline-flex items-center gap-1"
+                              title="Release this number"
+                            >
+                              <X className="w-3 h-3" /> Release
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1039,6 +1084,7 @@ const AgentRanges = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <OtpThreadDrawer allocationId={threadAllocId} onClose={() => setThreadAllocId(null)} />
     </>
   );
 };
