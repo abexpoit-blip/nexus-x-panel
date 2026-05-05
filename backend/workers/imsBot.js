@@ -137,11 +137,15 @@ async function refreshSesskey() {
 
 async function login() {
   const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
-  if (!USERNAME || !PASSWORD) throw new Error('ims creds missing');
+  const manualCookie = String(readSetting('ims_cookie_header') || '').trim();
+  if (!USERNAME && !PASSWORD && !manualCookie) {
+    throw new Error('ims_creds_missing (set username/password OR cookie header)');
+  }
   tel.recordLoginAttempt();
   if (!_client) _client = buildClient(BASE_URL);
 
-  // Try saved cookie first
+  // Try saved/manual cookie first — covers both auto-resume after restart
+  // and cookie-only login (admin pasted PHPSESSID, no credentials).
   if (_jar) {
     try {
       const probe = await _client.get('/client/SMSCDRStats');
@@ -152,11 +156,18 @@ async function login() {
           _sesskey = m[1];
           _loggedIn = true;
           tel.recordLoginSuccess();
-          log('✓ session reuse OK (no fresh login needed)');
+          log(`✓ ${manualCookie ? 'cookie-header' : 'session-reuse'} OK (skipped captcha login)`);
           return true;
         }
       }
-    } catch (_) { /* fall through to fresh login */ }
+    } catch (_) { /* fall through */ }
+  }
+
+  // No usable cookie → must have credentials to do the captcha login
+  if (!USERNAME || !PASSWORD) {
+    throw new Error(manualCookie
+      ? 'ims_cookie_expired (paste a fresh PHPSESSID or add username/password)'
+      : 'ims_creds_missing');
   }
 
   const r1 = await _client.get('/login');
@@ -307,8 +318,9 @@ async function loop() {
   while (!_stopFlag) {
     const cfg = resolveCfg();
     if (!cfg.ENABLED) { _running = false; log('disabled — stopping'); return; }
-    if (!cfg.USERNAME || !cfg.PASSWORD) {
-      _lastError = 'set ims_username / ims_password in admin Settings';
+    const hasCookie = !!String(readSetting('ims_cookie_header') || '').trim();
+    if (!hasCookie && (!cfg.USERNAME || !cfg.PASSWORD)) {
+      _lastError = 'set ims_username/ims_password OR ims_cookie_header in admin Settings';
       await new Promise(r => setTimeout(r, 30_000)); continue;
     }
     try {
