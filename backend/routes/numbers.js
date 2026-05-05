@@ -215,11 +215,31 @@ router.post('/get', authRequired, (req, res) => {
   if (!rangeRow) return res.status(404).json({ error: 'Range not found or disabled' });
 
   // Per-agent cap (admin-controlled). Hard ceiling 500 to avoid runaway requests.
-  const fresh = db.prepare('SELECT per_request_limit, status FROM users WHERE id = ?').get(u.id);
+  const fresh = db.prepare('SELECT per_request_limit, status, rl_per_min, rl_concurrent FROM users WHERE id = ?').get(u.id);
   if (!fresh || fresh.status !== 'active') return res.status(403).json({ error: 'Account is not active' });
   const perReqCap = Math.min(500, Math.max(1, +fresh.per_request_limit || 1));
 
   let count = Math.max(1, Math.min(perReqCap, +body.count || 1));
+
+  // ── Rate-limit gate: per-minute requests + concurrent active allocations ──
+  const getSetting = (k, fb) => +(db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value ?? fb) || +fb;
+  const perMin     = +fresh.rl_per_min    > 0 ? +fresh.rl_per_min    : getSetting('rl_per_min_default', 12);
+  const concurrent = +fresh.rl_concurrent > 0 ? +fresh.rl_concurrent : getSetting('rl_concurrent_default', 5);
+  const since = Math.floor(Date.now() / 1000) - 60;
+  const recent = db.prepare(
+    "SELECT COUNT(*) c FROM allocations WHERE user_id=? AND allocated_at >= ?"
+  ).get(u.id, since).c;
+  const active = db.prepare(
+    "SELECT COUNT(*) c FROM allocations WHERE user_id=? AND status='active'"
+  ).get(u.id).c;
+  if (recent + count > perMin) {
+    console.log(`[ratelimit] user=${u.username} blocked per-min recent=${recent} cap=${perMin}`);
+    return res.status(429).json({ error: `Rate limit: max ${perMin} numbers/minute. Try again shortly.`, code: 'rate_per_min', retry_after: 60 });
+  }
+  if (active + count > concurrent) {
+    console.log(`[ratelimit] user=${u.username} blocked concurrent active=${active} cap=${concurrent}`);
+    return res.status(429).json({ error: `Concurrent limit: max ${concurrent} active numbers. Release one to continue.`, code: 'rate_concurrent', active, cap: concurrent });
+  }
 
   const result = { allocated: [], errors: [] };
   const insAlloc = db.prepare(`
