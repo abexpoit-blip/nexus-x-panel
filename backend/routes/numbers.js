@@ -163,6 +163,35 @@ router.post('/release/:id', authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/numbers/:id/thread — full SMS thread for one allocation
+// Returns every CDR row matching this allocation_id PLUS any other CDR row
+// for the SAME phone_number from this user within the last 24h (resends,
+// follow-up codes). Includes raw `sms_text` so the agent sees the full SMS.
+router.get('/:id/thread', authRequired, (req, res) => {
+  const id = +req.params.id;
+  const a = db.prepare(`
+    SELECT a.id, a.phone_number, a.provider, a.country_code, a.operator,
+           a.status, a.allocated_at, a.otp_received_at, a.user_id,
+           s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
+    FROM allocations a
+    LEFT JOIN services s ON s.id = a.service_id
+    WHERE a.id = ? AND a.user_id = ?
+  `).get(id, req.user.id);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+
+  // Cutoff: 24h before allocation start, captures any straggler resends.
+  const since = (a.allocated_at || Math.floor(Date.now()/1000)) - 3600;
+  const messages = db.prepare(`
+    SELECT id, otp_code, cli, sms_text, created_at, allocation_id, price_bdt, status
+    FROM cdr
+    WHERE user_id = ? AND phone_number = ? AND created_at >= ?
+      AND (note IS NULL OR note != 'fake:broadcast')
+    ORDER BY created_at ASC
+  `).all(req.user.id, a.phone_number, since);
+
+  res.json({ allocation: a, messages, server_now: Math.floor(Date.now() / 1000) });
+});
+
 // =============================================================
 // POST /api/numbers/get — allocate one or more numbers from a range pool
 // Body: { range_id?, provider?, country_code?, range?, count? }
