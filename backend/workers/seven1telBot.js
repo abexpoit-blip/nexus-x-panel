@@ -206,16 +206,17 @@ function fmtDate(d) {
 }
 
 async function fetchCdrRows() {
-  // Pull a wide window of CDR — Seven1Tel filters fdate1/fdate2 in its own
-  // server's local timezone, which may differ from our VPS by several hours.
-  // Using a 12-hour past + 2-hour future window guarantees the SMS row is
-  // included regardless of TZ skew. In-process _seenIds dedups repeats.
+  // Window: -2h … +2h around the VPS clock. This covers any TZ skew up to
+  // ±2 hours (Seven1Tel server is in BD/UTC+6, our VPS is UTC) while keeping
+  // the response small AND avoiding wrong-agent matches on recycled numbers.
+  // 12-hour windows previously matched a 6-hour-old SMS to a brand-new
+  // allocation with the same MSISDN.
   const now  = new Date(Date.now() + 2 * 60 * 60_000);
-  const past = new Date(Date.now() - 12 * 60 * 60_000);
+  const past = new Date(Date.now() - 2 * 60 * 60_000);
   const params = new URLSearchParams({
     fdate1: fmtDate(past),
     fdate2: fmtDate(now),
-    iDisplayLength: '500',
+    iDisplayLength: '300',
     iDisplayStart: '0',
     sEcho: String(Date.now() % 100000),
   });
@@ -269,14 +270,29 @@ function parseRow(row) {
 }
 
 function findActiveAllocation(phone) {
-  // suffix match — last 9 digits — handles "+44…" vs "44…" etc.
+  // Match the most recent allocation for this MSISDN (suffix-9, handles +44 vs 44),
+  // accepting any of:
+  //   • status='active'                           — normal in-window delivery
+  //   • status='expired' within GRACE_SEC         — SMS arrived seconds late
+  //   • status='received' within RESEND_SEC       — site sent a 2nd OTP
+  // The agent who originally held the number still gets credited.
+  const GRACE_SEC  = 300;  // 5 min late tolerance
+  const RESEND_SEC = 600;  // 10 min re-confirm window
   const tail = phone.slice(-9);
+  const cutoffActive   = Math.floor(Date.now() / 1000);  // anything still 'active' is fine
+  const cutoffExpired  = cutoffActive - GRACE_SEC;
+  const cutoffReceived = cutoffActive - RESEND_SEC;
   return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator
+    SELECT id, user_id, phone_number, provider, country_code, operator, status, allocated_at
     FROM allocations
-    WHERE status = 'active' AND phone_number LIKE ?
+    WHERE phone_number LIKE ?
+      AND (
+            status = 'active'
+         OR (status = 'expired'  AND allocated_at >= ?)
+         OR (status = 'received' AND allocated_at >= ?)
+      )
     ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`);
+  `).get(`%${tail}`, cutoffExpired, cutoffReceived);
 }
 
 async function tickOnce() {
