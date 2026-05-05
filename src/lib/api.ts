@@ -430,9 +430,17 @@ export const api = {
   },
 
   // ===== Agent v2 ranges =====
-  v2Countries: () => request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>("/numbers/v2/countries"),
-  v2Ranges: (countryCode: string) =>
-    request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges?country=${encodeURIComponent(countryCode)}`),
+  v2Countries: (serviceId?: number) => {
+    const qs = serviceId ? `?service_id=${serviceId}` : "";
+    return request<{ countries: Array<{ country_code: string; country_name: string; range_count: number }> }>(`/numbers/v2/countries${qs}`);
+  },
+  v2Ranges: (countryCode: string, serviceId?: number) => {
+    const qs = `?country=${encodeURIComponent(countryCode)}${serviceId ? `&service_id=${serviceId}` : ""}`;
+    return request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges${qs}`);
+  },
+
+  // ===== Services (catalog) =====
+  services: () => request<{ services: Service[] }>("/services"),
 
   // ===== Fake OTP Broadcaster (admin realism layer) =====
   fakeOtp: {
