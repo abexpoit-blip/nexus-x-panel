@@ -7,7 +7,7 @@ import { prefetchPage } from "@/lib/lazyPages";
 import {
   LayoutDashboard, Hash, MessageSquare, List, BarChart3, Bell, Inbox,
   Users, Server, DollarSign, FileText, LogOut, X, Layers,
-  Wallet, Shield, User, CreditCard, Trophy, Bot, ArrowDownToLine, History, Settings
+  Wallet, Shield, User, CreditCard, Trophy, Bot, ArrowDownToLine, History, Settings, AppWindow
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +32,7 @@ const agentNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { label: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Provider Ranges", path: "/admin/provider-ranges", icon: Layers },
+  { label: "Services", path: "/admin/services", icon: AppWindow },
   { label: "Agents", path: "/admin/agents", icon: Users },
   { label: "Rate Card", path: "/admin/rates", icon: DollarSign },
   { label: "Allocation", path: "/admin/allocation", icon: Layers },
