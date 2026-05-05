@@ -8,6 +8,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { Menu, Wallet, Search, Wrench, ShieldAlert, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useOtpAlerts } from "@/hooks/useOtpAlerts";
 
 interface AppLayoutProps {
   requiredRole: UserRole;
@@ -17,6 +18,9 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
   const { user, isAuthenticated, maintenanceMode, maintenanceMessage, impersonator, exitImpersonation } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Ambient OTP alerts (sound + browser push) for agents — runs across every page.
+  useOtpAlerts(user?.role === "agent");
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role !== requiredRole) return <Navigate to={`/${user?.role}/dashboard`} replace />;
