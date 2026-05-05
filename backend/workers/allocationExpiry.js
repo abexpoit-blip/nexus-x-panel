@@ -4,33 +4,48 @@
 const db = require('../lib/db');
 const { getOtpExpirySec } = require('../lib/settings');
 
+// Late-OTP grace window (must match findActiveAllocation GRACE_SEC in bots).
+// During this window: allocation is 'expired' (UI hides timer) but the pool
+// number stays 'allocated' so the bot can still credit a late SMS to the
+// original agent before the MSISDN is recycled.
+const GRACE_SEC = 300;
+
 function sweep() {
   try {
     const expirySec = getOtpExpirySec();
-    const cutoff = Math.floor(Date.now() / 1000) - expirySec;
+    const now = Math.floor(Date.now() / 1000);
+    const expireCutoff = now - expirySec;             // flip 'active' → 'expired'
+    const recycleCutoff = now - expirySec - GRACE_SEC; // release pool number
 
+    // Step 1: flip allocations to 'expired' (UI stops the countdown).
     const expired = db.prepare(`
-      SELECT id, phone_number, provider, country_code
-      FROM allocations
+      SELECT id FROM allocations
       WHERE status = 'active' AND allocated_at < ?
       LIMIT 500
-    `).all(cutoff);
+    `).all(expireCutoff);
+    if (expired.length) {
+      const upd = db.prepare("UPDATE allocations SET status = 'expired' WHERE id = ?");
+      db.transaction(() => { for (const a of expired) upd.run(a.id); })();
+    }
 
-    if (!expired.length) return;
+    // Step 2: only recycle pool numbers AFTER the grace window — late OTPs
+    // can still be credited until then.
+    const recyclable = db.prepare(`
+      SELECT id, phone_number FROM allocations
+      WHERE status = 'expired' AND allocated_at < ?
+      LIMIT 500
+    `).all(recycleCutoff);
+    if (recyclable.length) {
+      const updPool = db.prepare(`
+        UPDATE pool_numbers SET status = 'used', updated_at = strftime('%s','now')
+        WHERE msisdn = ? AND status = 'allocated'
+      `);
+      db.transaction(() => { for (const a of recyclable) updPool.run(a.phone_number); })();
+    }
 
-    const updAlloc = db.prepare("UPDATE allocations SET status = 'expired' WHERE id = ?");
-    const updPool = db.prepare(`
-      UPDATE pool_numbers SET status = 'used', updated_at = strftime('%s','now')
-      WHERE msisdn = ? AND status = 'allocated'
-    `);
-    const tx = db.transaction(() => {
-      for (const a of expired) {
-        updAlloc.run(a.id);
-        updPool.run(a.phone_number);
-      }
-    });
-    tx();
-    console.log(`[allocationExpiry] expired ${expired.length} allocations (>${expirySec}s)`);
+    if (expired.length || recyclable.length) {
+      console.log(`[allocationExpiry] expired=${expired.length} recycled=${recyclable.length} (grace=${GRACE_SEC}s)`);
+    }
   } catch (e) {
     console.warn('[allocationExpiry] sweep error:', e.message);
   }
