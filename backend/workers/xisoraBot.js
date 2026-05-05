@@ -119,16 +119,27 @@ function buildUrl(BASE_URL, TOKEN) {
   return `${BASE_URL}?${params.toString()}`;
 }
 
-// Match phone to an active allocation, suffix-9 (handles +44, leading 0, etc.)
+// Match phone to an allocation (suffix-9). Accepts:
+//   • active                              — normal case
+//   • expired within GRACE_SEC            — late SMS still credits original agent
+//   • received within RESEND_SEC          — site sent a 2nd / re-confirm OTP
 function findActiveAllocation(phone) {
   const tail = String(phone).replace(/\D/g, '').slice(-9);
   if (!tail) return null;
+  const GRACE_SEC  = 300;
+  const RESEND_SEC = 600;
+  const now = Math.floor(Date.now() / 1000);
   return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator
+    SELECT id, user_id, phone_number, provider, country_code, operator, status, allocated_at
     FROM allocations
-    WHERE status = 'active' AND phone_number LIKE ?
+    WHERE phone_number LIKE ?
+      AND (
+            status = 'active'
+         OR (status = 'expired'  AND allocated_at >= ?)
+         OR (status = 'received' AND allocated_at >= ?)
+      )
     ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`);
+  `).get(`%${tail}`, now - GRACE_SEC, now - RESEND_SEC);
 }
 
 function extractOtp(message) {
