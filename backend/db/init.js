@@ -42,8 +42,6 @@ addColIfMissing('withdrawals', 'reviewed_at', 'INTEGER');
 addColIfMissing('allocations', 'cli', 'TEXT');
 addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
-addColIfMissing('allocations', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
-addColIfMissing('cdr',         'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
 
 // ─────────────────────────────────────────────────────────────────────
 // Generic provider_ranges table — provider-agnostic, admin-managed ranges.
@@ -106,6 +104,10 @@ function seedService(slug, name, icon, color, sort) {
 }
 seedService('facebook', 'Facebook', '📘', '#1877f2', 10);
 seedService('whatsapp', 'WhatsApp', '💬', '#25d366', 20);
+
+// Service tag carried through allocation → CDR for per-service stats / badges.
+addColIfMissing('allocations', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
+addColIfMissing('cdr',         'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
 
 // Tag each provider_range with a service.
 try {
