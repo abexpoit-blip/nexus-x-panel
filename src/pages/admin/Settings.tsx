@@ -81,6 +81,11 @@ const AdminSettings = () => {
   const [xisoraPass, setXisoraPass] = useState("");
   const [xisoraCookie, setXisoraCookie] = useState("");
   const [xisoraInterval, setXisoraInterval] = useState<number>(10);
+  const [imsUrl, setImsUrl] = useState("");
+  const [imsUser, setImsUser] = useState("");
+  const [imsPass, setImsPass] = useState("");
+  const [imsCookie, setImsCookie] = useState("");
+  const [imsInterval, setImsInterval] = useState<number>(18);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
@@ -106,6 +111,11 @@ const AdminSettings = () => {
     setXisoraPass(str(s, "xisora_password", "mamun@12aa"));
     setXisoraCookie(str(s, "xisora_cookie_header"));
     setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
+    setImsUrl(str(s, "ims_base_url", "https://www.imssms.org"));
+    setImsUser(str(s, "ims_username"));
+    setImsPass(str(s, "ims_password"));
+    setImsCookie(str(s, "ims_cookie_header"));
+    setImsInterval(Number(str(s, "ims_otp_interval", "18")) || 18);
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     setOtpSound((str(s, "otp_sound_default", "chime") as OtpSoundId) || "chime");
