@@ -380,18 +380,18 @@ const AgentRanges = () => {
     <div className="relative space-y-5 w-full">
       <GradientMesh variant="default" />
       {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Pick a country and range — your number and OTP appear right below.
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <div className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-muted-foreground">
+        <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+          <div className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-muted-foreground whitespace-nowrap">
             Active: <span className="font-mono font-bold text-foreground">{activeCount}</span>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/20 text-neon-green">
+          <div className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/20 text-neon-green whitespace-nowrap">
             OTPs: <span className="font-mono font-bold">{otpCount}</span>
           </div>
         </div>
