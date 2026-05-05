@@ -916,7 +916,107 @@ const AgentRanges = () => {
             <div className="text-xs mt-1">Use Get Number above to allocate — your OTPs arrive here automatically.</div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile card list — < sm */}
+          <div className="sm:hidden divide-y divide-white/[0.05]">
+            {visibleRows.map((r) => {
+              const recv = r.otp_received_at as number | undefined;
+              const isFresh = (!!recv && now - recv < 60) || freshIds.has(r.id);
+              const allocAt = r.allocated_at as number;
+              const remaining = allocAt ? Math.max(0, WINDOW_SEC - (now - allocAt)) : 0;
+              const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+              const ss = String(remaining % 60).padStart(2, "0");
+              const low = remaining < 5 * 60;
+              return (
+                <div key={r.id} className={cn("p-3 space-y-2", isFresh && "bg-neon-green/[0.04]")}>
+                  {/* Top row: number + status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <button
+                      onClick={() => copyOne(r.phone_number, r.id)}
+                      className="flex items-center gap-2 min-w-0 text-left"
+                    >
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        r.status === "received" ? "bg-neon-green" :
+                        r.status === "active" ? "bg-neon-amber animate-pulse" :
+                        "bg-muted-foreground/40"
+                      )} />
+                      <span className="font-mono text-[13px] text-foreground truncate">{r.phone_number}</span>
+                      {copiedIdx === r.id
+                        ? <Check className="w-3.5 h-3.5 text-neon-green shrink-0" />
+                        : <Copy className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                    </button>
+                    <span className={cn(
+                      "shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                      r.status === "received" && "bg-neon-green/15 text-neon-green",
+                      r.status === "active" && "bg-neon-amber/15 text-neon-amber",
+                      r.status === "released" && "bg-muted text-muted-foreground",
+                      r.status === "expired" && "bg-destructive/15 text-destructive"
+                    )}>
+                      {r.status}
+                    </span>
+                  </div>
+
+                  {/* Country / operator */}
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {r.country_code && <span className="text-sm leading-none">{flagEmoji(r.country_code)}</span>}
+                    <span className="truncate">{r.country_code || "—"} · {r.operator || "—"}</span>
+                  </div>
+
+                  {/* OTP + countdown */}
+                  <div className="flex items-center justify-between gap-2">
+                    {r.otp ? (
+                      <button
+                        onClick={() => copyOtp(r.otp, r.id)}
+                        className={cn(
+                          "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
+                          "bg-neon-green/10 text-neon-green border border-neon-green/30",
+                          isFresh && "ring-2 ring-neon-green/50"
+                        )}
+                      >
+                        OTP: {r.otp}
+                        {copiedOtp === r.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3 opacity-70" />}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" /> waiting…
+                      </span>
+                    )}
+                    {r.status === "active" && allocAt && (
+                      <span className={cn(
+                        "inline-flex items-center gap-1 text-[11px] font-mono",
+                        low ? "text-destructive" : "text-neon-amber"
+                      )}>
+                        <Timer className="w-3 h-3" /> {mm}:{ss}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-1 border-t border-white/[0.04]">
+                    <button
+                      onClick={() => setThreadAllocId(r.id)}
+                      className="text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                    >
+                      <MessageSquare className="w-3 h-3" /> Thread
+                    </button>
+                    {r.status === "active" && (
+                      <button
+                        onClick={() => release.mutate(r.id)}
+                        disabled={release.isPending}
+                        className="text-[11px] text-destructive inline-flex items-center gap-1 ml-auto"
+                      >
+                        <X className="w-3 h-3" /> Release
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table — sm and up */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-white/[0.06]">
@@ -1054,6 +1154,7 @@ const AgentRanges = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </GlassCard>
     </div>
