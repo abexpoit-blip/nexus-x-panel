@@ -3,12 +3,15 @@ import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2 } from "lucide-react";
+import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2, Play, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
-import { loadOtpPrefs, saveOtpPrefs, requestPushPermission, type OtpAlertPrefs } from "@/hooks/useOtpAlerts";
+import {
+  loadOtpPrefs, saveOtpPrefs, requestPushPermission, playOtpSound,
+  SOUND_OPTIONS, type OtpAlertPrefs, type OtpSoundId,
+} from "@/hooks/useOtpAlerts";
 
 const AgentProfile = () => {
   const { user } = useAuth();
@@ -28,6 +31,21 @@ const AgentProfile = () => {
     typeof Notification === "undefined" ? "unsupported" : Notification.permission
   );
   useEffect(() => { saveOtpPrefs(otpPrefs); }, [otpPrefs]);
+  // Pull admin-suggested global sound default to seed agents who haven't picked one.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.settings.getAll();
+        const def = (res?.settings as any)?.otp_sound_default as OtpSoundId | undefined;
+        if (def) {
+          const cur = loadOtpPrefs();
+          if (!localStorage.getItem("nexus_otp_sound_user_set")) {
+            setOtpPrefs({ ...cur, soundId: def });
+          }
+        }
+      } catch { /* noop — endpoint optional */ }
+    })();
+  }, []);
   const togglePush = async (v: boolean) => {
     if (v && pushPerm !== "granted") {
       const r = await requestPushPermission();
@@ -233,11 +251,73 @@ const AgentProfile = () => {
                 </div>
                 <Switch checked={otpPrefs.push && pushPerm === "granted"} onCheckedChange={togglePush} />
               </div>
+
+              {/* Sound profile picker */}
+              <div className="space-y-2 pt-2 border-t border-white/[0.05]">
+                <div className="flex items-center gap-2 text-sm text-foreground">
+                  <Music className="w-4 h-4 text-muted-foreground" /> Notification sound
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {SOUND_OPTIONS.map((s) => {
+                    const active = (otpPrefs.soundId || "chime") === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setOtpPrefs(p => ({ ...p, soundId: s.id }));
+                          try { localStorage.setItem("nexus_otp_sound_user_set", "1"); } catch { /* noop */ }
+                        }}
+                        className={cn(
+                          "flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all",
+                          active
+                            ? "bg-primary/10 border-primary/40 text-foreground shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)]"
+                            : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-sm font-medium">
+                            {s.label}
+                            {s.tag === "popular" && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-neon-magenta/15 text-neon-magenta border border-neon-magenta/30">
+                                NEW
+                              </span>
+                            )}
+                            {s.tag === "default" && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30">
+                                default
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          role="button"
+                          onClick={(e) => { e.stopPropagation(); playOtpSound(s.id, otpPrefs.volume); }}
+                          className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-white/[0.04] hover:bg-primary/20 hover:text-primary text-muted-foreground transition-colors"
+                          title="Preview"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Volume — {otpPrefs.volume}%</label>
                 <input type="range" min={0} max={100} value={otpPrefs.volume}
                   onChange={(e) => setOtpPrefs(p => ({ ...p, volume: +e.target.value }))}
                   className="w-full accent-primary" />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => playOtpSound(otpPrefs.soundId || "chime", otpPrefs.volume)}
+                    className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    <Play className="w-3 h-3" /> Test sound
+                  </button>
+                </div>
               </div>
             </div>
           </div>
