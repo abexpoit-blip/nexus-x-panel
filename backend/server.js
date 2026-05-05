@@ -135,4 +135,8 @@ app.listen(PORT, () => {
   // Allocation expiry sweeper — frees stale active allocations after otp_expiry_sec
   try { require('./workers/allocationExpiry').start(); }
   catch (e) { console.warn('allocation expiry start error:', e.message); }
+
+  // Range Health + Auto-pause sweeper (1-min interval, opt-in via settings)
+  try { require('./workers/rangeHealth').start(); }
+  catch (e) { console.warn('range health start error:', e.message); }
 });
