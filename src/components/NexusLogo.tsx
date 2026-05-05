@@ -15,11 +15,12 @@ interface NexusLogoProps {
 const APP_VERSION = "v2.0";
 
 const sizes = {
-  xs: { wrap: "gap-[4px]",  nexus: "text-[11px]", x: "text-[13px]", ver: "text-[10px]", track: "tracking-[0.32em]" },
-  sm: { wrap: "gap-1.5",    nexus: "text-[15px]", x: "text-[18px]", ver: "text-[13px]", track: "tracking-[0.36em]" },
-  md: { wrap: "gap-2",      nexus: "text-[20px]", x: "text-[24px]", ver: "text-[17px]", track: "tracking-[0.38em]" },
-  lg: { wrap: "gap-2.5",    nexus: "text-[32px]", x: "text-[38px]", ver: "text-[26px]", track: "tracking-[0.4em]"  },
-  xl: { wrap: "gap-3",      nexus: "text-[52px]", x: "text-[62px]", ver: "text-[42px]", track: "tracking-[0.42em]" },
+  // Mobile-safe: xs/sm use tighter tracking + smaller v2.0 so wordmark never overflows narrow rails (≤320px).
+  xs: { wrap: "gap-[3px]",  nexus: "text-[10px]", x: "text-[12px]", ver: "text-[9px]",  track: "tracking-[0.22em]" },
+  sm: { wrap: "gap-[5px]",  nexus: "text-[13px]", x: "text-[16px]", ver: "text-[11px]", track: "tracking-[0.26em]" },
+  md: { wrap: "gap-2",      nexus: "text-[18px]", x: "text-[22px]", ver: "text-[15px]", track: "tracking-[0.32em]" },
+  lg: { wrap: "gap-2.5",    nexus: "text-[30px]", x: "text-[36px]", ver: "text-[24px]", track: "tracking-[0.36em]" },
+  xl: { wrap: "gap-3",      nexus: "text-[50px]", x: "text-[60px]", ver: "text-[40px]", track: "tracking-[0.4em]"  },
 };
 
 type Palette = {
@@ -35,25 +36,27 @@ const palettes: Record<Exclude<NexusLogoProps["variant"], undefined | "auto">, P
     wordShadow: "0 0 12px hsl(0 0% 100% / 0.25)",
     xGradient:
       "linear-gradient(135deg, hsl(188 100% 55%) 0%, hsl(220 90% 70%) 30%, hsl(258 90% 70%) 60%, hsl(320 95% 65%) 100%)",
+    // Brighter cyan→violet→magenta tuned so each stop hits ≥4.5:1 against #07070b
     verGradient:
-      "linear-gradient(135deg, hsl(188 100% 70%), hsl(258 90% 78%) 60%, hsl(320 95% 72%))",
+      "linear-gradient(135deg, hsl(188 100% 80%), hsl(258 95% 85%) 55%, hsl(320 100% 82%))",
   },
   light: {
     word: "hsl(230 20% 12%)",
     wordShadow: "0 0 0 transparent",
     xGradient:
       "linear-gradient(135deg, hsl(200 100% 38%) 0%, hsl(230 90% 50%) 30%, hsl(258 90% 52%) 60%, hsl(320 95% 48%) 100%)",
+    // Darkened so v2.0 hits ≥4.5:1 against white/near-white backgrounds
     verGradient:
-      "linear-gradient(135deg, hsl(200 100% 42%), hsl(258 90% 50%) 60%, hsl(320 95% 50%))",
+      "linear-gradient(135deg, hsl(200 100% 30%), hsl(258 90% 38%) 60%, hsl(320 95% 36%))",
   },
   contrast: {
     word: "hsl(0 0% 100%)",
     wordShadow:
       "0 0 0 transparent, 0 0 1px hsl(0 0% 0%), 0 0 6px hsl(0 0% 0% / 0.85)",
     xGradient:
-      "linear-gradient(135deg, hsl(58 100% 65%) 0%, hsl(48 100% 60%) 50%, hsl(38 100% 55%) 100%)",
+      "linear-gradient(135deg, hsl(55 100% 72%) 0%, hsl(48 100% 68%) 50%, hsl(42 100% 65%) 100%)",
     verGradient:
-      "linear-gradient(135deg, hsl(58 100% 75%), hsl(48 100% 65%) 60%, hsl(38 100% 60%))",
+      "linear-gradient(135deg, hsl(55 100% 80%), hsl(48 100% 75%) 60%, hsl(42 100% 72%))",
   },
 };
 

@@ -19,12 +19,12 @@
 }
 @keyframes nexus-ver-pulse {
   0%, 100% {
-    filter: drop-shadow(0 0 10px hsl(188 100% 55% / 0.55))
-            drop-shadow(0 0 22px hsl(258 90% 66% / 0.35));
+    filter: drop-shadow(0 0 6px hsl(188 100% 70% / 0.45))
+            drop-shadow(0 0 14px hsl(258 90% 75% / 0.28));
   }
   50% {
-    filter: drop-shadow(0 0 16px hsl(188 100% 60% / 0.8))
-            drop-shadow(0 0 32px hsl(258 90% 70% / 0.55));
+    filter: drop-shadow(0 0 10px hsl(188 100% 75% / 0.65))
+            drop-shadow(0 0 22px hsl(258 90% 78% / 0.42));
   }
 }
 @keyframes nexus-logo-in {
