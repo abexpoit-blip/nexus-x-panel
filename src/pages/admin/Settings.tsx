@@ -325,6 +325,64 @@ const AdminSettings = () => {
               </Button>
             </div>
           </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 mt-0.5">
+                <Music className="w-4 h-4 text-neon-magenta" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">OTP Notification Sound (default)</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Suggested sound for new agents. Each agent can override in their Profile → Security.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {SOUND_OPTIONS.map((s) => {
+                const active = otpSound === s.id;
+                return (
+                  <button key={s.id} type="button" onClick={() => setOtpSound(s.id)}
+                    className={cn(
+                      "flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border transition-all text-left",
+                      active
+                        ? "bg-primary/10 border-primary/40 text-foreground shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)]"
+                        : "bg-white/[0.02] border-white/[0.08] text-muted-foreground hover:text-foreground"
+                    )}>
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      {s.label}
+                      {s.tag === "popular" && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-neon-magenta/15 text-neon-magenta border border-neon-magenta/30">NEW</span>
+                      )}
+                      {s.tag === "default" && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30">default</span>
+                      )}
+                    </div>
+                    <span role="button" onClick={(e) => { e.stopPropagation(); playOtpSound(s.id, 70); }}
+                      className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-white/[0.04] hover:bg-primary/20 hover:text-primary text-muted-foreground transition-colors">
+                      <Play className="w-3.5 h-3.5" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex justify-end mt-3">
+              <Button onClick={async () => {
+                setSavingKey("otp_sound_default");
+                try {
+                  await api.settings.set("otp_sound_default", otpSound);
+                  toast({ title: "Default sound saved" });
+                  qc.invalidateQueries({ queryKey: ["admin-settings"] });
+                } catch (e) {
+                  toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
+                } finally { setSavingKey(null); }
+              }} disabled={savingKey === "otp_sound_default"}
+                className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+                {savingKey === "otp_sound_default" ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+                Save default sound
+              </Button>
+            </div>
+          </GlassCard>
         </TabsContent>
 
         {/* ============ OTP TIMING ============ */}
