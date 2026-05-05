@@ -18,8 +18,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { GradientMesh } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer, MessageSquare, History } from "lucide-react";
 import { BrandIcon } from "@/components/BrandIcon";
+import { OtpThreadDrawer } from "@/components/OtpThreadDrawer";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,6 +65,36 @@ async function safeCopy(text: string): Promise<boolean> {
 const LS_COUNTRY = "nx.getnum.country";
 const LS_RANGE = "nx.getnum.rangeId";
 const LS_SERVICE = "nx.getnum.serviceId";
+const LS_RECENT = "nx.getnum.recent"; // last-used [{serviceId, country, rangeId, label, country_name, ts}]
+const RECENT_MAX = 5;
+
+type RecentChip = {
+  serviceId: number | null;
+  country: string;
+  rangeId: number;
+  label: string;
+  country_name: string;
+  ts: number;
+};
+
+function loadRecent(): RecentChip[] {
+  try { return JSON.parse(localStorage.getItem(LS_RECENT) || "[]"); } catch { return []; }
+}
+function pushRecent(chip: RecentChip) {
+  try {
+    const cur = loadRecent().filter(c => !(c.rangeId === chip.rangeId && c.serviceId === chip.serviceId));
+    cur.unshift(chip);
+    localStorage.setItem(LS_RECENT, JSON.stringify(cur.slice(0, RECENT_MAX)));
+  } catch { /* ignore */ }
+}
+
+// Heatmap dot color from free count (relative to range stock).
+function heatColor(free: number): string {
+  if (free <= 0) return "bg-destructive/70";
+  if (free < 5)  return "bg-neon-amber/80";
+  if (free < 20) return "bg-neon-cyan/80";
+  return "bg-neon-green/80";
+}
 
 const AgentRanges = () => {
   const qc = useQueryClient();
@@ -120,6 +151,10 @@ const AgentRanges = () => {
   const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "received" | "released" | "expired">("all");
   const [searchQ, setSearchQ] = useState("");
+  // OTP thread drawer state
+  const [threadAllocId, setThreadAllocId] = useState<number | null>(null);
+  // last-used chips (re-read on mount + after each successful allocation)
+  const [recentChips, setRecentChips] = useState<RecentChip[]>(() => loadRecent());
 
   useEffect(() => {
     try {
@@ -182,6 +217,18 @@ const AgentRanges = () => {
       const r = await api.getNumber({ range_id: selectedRange.id, count });
       if (r.allocated?.length) {
         bumpDaily(r.allocated.length);
+        // Remember this country+range for one-click reuse next time.
+        if (selectedCountry && selectedRange) {
+          pushRecent({
+            serviceId: serviceId || null,
+            country: selectedCountry.country_code,
+            rangeId: selectedRange.id,
+            label: selectedRange.range_label,
+            country_name: selectedCountry.country_name || selectedCountry.country_code,
+            ts: Math.floor(Date.now() / 1000),
+          });
+          setRecentChips(loadRecent());
+        }
         // Mark these as fresh (yellow flash) for ~30s
         const ids = new Set<number>((r.allocated as any[]).map(a => a.id).filter(Boolean));
         if (ids.size) {
