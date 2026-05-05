@@ -4,6 +4,40 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Nexus X v2.0 Logo animations ===== */
+@keyframes nexus-x-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px hsl(188 100% 55% / 0.65))
+            drop-shadow(0 0 28px hsl(258 90% 66% / 0.45))
+            drop-shadow(0 0 48px hsl(320 95% 65% / 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px hsl(188 100% 60% / 0.9))
+            drop-shadow(0 0 42px hsl(258 90% 70% / 0.65))
+            drop-shadow(0 0 70px hsl(320 95% 68% / 0.45));
+  }
+}
+@keyframes nexus-ver-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px hsl(188 100% 55% / 0.55))
+            drop-shadow(0 0 22px hsl(258 90% 66% / 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px hsl(188 100% 60% / 0.8))
+            drop-shadow(0 0 32px hsl(258 90% 70% / 0.55));
+  }
+}
+@keyframes nexus-logo-in {
+  0%   { opacity: 0; transform: translateY(4px); letter-spacing: 0.5em; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.nexus-x-glow      { animation: nexus-logo-in 700ms ease-out both, nexus-x-pulse 4.5s ease-in-out 700ms infinite; }
+.nexus-ver-glow    { animation: nexus-logo-in 800ms ease-out both, nexus-ver-pulse 4.5s ease-in-out 800ms infinite; }
+.nexus-logo-wrap:hover .nexus-x-glow   { animation: nexus-x-pulse 1.4s ease-in-out infinite; }
+.nexus-logo-wrap:hover .nexus-ver-glow { animation: nexus-ver-pulse 1.4s ease-in-out infinite; }
+.nexus-logo-wrap:hover .nexus-word     { text-shadow: 0 0 18px hsl(0 0% 100% / 0.55); }
+.nexus-word { transition: text-shadow .35s ease; }
+
 @layer base {
   :root {
     /* === V2.0 Neo-Cyber Lux — $100k tier === */
