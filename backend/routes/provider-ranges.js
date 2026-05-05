@@ -44,18 +44,34 @@ function validate(body, partial = false) {
   }
   if (body.enabled !== undefined) out.enabled = body.enabled ? 1 : 0;
   if (body.hot !== undefined) out.hot = body.hot ? 1 : 0;
+  if (body.service_id !== undefined) {
+    if (body.service_id === null || body.service_id === '') { out.service_id = null; }
+    else {
+      const sid = +body.service_id;
+      if (!Number.isFinite(sid) || sid <= 0) throw new Error('service_id must be a positive integer');
+      const exists = db.prepare('SELECT 1 FROM services WHERE id = ?').get(sid);
+      if (!exists) throw new Error('service_id does not exist');
+      out.service_id = sid;
+    }
+  }
   return out;
 }
 
 // ============ ADMIN ============
 router.get('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
-  const { provider, country_code, enabled } = req.query;
+  const { provider, country_code, enabled, service_id } = req.query;
   const where = [];
   const params = [];
   if (provider) { where.push('provider = ?'); params.push(provider); }
   if (country_code) { where.push('country_code = ?'); params.push(String(country_code).toUpperCase()); }
   if (enabled === '0' || enabled === '1') { where.push('enabled = ?'); params.push(+enabled); }
-  const sql = `SELECT * FROM provider_ranges ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY provider, country_code, range_label`;
+  if (service_id) { where.push('service_id = ?'); params.push(+service_id); }
+  const sql = `
+    SELECT r.*, s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
+    FROM provider_ranges r
+    LEFT JOIN services s ON s.id = r.service_id
+    ${where.length ? 'WHERE ' + where.map(w => w.replace(/\b(provider|country_code|enabled|service_id)\b/, 'r.$1')).join(' AND ') : ''}
+    ORDER BY r.provider, r.country_code, r.range_label`;
   res.json({ rows: db.prepare(sql).all(...params) });
 });
 
@@ -63,13 +79,14 @@ router.post('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
   try {
     const v = validate(req.body || {});
     const r = db.prepare(`
-      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot, service_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       v.provider, v.country_code, v.country_name || null, v.range_label,
       v.range_prefix || null, v.operator || null, v.price_bdt || 0,
       v.enabled === undefined ? 1 : v.enabled, v.notes || null,
-      v.hot ? 1 : 0
+      v.hot ? 1 : 0,
+      v.service_id ?? null
     );
     logFromReq(req, 'range_create', { meta: { provider: v.provider, country: v.country_code, label: v.range_label } });
     res.json({ id: r.lastInsertRowid });
@@ -246,29 +263,40 @@ router.get('/admin/provider-ranges-stats', authRequired, adminOnly, (req, res) =
 // ============ AGENT ============
 // GET /api/numbers/v2/countries — distinct countries that have ≥1 enabled range
 router.get('/numbers/v2/countries', authRequired, (req, res) => {
+  const serviceId = req.query.service_id ? +req.query.service_id : null;
+  const where = ['enabled = 1'];
+  const params = [];
+  if (serviceId) { where.push('service_id = ?'); params.push(serviceId); }
   const rows = db.prepare(`
     SELECT country_code,
            COALESCE(MAX(country_name), country_code) AS country_name,
            COUNT(*) AS range_count
     FROM provider_ranges
-    WHERE enabled = 1
+    WHERE ${where.join(' AND ')}
     GROUP BY country_code
     ORDER BY country_name
-  `).all();
+  `).all(...params);
   res.json({ countries: rows });
 });
 
-// GET /api/numbers/v2/ranges?country=XX — enabled ranges for an agent in a country
+// GET /api/numbers/v2/ranges?country=XX[&service_id=N]
 router.get('/numbers/v2/ranges', authRequired, (req, res) => {
   const cc = String(req.query.country || '').toUpperCase();
   if (!cc) return res.status(400).json({ error: 'country query param required' });
+  const serviceId = req.query.service_id ? +req.query.service_id : null;
+  const where = ['r.enabled = 1', 'UPPER(TRIM(r.country_code)) = ?'];
+  const params = [cc];
+  if (serviceId) { where.push('r.service_id = ?'); params.push(serviceId); }
   const rows = db.prepare(`
-    SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, hot,
-           (SELECT COUNT(*) FROM pool_numbers p WHERE p.range_id = provider_ranges.id AND p.status = 'free') AS free_count
-    FROM provider_ranges
-    WHERE enabled = 1 AND UPPER(TRIM(country_code)) = ?
-    ORDER BY hot DESC, provider, range_label
-  `).all(cc);
+    SELECT r.id, r.provider, r.country_code, r.country_name, r.range_label, r.range_prefix,
+           r.operator, r.price_bdt, r.hot, r.service_id,
+           s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color,
+           (SELECT COUNT(*) FROM pool_numbers p WHERE p.range_id = r.id AND p.status = 'free') AS free_count
+    FROM provider_ranges r
+    LEFT JOIN services s ON s.id = r.service_id
+    WHERE ${where.join(' AND ')}
+    ORDER BY r.hot DESC, r.provider, r.range_label
+  `).all(...params);
   res.json({ ranges: rows });
 });
 
