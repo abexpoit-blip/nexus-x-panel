@@ -77,6 +77,48 @@ try {
 } catch (e) { /* noop */ }
 
 // ─────────────────────────────────────────────────────────────────────
+// Services — admin-managed catalog (Facebook, WhatsApp, Telegram, …).
+// Each provider_range is tagged with ONE service so agents can filter
+// stock per service. Seeded with Facebook + WhatsApp on first boot.
+// ─────────────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,        -- machine id ('facebook', 'whatsapp')
+    name TEXT NOT NULL,               -- display name
+    icon TEXT NOT NULL DEFAULT '📱',  -- emoji or single char
+    color TEXT NOT NULL DEFAULT '#3b82f6', -- hex accent (badge / pill)
+    enabled INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_services_enabled ON services(enabled, sort_order);
+`);
+function seedService(slug, name, icon, color, sort) {
+  const exists = db.prepare('SELECT 1 FROM services WHERE slug = ?').get(slug);
+  if (exists) return;
+  db.prepare(`INSERT INTO services (slug, name, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)`)
+    .run(slug, name, icon, color, sort);
+  console.log(`✓ Seeded service: ${name}`);
+}
+seedService('facebook', 'Facebook', '📘', '#1877f2', 10);
+seedService('whatsapp', 'WhatsApp', '💬', '#25d366', 20);
+
+// Tag each provider_range with a service.
+try {
+  const cols = db.prepare(`PRAGMA table_info(provider_ranges)`).all().map(c => c.name);
+  if (!cols.includes('service_id')) {
+    db.exec(`ALTER TABLE provider_ranges ADD COLUMN service_id INTEGER REFERENCES services(id) ON DELETE SET NULL`);
+    // Default existing ranges to Facebook so the panel keeps working unchanged.
+    const fb = db.prepare(`SELECT id FROM services WHERE slug='facebook'`).get();
+    if (fb) db.prepare(`UPDATE provider_ranges SET service_id = ? WHERE service_id IS NULL`).run(fb.id);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_pranges_service ON provider_ranges(service_id, enabled)`);
+    console.log('✓ Migration: provider_ranges.service_id (defaulted to Facebook)');
+  }
+} catch (e) { console.warn('service_id migration:', e.message); }
+
+// ─────────────────────────────────────────────────────────────────────
 // pool_numbers — manually-pasted MSISDNs that belong to a range.
 // Status: free → allocated → used (or free again if released).
 // ─────────────────────────────────────────────────────────────────────
