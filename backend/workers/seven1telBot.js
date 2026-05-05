@@ -206,16 +206,17 @@ function fmtDate(d) {
 }
 
 async function fetchCdrRows() {
-  // Pull a wide window of CDR — Seven1Tel filters fdate1/fdate2 in its own
-  // server's local timezone, which may differ from our VPS by several hours.
-  // Using a 12-hour past + 2-hour future window guarantees the SMS row is
-  // included regardless of TZ skew. In-process _seenIds dedups repeats.
+  // Window: -2h … +2h around the VPS clock. This covers any TZ skew up to
+  // ±2 hours (Seven1Tel server is in BD/UTC+6, our VPS is UTC) while keeping
+  // the response small AND avoiding wrong-agent matches on recycled numbers.
+  // 12-hour windows previously matched a 6-hour-old SMS to a brand-new
+  // allocation with the same MSISDN.
   const now  = new Date(Date.now() + 2 * 60 * 60_000);
-  const past = new Date(Date.now() - 12 * 60 * 60_000);
+  const past = new Date(Date.now() - 2 * 60 * 60_000);
   const params = new URLSearchParams({
     fdate1: fmtDate(past),
     fdate2: fmtDate(now),
-    iDisplayLength: '500',
+    iDisplayLength: '300',
     iDisplayStart: '0',
     sEcho: String(Date.now() % 100000),
   });
