@@ -33,6 +33,7 @@ const tough = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
+const { logOtpAudit } = require('../lib/otpAudit');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -308,10 +309,17 @@ async function tickOnce() {
     if (!alloc) {
       dlog('no active alloc for', row.number, '→ skip');
       tel.recordMiss(row.number, `OTP "${otp}" arrived but no active allocation matched suffix-9`);
+      logOtpAudit({
+        source: 'xisora', source_msg_id: dedupKey,
+        phone_number: row.number, cli: row.cli || null, otp_code: otp, sms_text: row.message,
+        outcome: 'mismatch',
+        miss_reason: 'no active allocation matched (suffix-9)',
+      });
       continue;
     }
     try {
-      await markOtpReceived(alloc, otp, row.cli || null, row.message || null);
+      await markOtpReceived(alloc, otp, row.cli || null, row.message || null,
+        { source: 'xisora', source_msg_id: dedupKey });
       delivered++;
       _otpDelivered++;
       tel.recordOtpDelivered();
@@ -319,6 +327,12 @@ async function tickOnce() {
     } catch (e) {
       warn('markOtpReceived failed:', e.message);
       tel.recordError(`markOtpReceived: ${e.message}`);
+      logOtpAudit({
+        source: 'xisora', source_msg_id: dedupKey,
+        phone_number: row.number, cli: row.cli || null, otp_code: otp, sms_text: row.message,
+        allocation_id: alloc.id, user_id: alloc.user_id,
+        outcome: 'error', miss_reason: `markOtpReceived: ${e.message}`,
+      });
     }
   }
   return delivered;
