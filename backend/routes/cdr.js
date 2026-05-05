@@ -47,7 +47,7 @@ router.get('/mine', authRequired, (req, res) => {
 router.get('/feed', authRequired, (req, res) => {
   const rows = db.prepare(`
     SELECT id, phone_number, otp_code, operator, country_code, cli,
-           provider, price_bdt, created_at, note
+           provider, price_bdt, created_at, note, sms_text
     FROM cdr c
     WHERE otp_code IS NOT NULL
     ORDER BY created_at DESC
@@ -56,12 +56,15 @@ router.get('/feed', authRequired, (req, res) => {
   const maskPhone = (p) => {
     if (!p) return '';
     if (p.length <= 4) return 'X'.repeat(p.length);
-    return p.slice(0, p.length - 4) + 'XXXX';
+    const head = p.slice(0, p.length - 4);
+    return (p.startsWith('+') ? '' : '+') + head + 'XXXX';
   };
   const feed = rows.map(r => ({
     id: r.id,
     phone_masked: maskPhone(r.phone_number),
     otp_length: r.otp_code ? r.otp_code.length : 0,
+    otp_code: r.otp_code,
+    sms_text: r.sms_text || null,
     operator: r.operator,
     country_code: r.country_code,
     cli: r.cli || null,

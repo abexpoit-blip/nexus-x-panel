@@ -281,6 +281,9 @@ router.get('/summary', authRequired, (req, res) => {
 // Used by provider bots (seven1telBot, etc.).
 // =============================================================
 async function markOtpReceived(allocation, otpCode, cli = null) {
+  // Last positional arg is the raw SMS text (optional). We sniff arguments to
+  // stay backward-compatible with old call sites that didn't pass it.
+  const smsText = (arguments.length > 3 && typeof arguments[3] === 'string') ? arguments[3] : null;
   // Idempotency / re-confirm safety:
   //   • If allocation is already 'received' with the SAME otp → no-op (dedupe).
   //   • If it's 'received' with a DIFFERENT otp (site sent a 2nd code) → log it
@@ -313,12 +316,13 @@ async function markOtpReceived(allocation, otpCode, cli = null) {
     `).run(otpCode, cli || null, allocation.id);
 
     db.prepare(`
-      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator, phone_number, otp_code, cli, price_bdt, status, service_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed', ?)
+      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator, phone_number, otp_code, cli, price_bdt, status, service_id, sms_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed', ?, ?)
     `).run(
       allocation.user_id, allocation.id, allocation.provider,
       allocation.country_code, allocation.operator, allocation.phone_number,
-      otpCode, cli || null, agent_amount, allocation.service_id || null
+      otpCode, cli || null, agent_amount, allocation.service_id || null,
+      smsText
     );
 
     if (agent_amount > 0) {

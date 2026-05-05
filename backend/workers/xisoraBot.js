@@ -311,7 +311,7 @@ async function tickOnce() {
       continue;
     }
     try {
-      await markOtpReceived(alloc, otp, row.cli || null);
+      await markOtpReceived(alloc, otp, row.cli || null, row.message || null);
       delivered++;
       _otpDelivered++;
       tel.recordOtpDelivered();
