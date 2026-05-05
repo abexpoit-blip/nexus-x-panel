@@ -25,11 +25,29 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Convert ISO 3166-1 alpha-2 country code → flag emoji.
-// For non-2-letter codes (e.g. "TZ" works, "USA" falls back to globe).
+// Most-common ISO-3 → ISO-2 fallback (so "AFG", "USA", "MDG"… still render flags).
+const ISO3_TO_2: Record<string, string> = {
+  AFG:"AF",ALB:"AL",DZA:"DZ",AND:"AD",AGO:"AO",ATG:"AG",ARG:"AR",ARM:"AM",AUS:"AU",AUT:"AT",AZE:"AZ",
+  BHS:"BS",BHR:"BH",BGD:"BD",BRB:"BB",BLR:"BY",BEL:"BE",BLZ:"BZ",BEN:"BJ",BTN:"BT",BOL:"BO",BIH:"BA",BWA:"BW",BRA:"BR",BRN:"BN",BGR:"BG",BFA:"BF",BDI:"BI",
+  KHM:"KH",CMR:"CM",CAN:"CA",CPV:"CV",CAF:"CF",TCD:"TD",CHL:"CL",CHN:"CN",COL:"CO",COM:"KM",COG:"CG",COD:"CD",CRI:"CR",CIV:"CI",HRV:"HR",CUB:"CU",CYP:"CY",CZE:"CZ",
+  DNK:"DK",DJI:"DJ",DMA:"DM",DOM:"DO",ECU:"EC",EGY:"EG",SLV:"SV",GNQ:"GQ",ERI:"ER",EST:"EE",SWZ:"SZ",ETH:"ET",
+  FJI:"FJ",FIN:"FI",FRA:"FR",GAB:"GA",GMB:"GM",GEO:"GE",DEU:"DE",GHA:"GH",GRC:"GR",GRD:"GD",GTM:"GT",GIN:"GN",GNB:"GW",GUY:"GY",
+  HTI:"HT",HND:"HN",HKG:"HK",HUN:"HU",ISL:"IS",IND:"IN",IDN:"ID",IRN:"IR",IRQ:"IQ",IRL:"IE",ISR:"IL",ITA:"IT",JAM:"JM",JPN:"JP",JOR:"JO",
+  KAZ:"KZ",KEN:"KE",KIR:"KI",PRK:"KP",KOR:"KR",KWT:"KW",KGZ:"KG",LAO:"LA",LVA:"LV",LBN:"LB",LSO:"LS",LBR:"LR",LBY:"LY",LIE:"LI",LTU:"LT",LUX:"LU",
+  MAC:"MO",MDG:"MG",MWI:"MW",MYS:"MY",MDV:"MV",MLI:"ML",MLT:"MT",MHL:"MH",MRT:"MR",MUS:"MU",MEX:"MX",FSM:"FM",MDA:"MD",MCO:"MC",MNG:"MN",MNE:"ME",MAR:"MA",MOZ:"MZ",MMR:"MM",
+  NAM:"NA",NRU:"NR",NPL:"NP",NLD:"NL",NZL:"NZ",NIC:"NI",NER:"NE",NGA:"NG",MKD:"MK",NOR:"NO",OMN:"OM",PAK:"PK",PLW:"PW",PSE:"PS",PAN:"PA",PNG:"PG",PRY:"PY",PER:"PE",PHL:"PH",POL:"PL",PRT:"PT",QAT:"QA",
+  ROU:"RO",RUS:"RU",RWA:"RW",KNA:"KN",LCA:"LC",VCT:"VC",WSM:"WS",SMR:"SM",STP:"ST",SAU:"SA",SEN:"SN",SRB:"RS",SYC:"SC",SLE:"SL",SGP:"SG",SVK:"SK",SVN:"SI",SLB:"SB",SOM:"SO",ZAF:"ZA",SSD:"SS",ESP:"ES",LKA:"LK",SDN:"SD",SUR:"SR",SWE:"SE",CHE:"CH",SYR:"SY",
+  TWN:"TW",TJK:"TJ",TZA:"TZ",THA:"TH",TLS:"TL",TGO:"TG",TON:"TO",TTO:"TT",TUN:"TN",TUR:"TR",TKM:"TM",TUV:"TV",UGA:"UG",UKR:"UA",ARE:"AE",GBR:"GB",USA:"US",URY:"UY",UZB:"UZ",VUT:"VU",VEN:"VE",VNM:"VN",YEM:"YE",ZMB:"ZM",ZWE:"ZW"
+};
+
+/**
+ * Auto-detect → flag emoji.
+ * Handles ISO-2 ("AF"), ISO-3 ("AFG"), and lowercase. Falls back to globe.
+ */
 function flagEmoji(code: string): string {
   if (!code) return "🌐";
-  const cc = code.toUpperCase();
+  let cc = code.toUpperCase().trim();
+  if (cc.length === 3 && ISO3_TO_2[cc]) cc = ISO3_TO_2[cc];
   if (cc.length !== 2) return "🌐";
   const A = 0x1f1e6;
   return String.fromCodePoint(A + cc.charCodeAt(0) - 65, A + cc.charCodeAt(1) - 65);
@@ -501,7 +519,7 @@ const AgentRanges = () => {
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <span className="text-2xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
+                        <span className="text-3xl leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">{flagEmoji(selectedCountry.country_code)}</span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
@@ -509,7 +527,6 @@ const AgentRanges = () => {
                               {selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}
                             </span>
                           </div>
-                          <div className="text-[10px] text-muted-foreground font-mono uppercase leading-tight">{selectedCountry.country_code}</div>
                         </div>
                       </>
                     ) : (
@@ -555,7 +572,6 @@ const AgentRanges = () => {
                       <span className="text-2xl leading-none">{flagEmoji(c.country_code)}</span>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-foreground truncate">{c.country_name}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono uppercase">{c.country_code}</div>
                       </div>
                       <span className="text-xs text-muted-foreground">{c.range_count}</span>
                     </button>
@@ -959,8 +975,8 @@ const AgentRanges = () => {
 
                   {/* Country / operator */}
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {r.country_code && <span className="text-sm leading-none">{flagEmoji(r.country_code)}</span>}
-                    <span className="truncate">{r.country_code || "—"} · {r.operator || "—"}</span>
+                    {r.country_code && <span className="text-base leading-none">{flagEmoji(r.country_code)}</span>}
+                    <span className="truncate">{r.operator || "—"}</span>
                   </div>
 
                   {/* OTP + countdown */}
@@ -970,8 +986,8 @@ const AgentRanges = () => {
                         onClick={() => copyOtp(r.otp, r.id)}
                         className={cn(
                           "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
-                          "bg-neon-green/10 text-neon-green border border-neon-green/30",
-                          isFresh && "ring-2 ring-neon-green/50"
+                          "bg-neon-green/10 text-neon-green border border-neon-green/30 transition-all",
+                          isFresh && "bg-neon-green/20 border-neon-green/60 otp-glow animate-otp-arrive"
                         )}
                       >
                         OTP: {r.otp}
@@ -1066,10 +1082,9 @@ const AgentRanges = () => {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2 text-[12px]">
-                          {r.country_code && <span className="text-base leading-none">{flagEmoji(r.country_code)}</span>}
+                          {r.country_code && <span className="text-xl leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">{flagEmoji(r.country_code)}</span>}
                           <div className="min-w-0">
-                            <div className="text-foreground truncate">{r.country_code || "—"}</div>
-                            <div className="text-[10px] text-muted-foreground truncate">{r.operator || "—"}</div>
+                            <div className="text-foreground truncate">{r.operator || "—"}</div>
                           </div>
                         </div>
                       </td>
@@ -1080,7 +1095,7 @@ const AgentRanges = () => {
                             className={cn(
                               "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
                               "bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 transition-colors",
-                              isFresh && "ring-2 ring-neon-green/50 shadow-[0_0_12px_-2px_hsl(var(--neon-green)/0.6)]"
+                            isFresh && "bg-neon-green/20 border-neon-green/70 otp-glow animate-otp-arrive scale-[1.02]"
                             )}
                           >
                             {r.otp}

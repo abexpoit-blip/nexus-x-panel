@@ -207,6 +207,10 @@ seedSetting('cdr_hide_fakes',    'false');
 seedSetting('rl_per_min_default',    '12');   // max allocation requests / minute / agent
 seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocations / agent
 
+// Default OTP-arrival sound profile (agents can override locally).
+// Options: 'chime' (default cyber) | 'fanfare' (Faaaah) | 'ding' | 'doublebeep' | 'pop'
+seedSetting('otp_sound_default', 'chime');
+
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
 
