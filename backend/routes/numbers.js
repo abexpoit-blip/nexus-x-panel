@@ -307,12 +307,12 @@ async function markOtpReceived(allocation, otpCode, cli = null) {
     `).run(otpCode, cli || null, allocation.id);
 
     db.prepare(`
-      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator, phone_number, otp_code, cli, price_bdt, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed')
+      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator, phone_number, otp_code, cli, price_bdt, status, service_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed', ?)
     `).run(
       allocation.user_id, allocation.id, allocation.provider,
       allocation.country_code, allocation.operator, allocation.phone_number,
-      otpCode, cli || null, agent_amount
+      otpCode, cli || null, agent_amount, allocation.service_id || null
     );
 
     if (agent_amount > 0) {
