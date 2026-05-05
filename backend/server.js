@@ -130,6 +130,10 @@ app.listen(PORT, () => {
   try { require('./workers/xisoraBot').start(); }
   catch (e) { console.warn('xisora bot start error:', e.message); }
 
+  // Start IMS bot (no-op if ims_enabled=false)
+  try { require('./workers/imsBot').start(); }
+  catch (e) { console.warn('ims bot start error:', e.message); }
+
   // Start Fake OTP broadcaster (idles until fake_otp_enabled=true)
   try { require('./workers/fakeOtpBroadcaster').start(); }
   catch (e) { console.warn('fake-otp broadcaster start error:', e.message); }

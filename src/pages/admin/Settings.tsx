@@ -81,6 +81,11 @@ const AdminSettings = () => {
   const [xisoraPass, setXisoraPass] = useState("");
   const [xisoraCookie, setXisoraCookie] = useState("");
   const [xisoraInterval, setXisoraInterval] = useState<number>(10);
+  const [imsUrl, setImsUrl] = useState("");
+  const [imsUser, setImsUser] = useState("");
+  const [imsPass, setImsPass] = useState("");
+  const [imsCookie, setImsCookie] = useState("");
+  const [imsInterval, setImsInterval] = useState<number>(18);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
@@ -106,6 +111,11 @@ const AdminSettings = () => {
     setXisoraPass(str(s, "xisora_password", "mamun@12aa"));
     setXisoraCookie(str(s, "xisora_cookie_header"));
     setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
+    setImsUrl(str(s, "ims_base_url", "https://www.imssms.org"));
+    setImsUser(str(s, "ims_username"));
+    setImsPass(str(s, "ims_password"));
+    setImsCookie(str(s, "ims_cookie_header"));
+    setImsInterval(Number(str(s, "ims_otp_interval", "18")) || 18);
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     setOtpSound((str(s, "otp_sound_default", "chime") as OtpSoundId) || "chime");
@@ -695,6 +705,36 @@ const AdminSettings = () => {
               toast({ title: "XISORA session cleared" });
             }}
             saving={savingKey?.startsWith("xisora_") || false}
+          />
+
+          {/* ─── IMS (imssms.org — 15s rate-limit aware) ─── */}
+          <BotConfigCard
+            tone="magenta"
+            title="IMS Bot (imssms.org)"
+            urlKey="ims_base_url"
+            url={imsUrl} setUrl={setImsUrl}
+            user={imsUser} setUser={setImsUser} userKey="ims_username"
+            pass={imsPass} setPass={setImsPass} passKey="ims_password"
+            cookie={imsCookie} setCookie={setImsCookie} cookieKey="ims_cookie_header"
+            cookiePlaceholder="PHPSESSID=..."
+            cookieHint="Optional. If set, bot uses this cookie instead of running the captcha login. Min poll interval is 16s — IMS portal warns at <15s."
+            interval={imsInterval} setInterval={setImsInterval} intervalKey="ims_otp_interval"
+            showPw={showPw}
+            health={healthState["ims"]}
+            onSave={async () => {
+              await setSetting("ims_base_url", imsUrl);
+              await setSetting("ims_username", imsUser);
+              await setSetting("ims_password", imsPass);
+              await setSetting("ims_cookie_header", imsCookie);
+              await setSetting("ims_otp_interval", String(Math.max(16, imsInterval)));
+            }}
+            onHealth={() => runHealth("ims")}
+            onClearCookies={async () => {
+              if (!confirm("Clear saved IMS session cookie? Next tick re-logs in via captcha.")) return;
+              await setSetting("ims_session_cookie", "");
+              toast({ title: "IMS session cleared" });
+            }}
+            saving={savingKey?.startsWith("ims_") || false}
           />
 
           <p className="text-[11px] text-muted-foreground">

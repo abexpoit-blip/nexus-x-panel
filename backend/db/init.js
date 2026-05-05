@@ -196,6 +196,14 @@ seedSetting('xisora_username',     process.env.XISORA_USERNAME     || 'mamun33')
 seedSetting('xisora_password',     process.env.XISORA_PASSWORD     || 'mamun@12aa');
 seedSetting('xisora_cookie_header', process.env.XISORA_COOKIE_HEADER || '');
 seedSetting('xisora_otp_interval', process.env.XISORA_OTP_INTERVAL || '10');
+// IMS bot defaults — scrapes https://www.imssms.org. 15s portal rate-limit
+// is enforced inside the worker (min interval 16s).
+seedSetting('ims_enabled',       process.env.IMS_ENABLED       || 'false');
+seedSetting('ims_base_url',      process.env.IMS_BASE_URL      || 'https://www.imssms.org');
+seedSetting('ims_username',      process.env.IMS_USERNAME      || '');
+seedSetting('ims_password',      process.env.IMS_PASSWORD      || '');
+seedSetting('ims_cookie_header', process.env.IMS_COOKIE_HEADER || '');
+seedSetting('ims_otp_interval',  process.env.IMS_OTP_INTERVAL  || '18');
 // Fake OTP broadcaster defaults (off by default — admin enables in UI)
 seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
 seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
