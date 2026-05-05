@@ -269,14 +269,29 @@ function parseRow(row) {
 }
 
 function findActiveAllocation(phone) {
-  // suffix match — last 9 digits — handles "+44…" vs "44…" etc.
+  // Match the most recent allocation for this MSISDN (suffix-9, handles +44 vs 44),
+  // accepting any of:
+  //   • status='active'                           — normal in-window delivery
+  //   • status='expired' within GRACE_SEC         — SMS arrived seconds late
+  //   • status='received' within RESEND_SEC       — site sent a 2nd OTP
+  // The agent who originally held the number still gets credited.
+  const GRACE_SEC  = 300;  // 5 min late tolerance
+  const RESEND_SEC = 600;  // 10 min re-confirm window
   const tail = phone.slice(-9);
+  const cutoffActive   = Math.floor(Date.now() / 1000);  // anything still 'active' is fine
+  const cutoffExpired  = cutoffActive - GRACE_SEC;
+  const cutoffReceived = cutoffActive - RESEND_SEC;
   return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator
+    SELECT id, user_id, phone_number, provider, country_code, operator, status, allocated_at
     FROM allocations
-    WHERE status = 'active' AND phone_number LIKE ?
+    WHERE phone_number LIKE ?
+      AND (
+            status = 'active'
+         OR (status = 'expired'  AND allocated_at >= ?)
+         OR (status = 'received' AND allocated_at >= ?)
+      )
     ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`);
+  `).get(`%${tail}`, cutoffExpired, cutoffReceived);
 }
 
 async function tickOnce() {
