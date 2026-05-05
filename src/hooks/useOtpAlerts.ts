@@ -18,23 +18,27 @@ import { toast } from "sonner";
 
 const PREFS_KEY = "nexus_otp_alert_prefs";
 
-export type OtpSoundId = "chime" | "fanfare" | "ding" | "doublebeep" | "pop";
+// Premium single-sound mode: every OTP plays the viral "Faaaah" fanfare
+// (the TikTok/Facebook horn-stab that became a meme in early 2026).
+// We keep the OtpSoundId union as a single literal for backward-compat
+// with stored prefs, but every value collapses to the same player.
+export type OtpSoundId = "faaaah";
 export type OtpAlertPrefs = { sound: boolean; push: boolean; volume: number; soundId?: OtpSoundId };
 
 export const SOUND_OPTIONS: { id: OtpSoundId; label: string; tag?: string }[] = [
-  { id: "chime",      label: "Cyber Chime",   tag: "default" },
-  { id: "fanfare",    label: "Fanfare (Faaaah)", tag: "popular" },
-  { id: "ding",       label: "Crystal Ding" },
-  { id: "doublebeep", label: "Double Beep" },
-  { id: "pop",        label: "Soft Pop" },
+  { id: "faaaah", label: "Faaaah (viral horn)", tag: "premium" },
 ];
 
 export const loadOtpPrefs = (): OtpAlertPrefs => {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (raw) return { sound: true, push: true, volume: 70, soundId: "chime", ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Force the only remaining sound regardless of legacy stored value.
+      return { sound: true, push: true, volume: 70, ...parsed, soundId: "faaaah" };
+    }
   } catch { /* noop */ }
-  return { sound: true, push: true, volume: 70, soundId: "chime" };
+  return { sound: true, push: true, volume: 70, soundId: "faaaah" };
 };
 
 export const saveOtpPrefs = (p: OtpAlertPrefs) => {
@@ -42,10 +46,11 @@ export const saveOtpPrefs = (p: OtpAlertPrefs) => {
 };
 
 /**
- * Play one of the named OTP sound profiles using the Web Audio API
- * (no audio assets needed, ~0KB cost). Volume 0–100.
+ * Play the premium "Faaaah" viral horn — a brassy 2-stab + sustained
+ * fall, synthesised in pure Web Audio (no asset, ~0 KB).
+ * `_id` kept for back-compat with old call sites.
  */
-export function playOtpSound(id: OtpSoundId, volume: number) {
+export function playOtpSound(_id: OtpSoundId | string, volume: number) {
   try {
     const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
     if (!Ctx) return;
@@ -69,38 +74,27 @@ export function playOtpSound(id: OtpSoundId, volume: number) {
       osc.stop(t0 + start + dur + 0.02);
     };
 
-    let total = 0.5;
-    switch (id) {
-      case "chime":
-        tone(880, 0.00, 0.18);
-        tone(1320, 0.12, 0.20);
-        tone(1760, 0.24, 0.22);
-        total = 0.6;
-        break;
-      case "fanfare":
-        // "Faaaah" — bold rising horn, ~0.9s, square+triangle for brassy timbre.
-        tone(523.25, 0.00, 0.18, "square",   0.18); // C5
-        tone(659.25, 0.16, 0.20, "square",   0.20); // E5
-        tone(783.99, 0.34, 0.55, "triangle", 0.36); // G5 sustain
-        tone(1046.5, 0.34, 0.55, "sine",     0.22); // C6 octave shimmer
-        total = 1.0;
-        break;
-      case "ding":
-        tone(1568, 0.00, 0.55, "sine", 0.32);   // bell G6
-        tone(2349, 0.00, 0.40, "sine", 0.18);   // overtone
-        total = 0.65;
-        break;
-      case "doublebeep":
-        tone(1200, 0.00, 0.10, "square", 0.30);
-        tone(1200, 0.16, 0.10, "square", 0.30);
-        total = 0.35;
-        break;
-      case "pop":
-        tone(440, 0.00, 0.06, "sine", 0.40);
-        tone(880, 0.04, 0.08, "sine", 0.32);
-        total = 0.2;
-        break;
-    }
+    // ── "Faaaah" — the viral horn-stab (TikTok / FB meme, late 2025).
+    // Two sharp brass stabs then a long brassy sustain that bends
+    // up a tone before fading. Fifth-stack (root + perfect 5 + octave)
+    // gives the bright, edgy timbre everyone is using in shorts.
+    // Stab 1 — short bark
+    tone(392.0,  0.00, 0.16, "sawtooth", 0.30); // G4
+    tone(587.33, 0.00, 0.16, "square",   0.20); // D5
+    tone(784.0,  0.00, 0.14, "triangle", 0.16); // G5
+    // Stab 2
+    tone(392.0,  0.18, 0.16, "sawtooth", 0.30);
+    tone(587.33, 0.18, 0.16, "square",   0.22);
+    tone(784.0,  0.18, 0.14, "triangle", 0.18);
+    // Long "faaaah" — sustain with subtle pitch bend simulated by
+    // overlapping tones a quarter-tone apart for chorus, then a higher
+    // 5th joining halfway through.
+    tone(440.0,  0.40, 0.65, "sawtooth", 0.34); // A4 lead
+    tone(442.0,  0.40, 0.65, "sawtooth", 0.20); // detune chorus
+    tone(659.25, 0.42, 0.62, "square",   0.20); // E5
+    tone(880.0,  0.55, 0.55, "triangle", 0.18); // A5 octave shimmer
+    tone(1318.5, 0.70, 0.45, "sine",     0.10); // E6 sparkle
+    const total = 1.1;
     setTimeout(() => ctx.close(), Math.ceil(total * 1000) + 200);
   } catch { /* noop */ }
 }
