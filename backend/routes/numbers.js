@@ -274,6 +274,24 @@ router.get('/summary', authRequired, (req, res) => {
 // Used by provider bots (seven1telBot, etc.).
 // =============================================================
 async function markOtpReceived(allocation, otpCode, cli = null) {
+  // Idempotency / re-confirm safety:
+  //   • If allocation is already 'received' with the SAME otp → no-op (dedupe).
+  //   • If it's 'received' with a DIFFERENT otp (site sent a 2nd code) → log it
+  //     as a fresh notification but do NOT bill again. Stores latest OTP on row.
+  const fresh = db.prepare(
+    `SELECT id, status, otp FROM allocations WHERE id = ?`
+  ).get(allocation.id);
+  if (fresh && fresh.status === 'received') {
+    if (fresh.otp === otpCode) return; // exact duplicate → silently drop
+    db.prepare(`UPDATE allocations SET otp = ?, otp_received_at = strftime('%s','now') WHERE id = ?`)
+      .run(otpCode, allocation.id);
+    db.prepare(`
+      INSERT INTO notifications (user_id, title, message, type)
+      VALUES (?, 'Additional OTP', ?, 'info')
+    `).run(allocation.user_id, `${allocation.phone_number} → ${otpCode} (resend / 2nd code)`);
+    return;
+  }
+
   const { agent_amount } = agentPayout({
     provider: allocation.provider,
     country_code: allocation.country_code,
