@@ -519,7 +519,7 @@ const AgentRanges = () => {
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <span className="text-2xl leading-none">{flagEmoji(selectedCountry.country_code)}</span>
+                        <span className="text-3xl leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">{flagEmoji(selectedCountry.country_code)}</span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
@@ -527,7 +527,6 @@ const AgentRanges = () => {
                               {selectedCountry.range_count} range{selectedCountry.range_count === 1 ? "" : "s"}
                             </span>
                           </div>
-                          <div className="text-[10px] text-muted-foreground font-mono uppercase leading-tight">{selectedCountry.country_code}</div>
                         </div>
                       </>
                     ) : (
@@ -573,7 +572,6 @@ const AgentRanges = () => {
                       <span className="text-2xl leading-none">{flagEmoji(c.country_code)}</span>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-foreground truncate">{c.country_name}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono uppercase">{c.country_code}</div>
                       </div>
                       <span className="text-xs text-muted-foreground">{c.range_count}</span>
                     </button>
