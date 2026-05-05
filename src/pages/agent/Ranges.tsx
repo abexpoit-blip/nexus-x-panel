@@ -658,7 +658,7 @@ const AgentRanges = () => {
                           rangeId === r.id && "bg-primary/10"
                         )}
                       >
-                        <Hash className="w-4 h-4 text-neon-cyan shrink-0" />
+                        <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", heatColor(rFree))} title={`${rFree} free`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="text-sm font-medium text-foreground truncate">{r.range_label}</div>
@@ -722,6 +722,15 @@ const AgentRanges = () => {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Layers className="w-4 h-4 text-neon-cyan" />
             <span className="uppercase tracking-wider font-semibold text-foreground/80">Quantity</span>
+            {selectedRange && qty > 0 && (
+              <span className="ml-2 text-[11px] text-muted-foreground">
+                Max charge:{" "}
+                <span className="font-mono font-bold text-neon-green">
+                  ৳{(Number(selectedRange.price_bdt) * qty).toFixed(2)}
+                </span>
+                <span className="text-muted-foreground/60"> · only billed if OTP arrives</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             {baseOptions.map(n => {
