@@ -1,4 +1,4 @@
-import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target } from "lucide-react";
+import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { GlassCard } from "@/components/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,16 +8,38 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { OtpLine, SuccessGauge } from "@/components/charts/Charts";
 import { AvgOtpWaitTime } from "@/components/AvgOtpWaitTime";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 
 const AgentDashboard = () => {
   const { user } = useAuth();
   const { data: summary } = useQuery({ queryKey: ["summary"], queryFn: () => api.numberSummary(), refetchInterval: 30000 });
-  const { data: nums } = useQuery({ queryKey: ["my-numbers"], queryFn: () => api.myNumbers(), refetchInterval: 20000 });
+  const { data: nums } = useQuery({ queryKey: ["my-numbers"], queryFn: () => api.myNumbers(), refetchInterval: 5000 });
+
+  // Tick every second for countdown timers within the 30-minute window
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const s = summary || { today: { c: 0, s: 0 }, week: { c: 0, s: 0 }, month: { c: 0, s: 0 }, active: 0 };
   const recent = (nums?.numbers || []).slice(0, 8);
   const allNums = nums?.numbers || [];
+
+  // Active window = allocations not yet expired and within 30-minute window
+  const WINDOW_SEC = 30 * 60;
+  const activeWindow = useMemo(() => {
+    return allNums
+      .filter((n: any) => {
+        if (n.status === "expired") return false;
+        const elapsed = now - (n.allocated_at || 0);
+        return elapsed >= 0 && elapsed < WINDOW_SEC;
+      })
+      .sort((a: any, b: any) => (b.allocated_at || 0) - (a.allocated_at || 0));
+  }, [allNums, now]);
+  const arrivedCount = activeWindow.filter((n: any) => n.otp).length;
+  const waitingCount = activeWindow.length - arrivedCount;
 
   // Build 7-day OTP delivery series from my numbers
   const otpSeries = useMemo(() => {
@@ -107,6 +129,72 @@ const AgentDashboard = () => {
           </div>
         </GlassCard>
       </div>
+
+      <GlassCard className="p-6">
+        <h3 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
+          <BellRing className="w-4 h-4 text-neon-green" /> OTP Status — 30-min Window
+          <span className="ml-auto flex items-center gap-2 text-xs">
+            <Badge variant="outline" className="border-neon-green/40 text-neon-green">
+              {arrivedCount} arrived
+            </Badge>
+            <Badge variant="outline" className="border-neon-amber/40 text-neon-amber">
+              {waitingCount} waiting
+            </Badge>
+          </span>
+        </h3>
+        {!activeWindow.length && (
+          <p className="text-sm text-muted-foreground/60 text-center py-8">
+            No active numbers in the 30-minute window
+          </p>
+        )}
+        <div className="space-y-2">
+          {activeWindow.map((item: any) => {
+            const remaining = Math.max(0, WINDOW_SEC - (now - item.allocated_at));
+            const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+            const ss = String(remaining % 60).padStart(2, "0");
+            const arrived = !!item.otp;
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  "flex items-center justify-between py-2.5 px-3 rounded-lg border transition-colors",
+                  arrived
+                    ? "bg-neon-green/[0.06] border-neon-green/30"
+                    : "bg-white/[0.02] border-white/[0.05]"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      arrived ? "bg-neon-green" : "bg-neon-amber animate-pulse"
+                    )}
+                  />
+                  <div>
+                    <p className="text-sm font-mono text-foreground">{item.phone_number}</p>
+                    <p className="text-xs text-muted-foreground">{item.operator || "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {arrived ? (
+                    <Badge className="bg-neon-green/20 text-neon-green border border-neon-green/40 hover:bg-neon-green/20">
+                      OTP {item.otp}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-neon-amber/40 text-neon-amber">
+                      Waiting…
+                    </Badge>
+                  )}
+                  <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground min-w-[56px] justify-end">
+                    <Timer className="w-3 h-3" />
+                    {mm}:{ss}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </GlassCard>
 
       <GlassCard className="p-6">
         <h3 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
