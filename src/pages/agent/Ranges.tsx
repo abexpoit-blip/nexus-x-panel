@@ -450,6 +450,36 @@ const AgentRanges = () => {
         </GlassCard>
       ) : (
         <GlassCard className="!p-5 md:!p-6">
+        {/* Last-used quick-pick chips — 1-click reload of recent country+range */}
+        {recentChips.filter(c => !serviceId || c.serviceId === serviceId).length > 0 && (
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+              <History className="w-3 h-3" /> Recent
+            </span>
+            {recentChips
+              .filter(c => !serviceId || c.serviceId === serviceId)
+              .slice(0, RECENT_MAX)
+              .map(c => {
+                const isActive = country === c.country && rangeId === c.rangeId;
+                return (
+                  <button
+                    key={`${c.serviceId}-${c.rangeId}`}
+                    onClick={() => { setCountry(c.country); setRangeId(c.rangeId); }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all inline-flex items-center gap-1.5",
+                      isActive
+                        ? "bg-primary/15 border-primary/40 text-primary"
+                        : "bg-white/[0.04] border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/20"
+                    )}
+                    title={`${c.country_name} · ${c.label}`}
+                  >
+                    <span className="text-sm leading-none">{flagEmoji(c.country)}</span>
+                    <span className="font-mono">{c.label}</span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* ── Country selector box ── */}
           <div className="md:col-span-4">
