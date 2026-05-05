@@ -206,13 +206,16 @@ function fmtDate(d) {
 }
 
 async function fetchCdrRows() {
-  // Pull last 10 minutes of CDR — plenty of overlap, dedupe handles repeats.
-  const now = new Date();
-  const past = new Date(now.getTime() - 10 * 60_000);
+  // Pull a wide window of CDR — Seven1Tel filters fdate1/fdate2 in its own
+  // server's local timezone, which may differ from our VPS by several hours.
+  // Using a 12-hour past + 2-hour future window guarantees the SMS row is
+  // included regardless of TZ skew. In-process _seenIds dedups repeats.
+  const now  = new Date(Date.now() + 2 * 60 * 60_000);
+  const past = new Date(Date.now() - 12 * 60 * 60_000);
   const params = new URLSearchParams({
     fdate1: fmtDate(past),
     fdate2: fmtDate(now),
-    iDisplayLength: '100',
+    iDisplayLength: '500',
     iDisplayStart: '0',
     sEcho: String(Date.now() % 100000),
   });
