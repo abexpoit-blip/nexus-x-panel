@@ -63,7 +63,7 @@ const Login = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <NexusLogo size="md" />
+            <NexusLogo size="md" showVersion />
           </motion.div>
 
           <motion.div
@@ -135,7 +135,7 @@ const Login = () => {
           >
             {/* Mobile-only logo */}
             <div className="lg:hidden flex justify-center mb-8">
-              <NexusLogo size="md" />
+              <NexusLogo size="md" showVersion />
             </div>
 
             <div className="glass-luxe p-8 sm:p-10 relative">
