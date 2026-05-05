@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink, HeartPulse, CheckCircle2, AlertTriangle, Link2 } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink, HeartPulse, CheckCircle2, AlertTriangle, Link2, Gauge } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,9 @@ const AdminSettings = () => {
   const [recentHrs, setRecentHrs] = useState<number>(24);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
+  const [rlPerMin, setRlPerMin] = useState<number>(12);
+  const [rlConcurrent, setRlConcurrent] = useState<number>(5);
+
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
@@ -101,6 +104,8 @@ const AdminSettings = () => {
     setXisoraPass(str(s, "xisora_password", "mamun@12aa"));
     setXisoraCookie(str(s, "xisora_cookie_header"));
     setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
+    setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
+    setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
   }, [s]);
 
   useEffect(() => {
@@ -270,6 +275,51 @@ const AdminSettings = () => {
                   Save message
                 </Button>
               </div>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-neon-amber/10 border border-neon-amber/20 mt-0.5">
+                <Gauge className="w-4 h-4 text-neon-amber" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Agent Rate Limits (global default)</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Applies to every agent unless overridden per-agent in the Agents page. Protects pools from abuse and runaway scripts.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Max numbers / minute</Label>
+                <Input type="number" min={1} max={500} value={rlPerMin}
+                  onChange={(e) => setRlPerMin(+e.target.value)}
+                  className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Max concurrent active</Label>
+                <Input type="number" min={1} max={500} value={rlConcurrent}
+                  onChange={(e) => setRlConcurrent(+e.target.value)}
+                  className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+            </div>
+            <div className="flex justify-end mt-3">
+              <Button onClick={async () => {
+                setSavingKey("rl_defaults");
+                try {
+                  await api.settings.set("rl_per_min_default", String(rlPerMin));
+                  await api.settings.set("rl_concurrent_default", String(rlConcurrent));
+                  toast({ title: "Rate limits saved" });
+                  qc.invalidateQueries({ queryKey: ["admin-settings"] });
+                } catch (e) {
+                  toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
+                } finally { setSavingKey(null); }
+              }} disabled={savingKey === "rl_defaults"}
+                className="bg-gradient-to-r from-primary to-neon-magenta text-primary-foreground border-0">
+                {savingKey === "rl_defaults" ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+                Save defaults
+              </Button>
             </div>
           </GlassCard>
         </TabsContent>

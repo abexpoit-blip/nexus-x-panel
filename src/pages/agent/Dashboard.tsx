@@ -1,4 +1,4 @@
-import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer, Copy, CheckCircle2, History } from "lucide-react";
+import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer, Copy, CheckCircle2, History, Trophy, Crown, Medal } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { GlassCard } from "@/components/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -90,6 +90,15 @@ const AgentDashboard = () => {
   const totalAllocations = allNums.length;
   const receivedCount = allNums.filter((n: any) => n.otp).length;
   const successRate = totalAllocations > 0 ? (receivedCount / totalAllocations) * 100 : 0;
+
+  // Today's leaderboard — top 5 agents by OTP count.
+  const { data: lbData } = useQuery({
+    queryKey: ["agent-leaderboard-today"],
+    queryFn: () => api.leaderboard("today"),
+    refetchInterval: 30000,
+  });
+  const leaderboard = (lbData?.leaderboard || []).slice(0, 5);
+  const myRankIdx = leaderboard.findIndex((r) => r.username === user?.username);
 
   return (
     <div className="space-y-6">
@@ -314,6 +323,69 @@ const AgentDashboard = () => {
               </div>
             </div>
           ))}
+        </div>
+      </GlassCard>
+
+      {/* ── Daily leaderboard widget ── */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-neon-amber" /> Today's Top Earners
+          </h3>
+          {myRankIdx >= 0 ? (
+            <Badge variant="outline" className="border-neon-green/30 text-neon-green">
+              You're #{myRankIdx + 1}
+            </Badge>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">Get OTPs to enter the board</span>
+          )}
+        </div>
+        {!leaderboard.length && (
+          <p className="text-sm text-muted-foreground/60 text-center py-8">
+            No OTPs delivered today yet — be the first 🚀
+          </p>
+        )}
+        <div className="space-y-2">
+          {leaderboard.map((row, i) => {
+            const me = row.username === user?.username;
+            const RankIcon = i === 0 ? Crown : i === 1 ? Medal : i === 2 ? Trophy : null;
+            const rankColor =
+              i === 0 ? "text-neon-amber" :
+              i === 1 ? "text-muted-foreground" :
+              i === 2 ? "text-neon-magenta" : "text-muted-foreground/60";
+            return (
+              <div key={row.id}
+                className={cn(
+                  "flex items-center justify-between py-2.5 px-3 rounded-lg border transition-all",
+                  me
+                    ? "bg-neon-green/5 border-neon-green/30"
+                    : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04]"
+                )}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={cn(
+                    "w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs font-bold shrink-0",
+                    i === 0 ? "bg-neon-amber/15 text-neon-amber" :
+                    i === 1 ? "bg-white/10 text-foreground" :
+                    i === 2 ? "bg-neon-magenta/10 text-neon-magenta" :
+                    "bg-white/5 text-muted-foreground"
+                  )}>
+                    {RankIcon ? <RankIcon className="w-3.5 h-3.5" /> : i + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {row.username} {me && <span className="text-[10px] text-neon-green ml-1">(you)</span>}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {row.otp_count} OTP{row.otp_count === 1 ? "" : "s"} delivered
+                    </p>
+                  </div>
+                </div>
+                <div className={cn("text-sm font-mono font-semibold", rankColor)}>
+                  ৳{Math.round(row.earnings_bdt || 0).toLocaleString()}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </GlassCard>
     </div>

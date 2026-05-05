@@ -22,6 +22,8 @@ type AgentForm = {
   telegram?: string;
   daily_limit?: number;
   per_request_limit?: number;
+  rl_per_min?: number | null;
+  rl_concurrent?: number | null;
   status?: string;
 };
 
@@ -277,6 +279,14 @@ const AdminAgents = () => {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Daily limit"><Input type="number" value={form.daily_limit ?? 0} onChange={(e) => setForm({ ...form, daily_limit: +e.target.value })} /></Field>
               <Field label="Per-request limit"><Input type="number" value={form.per_request_limit ?? 0} onChange={(e) => setForm({ ...form, per_request_limit: +e.target.value })} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Rate: numbers / minute (blank = global)">
+                <Input type="number" placeholder="global" value={form.rl_per_min ?? ""} onChange={(e) => setForm({ ...form, rl_per_min: e.target.value === "" ? null : +e.target.value })} />
+              </Field>
+              <Field label="Concurrent active (blank = global)">
+                <Input type="number" placeholder="global" value={form.rl_concurrent ?? ""} onChange={(e) => setForm({ ...form, rl_concurrent: e.target.value === "" ? null : +e.target.value })} />
+              </Field>
             </div>
             <Field label="Status">
               <select value={form.status || "active"} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full h-10 px-3 rounded-md bg-white/[0.04] border border-white/[0.08]">

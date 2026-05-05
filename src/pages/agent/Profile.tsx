@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { loadOtpPrefs, saveOtpPrefs, requestPushPermission, type OtpAlertPrefs } from "@/hooks/useOtpAlerts";
 
 const AgentProfile = () => {
   const { user } = useAuth();
@@ -19,6 +21,24 @@ const AgentProfile = () => {
   const [confirmPw, setConfirmPw] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
+
+  // OTP alert preferences (sound + browser push) — stored in localStorage
+  const [otpPrefs, setOtpPrefs] = useState<OtpAlertPrefs>(() => loadOtpPrefs());
+  const [pushPerm, setPushPerm] = useState<string>(() =>
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
+  useEffect(() => { saveOtpPrefs(otpPrefs); }, [otpPrefs]);
+  const togglePush = async (v: boolean) => {
+    if (v && pushPerm !== "granted") {
+      const r = await requestPushPermission();
+      setPushPerm(r);
+      if (r !== "granted") {
+        toast.error("Browser denied notifications. Enable them in browser settings.");
+        return;
+      }
+    }
+    setOtpPrefs(p => ({ ...p, push: v }));
+  };
 
   const submitPasswordChange = async () => {
     if (!currentPw || !newPw) {
@@ -185,6 +205,40 @@ const AgentProfile = () => {
                 <p className="text-xs text-muted-foreground mt-1">192.168.1.xxx • Chrome on Windows</p>
               </div>
               <span className="text-xs text-muted-foreground">2 min ago</span>
+            </div>
+
+            {/* OTP Alerts */}
+            <div className="p-4 rounded-xl bg-gradient-to-br from-neon-cyan/[0.04] to-neon-magenta/[0.04] border border-white/[0.08] space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20">
+                  <BellRing className="w-4 h-4 text-neon-cyan" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-foreground">OTP Alerts</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Get notified the instant an OTP arrives — even when this tab isn't focused.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-foreground">
+                  <Volume2 className="w-4 h-4 text-muted-foreground" /> Sound chime
+                </div>
+                <Switch checked={otpPrefs.sound} onCheckedChange={(v) => setOtpPrefs(p => ({ ...p, sound: v }))} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-foreground">
+                  <BellRing className="w-4 h-4 text-muted-foreground" /> Browser push
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">({pushPerm})</span>
+                </div>
+                <Switch checked={otpPrefs.push && pushPerm === "granted"} onCheckedChange={togglePush} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Volume — {otpPrefs.volume}%</label>
+                <input type="range" min={0} max={100} value={otpPrefs.volume}
+                  onChange={(e) => setOtpPrefs(p => ({ ...p, volume: +e.target.value }))}
+                  className="w-full accent-primary" />
+              </div>
             </div>
           </div>
         </GlassCard>

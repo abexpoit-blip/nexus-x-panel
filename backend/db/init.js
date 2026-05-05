@@ -44,6 +44,10 @@ addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
 addColIfMissing('cdr', 'sms_text', 'TEXT');
 
+// Per-agent rate-limit overrides (NULL = use global setting).
+addColIfMissing('users', 'rl_per_min',     'INTEGER');
+addColIfMissing('users', 'rl_concurrent',  'INTEGER');
+
 // ─────────────────────────────────────────────────────────────────────
 // Generic provider_ranges table — provider-agnostic, admin-managed ranges.
 // Agents only see ranges where enabled=1. OTP wiring per provider is added
@@ -198,6 +202,10 @@ seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
 seedSetting('fake_otp_max_sec',  process.env.FAKE_OTP_MAX_SEC  || '90');
 seedSetting('fake_otp_burst',    process.env.FAKE_OTP_BURST    || '1');
 seedSetting('cdr_hide_fakes',    'false');
+
+// Per-agent rate-limit GLOBAL defaults — admin overrides via Settings UI.
+seedSetting('rl_per_min_default',    '12');   // max allocation requests / minute / agent
+seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocations / agent
 
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
