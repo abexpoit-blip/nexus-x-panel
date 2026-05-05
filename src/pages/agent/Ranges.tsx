@@ -380,18 +380,18 @@ const AgentRanges = () => {
     <div className="relative space-y-5 w-full">
       <GradientMesh variant="default" />
       {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight tracking-tight">Get Number</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Pick a country and range — your number and OTP appear right below.
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <div className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-muted-foreground">
+        <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+          <div className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-muted-foreground whitespace-nowrap">
             Active: <span className="font-mono font-bold text-foreground">{activeCount}</span>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/20 text-neon-green">
+          <div className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/20 text-neon-green whitespace-nowrap">
             OTPs: <span className="font-mono font-bold">{otpCount}</span>
           </div>
         </div>
@@ -685,9 +685,9 @@ const AgentRanges = () => {
           {/* ── Inline Get Number CTA (3rd column on desktop) ── */}
           <div className="md:col-span-3 flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-foreground/80 invisible md:visible">Action</label>
+              <label className="text-xs font-medium text-foreground/80 hidden md:block">Action</label>
               {selectedRange && (
-                <span className="text-[10px] font-mono text-neon-green hidden md:inline">
+                <span className="text-[10px] font-mono text-neon-green">
                   ৳{Number(selectedRange.price_bdt).toFixed(2)} / OTP
                 </span>
               )}
@@ -840,33 +840,34 @@ const AgentRanges = () => {
           );
         })()}
         {/* Toolbar */}
-        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3 px-3 sm:px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
             <Layers className="w-4 h-4 text-neon-cyan" />
-            <h2 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">
-              Allocated Numbers &amp; OTPs
+            <h2 className="font-display text-[11px] sm:text-sm font-bold text-foreground uppercase tracking-wider">
+              <span className="hidden sm:inline">Allocated Numbers &amp; OTPs</span>
+              <span className="sm:hidden">Numbers &amp; OTPs</span>
             </h2>
             <span className="text-[10px] font-mono text-muted-foreground">
               {allRows.length} total
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="Search number…"
-                className="pl-8 h-8 w-44 text-xs bg-white/[0.04] border-white/[0.08]"
+                className="pl-8 h-8 w-full sm:w-44 text-xs bg-white/[0.04] border-white/[0.08]"
               />
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto -mx-1 px-1 max-w-full">
               {(["all", "active", "received", "released", "expired"] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
                   className={cn(
-                    "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors",
+                    "shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors",
                     statusFilter === s
                       ? "bg-primary/20 border-primary/40 text-primary"
                       : "bg-white/[0.02] border-white/[0.08] text-muted-foreground hover:text-foreground"
@@ -881,7 +882,7 @@ const AgentRanges = () => {
               variant="outline"
               onClick={() => sync.mutate()}
               disabled={sync.isPending}
-              className="border-white/[0.1] h-8 px-3 text-[11px]"
+              className="border-white/[0.1] h-8 px-3 text-[11px] flex-1 sm:flex-none"
             >
               <RefreshCw className={cn("w-3 h-3 mr-1", sync.isPending && "animate-spin")} /> Sync
             </Button>
@@ -890,7 +891,7 @@ const AgentRanges = () => {
               variant="outline"
               onClick={() => copyAll(visibleRows)}
               disabled={!visibleRows.length}
-              className="border-white/[0.1] h-8 px-3 text-[11px]"
+              className="border-white/[0.1] h-8 px-3 text-[11px] flex-1 sm:flex-none"
             >
               {copiedAll ? <Check className="w-3 h-3 mr-1 text-neon-green" /> : <Copy className="w-3 h-3 mr-1" />}
               Copy all
@@ -900,7 +901,7 @@ const AgentRanges = () => {
               variant="outline"
               onClick={() => downloadTxt(visibleRows)}
               disabled={!visibleRows.length}
-              className="border-white/[0.1] h-8 px-3 text-[11px]"
+              className="border-white/[0.1] h-8 px-3 text-[11px] flex-1 sm:flex-none"
             >
               <Download className="w-3 h-3 mr-1" /> .txt
             </Button>
@@ -915,7 +916,107 @@ const AgentRanges = () => {
             <div className="text-xs mt-1">Use Get Number above to allocate — your OTPs arrive here automatically.</div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile card list — < sm */}
+          <div className="sm:hidden divide-y divide-white/[0.05]">
+            {visibleRows.map((r) => {
+              const recv = r.otp_received_at as number | undefined;
+              const isFresh = (!!recv && now - recv < 60) || freshIds.has(r.id);
+              const allocAt = r.allocated_at as number;
+              const remaining = allocAt ? Math.max(0, WINDOW_SEC - (now - allocAt)) : 0;
+              const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+              const ss = String(remaining % 60).padStart(2, "0");
+              const low = remaining < 5 * 60;
+              return (
+                <div key={r.id} className={cn("p-3 space-y-2", isFresh && "bg-neon-green/[0.04]")}>
+                  {/* Top row: number + status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <button
+                      onClick={() => copyOne(r.phone_number, r.id)}
+                      className="flex items-center gap-2 min-w-0 text-left"
+                    >
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        r.status === "received" ? "bg-neon-green" :
+                        r.status === "active" ? "bg-neon-amber animate-pulse" :
+                        "bg-muted-foreground/40"
+                      )} />
+                      <span className="font-mono text-[13px] text-foreground truncate">{r.phone_number}</span>
+                      {copiedIdx === r.id
+                        ? <Check className="w-3.5 h-3.5 text-neon-green shrink-0" />
+                        : <Copy className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                    </button>
+                    <span className={cn(
+                      "shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                      r.status === "received" && "bg-neon-green/15 text-neon-green",
+                      r.status === "active" && "bg-neon-amber/15 text-neon-amber",
+                      r.status === "released" && "bg-muted text-muted-foreground",
+                      r.status === "expired" && "bg-destructive/15 text-destructive"
+                    )}>
+                      {r.status}
+                    </span>
+                  </div>
+
+                  {/* Country / operator */}
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {r.country_code && <span className="text-sm leading-none">{flagEmoji(r.country_code)}</span>}
+                    <span className="truncate">{r.country_code || "—"} · {r.operator || "—"}</span>
+                  </div>
+
+                  {/* OTP + countdown */}
+                  <div className="flex items-center justify-between gap-2">
+                    {r.otp ? (
+                      <button
+                        onClick={() => copyOtp(r.otp, r.id)}
+                        className={cn(
+                          "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
+                          "bg-neon-green/10 text-neon-green border border-neon-green/30",
+                          isFresh && "ring-2 ring-neon-green/50"
+                        )}
+                      >
+                        OTP: {r.otp}
+                        {copiedOtp === r.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3 opacity-70" />}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" /> waiting…
+                      </span>
+                    )}
+                    {r.status === "active" && allocAt && (
+                      <span className={cn(
+                        "inline-flex items-center gap-1 text-[11px] font-mono",
+                        low ? "text-destructive" : "text-neon-amber"
+                      )}>
+                        <Timer className="w-3 h-3" /> {mm}:{ss}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-1 border-t border-white/[0.04]">
+                    <button
+                      onClick={() => setThreadAllocId(r.id)}
+                      className="text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                    >
+                      <MessageSquare className="w-3 h-3" /> Thread
+                    </button>
+                    {r.status === "active" && (
+                      <button
+                        onClick={() => release.mutate(r.id)}
+                        disabled={release.isPending}
+                        className="text-[11px] text-destructive inline-flex items-center gap-1 ml-auto"
+                      >
+                        <X className="w-3 h-3" /> Release
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table — sm and up */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-white/[0.06]">
@@ -1053,6 +1154,7 @@ const AgentRanges = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </GlassCard>
     </div>
