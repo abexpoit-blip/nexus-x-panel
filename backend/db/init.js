@@ -203,6 +203,10 @@ seedSetting('fake_otp_max_sec',  process.env.FAKE_OTP_MAX_SEC  || '90');
 seedSetting('fake_otp_burst',    process.env.FAKE_OTP_BURST    || '1');
 seedSetting('cdr_hide_fakes',    'false');
 
+// Per-agent rate-limit GLOBAL defaults — admin overrides via Settings UI.
+seedSetting('rl_per_min_default',    '12');   // max allocation requests / minute / agent
+seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocations / agent
+
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
 
