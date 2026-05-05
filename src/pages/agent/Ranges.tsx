@@ -986,8 +986,8 @@ const AgentRanges = () => {
                         onClick={() => copyOtp(r.otp, r.id)}
                         className={cn(
                           "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
-                          "bg-neon-green/10 text-neon-green border border-neon-green/30",
-                          isFresh && "ring-2 ring-neon-green/50"
+                          "bg-neon-green/10 text-neon-green border border-neon-green/30 transition-all",
+                          isFresh && "bg-neon-green/20 border-neon-green/60 otp-glow animate-otp-arrive"
                         )}
                       >
                         OTP: {r.otp}
@@ -1095,7 +1095,7 @@ const AgentRanges = () => {
                             className={cn(
                               "font-mono font-bold text-[13px] inline-flex items-center gap-1.5 px-2 py-1 rounded",
                               "bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 transition-colors",
-                              isFresh && "ring-2 ring-neon-green/50 shadow-[0_0_12px_-2px_hsl(var(--neon-green)/0.6)]"
+                            isFresh && "bg-neon-green/20 border-neon-green/70 otp-glow animate-otp-arrive scale-[1.02]"
                             )}
                           >
                             {r.otp}
