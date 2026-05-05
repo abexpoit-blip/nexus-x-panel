@@ -414,6 +414,27 @@ export const api = {
         `/admin/provider-ranges/${rangeId}/pool/purge?status=${status}`, { method: "POST" }
       ),
 
+    // ─── Range health + auto-pause ───────────────────────────────
+    rangeHealth: (windowMin?: number) => {
+      const qs = windowMin ? `?window_min=${windowMin}` : "";
+      return request<{
+        stats: Record<string, {
+          range_id: number; delivered: number; expired_no_otp: number;
+          samples: number; score: number | null; last_otp_at: number | null;
+        }>;
+        config: { enabled: boolean; threshold: number; minSamples: number; windowMin: number };
+        window_min: number;
+      }>(`/admin/provider-ranges/health${qs}`);
+    },
+    rangeAutopauseGet: () =>
+      request<{ config: { enabled: boolean; threshold: number; minSamples: number; windowMin: number } }>(
+        "/admin/range-autopause"
+      ),
+    rangeAutopauseSave: (body: { enabled?: boolean; threshold?: number; min_samples?: number; window_min?: number }) =>
+      request<{ ok: boolean; config: { enabled: boolean; threshold: number; minSamples: number; windowMin: number } }>(
+        "/admin/range-autopause", { method: "PUT", body: JSON.stringify(body) }
+      ),
+
     // ─── Bots Control ─────────────────────────────────────────────
     bots: {
       list: () => request<{ bots: Record<string, BotInfo> }>("/admin/bots"),
@@ -448,6 +469,24 @@ export const api = {
     const qs = `?country=${encodeURIComponent(countryCode)}${serviceId ? `&service_id=${serviceId}` : ""}`;
     return request<{ ranges: ProviderRange[] }>(`/numbers/v2/ranges${qs}`);
   },
+
+  // Per-allocation OTP thread (full SMS history for one number)
+  numberThread: (allocationId: number) =>
+    request<{
+      allocation: {
+        id: number; phone_number: string; provider: string;
+        country_code?: string | null; operator?: string | null;
+        status: string; allocated_at: number; otp_received_at?: number | null;
+        service_slug?: string | null; service_name?: string | null;
+        service_icon?: string | null; service_color?: string | null;
+      };
+      messages: Array<{
+        id: number; otp_code: string | null; cli: string | null;
+        sms_text: string | null; created_at: number;
+        allocation_id: number | null; price_bdt: number; status: string;
+      }>;
+      server_now: number;
+    }>(`/numbers/${allocationId}/thread`),
 
   // ===== Services (catalog) =====
   services: () => request<{ services: Service[] }>("/services"),
