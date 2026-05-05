@@ -72,9 +72,16 @@ export const AppSidebar = ({ open, onClose }: SidebarProps) => {
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="relative flex items-center justify-between px-5 h-[72px] border-b border-white/[0.06]">
-          <NexusLogo size="md" showVersion />
-          <button onClick={onClose} className="lg:hidden p-1 text-muted-foreground hover:text-foreground">
+        <div className="relative flex items-center justify-between gap-2 px-3 sm:px-5 h-[72px] border-b border-white/[0.06]">
+          <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+            <span className="hidden sm:inline-block">
+              <NexusLogo size="md" showVersion />
+            </span>
+            <span className="sm:hidden">
+              <NexusLogo size="sm" showVersion />
+            </span>
+          </div>
+          <button onClick={onClose} className="lg:hidden shrink-0 p-1 text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
           <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
