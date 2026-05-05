@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square, Layers, RotateCw, Activity } from "lucide-react";
+import { Plus, Trash2, Pencil, Server, Loader2, Power, CheckSquare, Square, Layers, RotateCw, Activity, FileText, AlertTriangle } from "lucide-react";
 import { GradientMesh, PageHeader } from "@/components/premium";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -62,6 +62,15 @@ const AdminProviderRanges = () => {
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [poolRangeId, setPoolRangeId] = useState<number | null>(null);
+  const [logsProvider, setLogsProvider] = useState<string | null>(null);
+  const [logsLevel, setLogsLevel] = useState<"all" | "error" | "miss">("all");
+
+  const { data: logsData, isFetching: logsFetching, refetch: refetchLogs } = useQuery({
+    queryKey: ["admin-bot-logs", logsProvider, logsLevel],
+    queryFn: () => api.admin.bots.logs(`${logsProvider}Bot`, logsLevel, 100),
+    enabled: !!logsProvider,
+    refetchInterval: logsProvider ? 5000 : false,
+  });
 
   // Per-range stats (stock + last activity)
   const { data: statsData } = useQuery({
@@ -352,6 +361,12 @@ const AdminProviderRanges = () => {
                             <Button size="sm" variant="ghost" onClick={() => restartBot(r.provider)}
                               className="h-7 w-7 p-0" title="Restart bot">
                               <RotateCw className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost"
+                              onClick={() => { setLogsProvider(r.provider); setLogsLevel("all"); }}
+                              className="h-7 w-7 p-0"
+                              title="Failure logs (no-alloc misses, scrape errors)">
+                              <FileText className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         );
