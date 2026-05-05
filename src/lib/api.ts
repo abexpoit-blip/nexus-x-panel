@@ -95,6 +95,25 @@ export type ProviderRange = {
   notes?: string | null;
   created_at?: number;
   updated_at?: number;
+  service_id?: number | null;
+  service_slug?: string | null;
+  service_name?: string | null;
+  service_icon?: string | null;
+  service_color?: string | null;
+};
+
+export type Service = {
+  id: number;
+  slug: string;
+  name: string;
+  icon: string;
+  color: string;
+  enabled: 0 | 1;
+  sort_order: number;
+  range_count?: number;
+  free_count?: number;
+  created_at?: number;
+  updated_at?: number;
 };
 
 export const api = {
