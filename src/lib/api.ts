@@ -370,6 +370,15 @@ export const api = {
         method: "POST", body: JSON.stringify({ ids, enabled }),
       }),
 
+    // ─── Services (admin CRUD) ───────────────────────────────────
+    servicesList: () => request<{ rows: Service[] }>("/admin/services"),
+    serviceCreate: (body: Partial<Service>) =>
+      request<{ id: number }>("/admin/services", { method: "POST", body: JSON.stringify(body) }),
+    serviceUpdate: (id: number, body: Partial<Service>) =>
+      request<{ ok: boolean }>(`/admin/services/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    serviceDelete: (id: number, force = false) =>
+      request<{ ok: boolean }>(`/admin/services/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
+
     // ─── Range pool numbers (manual MSISDN stock) ────────────────
     rangesStats: () =>
       request<{ stats: Record<string, {
