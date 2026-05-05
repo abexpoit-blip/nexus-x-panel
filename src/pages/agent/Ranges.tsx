@@ -685,9 +685,9 @@ const AgentRanges = () => {
           {/* ── Inline Get Number CTA (3rd column on desktop) ── */}
           <div className="md:col-span-3 flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-foreground/80 invisible md:visible">Action</label>
+              <label className="text-xs font-medium text-foreground/80 hidden md:block">Action</label>
               {selectedRange && (
-                <span className="text-[10px] font-mono text-neon-green hidden md:inline">
+                <span className="text-[10px] font-mono text-neon-green">
                   ৳{Number(selectedRange.price_bdt).toFixed(2)} / OTP
                 </span>
               )}
