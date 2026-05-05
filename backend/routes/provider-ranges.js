@@ -62,15 +62,15 @@ router.get('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
   const { provider, country_code, enabled, service_id } = req.query;
   const where = [];
   const params = [];
-  if (provider) { where.push('provider = ?'); params.push(provider); }
-  if (country_code) { where.push('country_code = ?'); params.push(String(country_code).toUpperCase()); }
-  if (enabled === '0' || enabled === '1') { where.push('enabled = ?'); params.push(+enabled); }
-  if (service_id) { where.push('service_id = ?'); params.push(+service_id); }
+  if (provider) { where.push('r.provider = ?'); params.push(provider); }
+  if (country_code) { where.push('r.country_code = ?'); params.push(String(country_code).toUpperCase()); }
+  if (enabled === '0' || enabled === '1') { where.push('r.enabled = ?'); params.push(+enabled); }
+  if (service_id) { where.push('r.service_id = ?'); params.push(+service_id); }
   const sql = `
     SELECT r.*, s.slug AS service_slug, s.name AS service_name, s.icon AS service_icon, s.color AS service_color
     FROM provider_ranges r
     LEFT JOIN services s ON s.id = r.service_id
-    ${where.length ? 'WHERE ' + where.map(w => w.replace(/\b(provider|country_code|enabled|service_id)\b/, 'r.$1')).join(' AND ') : ''}
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
     ORDER BY r.provider, r.country_code, r.range_label`;
   res.json({ rows: db.prepare(sql).all(...params) });
 });
