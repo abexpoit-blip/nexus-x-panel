@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { GradientMesh } from "@/components/premium";
-import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw } from "lucide-react";
+import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +31,33 @@ function flagEmoji(code: string): string {
   if (cc.length !== 2) return "🌐";
   const A = 0x1f1e6;
   return String.fromCodePoint(A + cc.charCodeAt(0) - 65, A + cc.charCodeAt(1) - 65);
+}
+
+// Robust clipboard write — falls back to a hidden textarea + execCommand when
+// the async Clipboard API is unavailable or blocked (insecure context, focus
+// issues, certain browsers / extensions).
+async function safeCopy(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 const LS_COUNTRY = "nx.getnum.country";
@@ -143,15 +170,9 @@ const AgentRanges = () => {
             });
           }, 30000);
         }
-        // Auto-copy allocated number(s) to clipboard
+        // Auto-copy allocated number(s) to clipboard (with fallback)
         const phones = (r.allocated as any[]).map(a => a.phone_number).filter(Boolean);
-        let copied = false;
-        if (phones.length) {
-          try {
-            await navigator.clipboard.writeText(phones.join("\n"));
-            copied = true;
-          } catch { /* ignore — clipboard may be blocked */ }
-        }
+        const copied = phones.length ? await safeCopy(phones.join("\n")) : false;
         // Refresh allocated list immediately so they appear inline
         qc.invalidateQueries({ queryKey: ["my-numbers-inline"] });
         toast({
@@ -173,26 +194,32 @@ const AgentRanges = () => {
   };
 
   const copyOne = async (text: string, idx: number) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await safeCopy(text);
+    if (ok) {
       setCopiedIdx(idx);
       setTimeout(() => setCopiedIdx(null), 1200);
-    } catch { toast({ title: "Copy failed", variant: "destructive" }); }
+    } else {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
   };
   const copyOtp = async (text: string, idx: number) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await safeCopy(text);
+    if (ok) {
       setCopiedOtp(idx);
       setTimeout(() => setCopiedOtp(null), 1200);
-    } catch { toast({ title: "Copy failed", variant: "destructive" }); }
+    } else {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
   };
   const copyAll = async (rows: { phone_number: string }[]) => {
     if (!rows.length) return;
-    try {
-      await navigator.clipboard.writeText(rows.map(a => a.phone_number).join("\n"));
+    const ok = await safeCopy(rows.map(a => a.phone_number).join("\n"));
+    if (ok) {
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 1500);
-    } catch { toast({ title: "Copy failed", variant: "destructive" }); }
+    } else {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
   };
   // Download as `Number|OTP` (one row per line). Rows without OTP yet are
   // included with an empty OTP so the file structure stays consistent.
@@ -251,12 +278,13 @@ const AgentRanges = () => {
     },
   });
 
-  // Tick to re-evaluate "NEW" highlight
+  // Tick every second so the 30-min countdown for active rows updates live.
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
-    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 5000);
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(id);
   }, []);
+  const WINDOW_SEC = 30 * 60;
 
   const allRows = (myData?.numbers || []) as any[];
   const visibleRows = useMemo(() => {
@@ -787,7 +815,28 @@ const AgentRanges = () => {
                         </span>
                       </td>
                       <td className="px-3 py-3 text-[11px] text-muted-foreground font-mono whitespace-nowrap">
-                        {new Date(((recv || r.allocated_at) as number) * 1000).toLocaleTimeString()}
+                        {(() => {
+                          const allocAt = r.allocated_at as number;
+                          const timeStr = new Date(((recv || allocAt) as number) * 1000).toLocaleTimeString();
+                          if (r.status === "active" && allocAt) {
+                            const remaining = Math.max(0, WINDOW_SEC - (now - allocAt));
+                            const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+                            const ss = String(remaining % 60).padStart(2, "0");
+                            const low = remaining < 5 * 60;
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span>{timeStr}</span>
+                                <span className={cn(
+                                  "inline-flex items-center gap-1 text-[10px]",
+                                  low ? "text-destructive" : "text-neon-amber"
+                                )}>
+                                  <Timer className="w-3 h-3" /> {mm}:{ss} left
+                                </span>
+                              </div>
+                            );
+                          }
+                          return timeStr;
+                        })()}
                       </td>
                       <td className="px-5 py-3 text-right">
                         {r.status === "active" && (
