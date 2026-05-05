@@ -1,4 +1,4 @@
-import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer, Copy, CheckCircle2, History } from "lucide-react";
+import { Hash, MessageSquare, TrendingUp, Wallet, Activity, Clock, Target, BellRing, Timer, Copy, CheckCircle2, History, Trophy, Crown, Medal } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { GlassCard } from "@/components/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -90,6 +90,15 @@ const AgentDashboard = () => {
   const totalAllocations = allNums.length;
   const receivedCount = allNums.filter((n: any) => n.otp).length;
   const successRate = totalAllocations > 0 ? (receivedCount / totalAllocations) * 100 : 0;
+
+  // Today's leaderboard — top 5 agents by OTP count.
+  const { data: lbData } = useQuery({
+    queryKey: ["agent-leaderboard-today"],
+    queryFn: () => api.leaderboard("today"),
+    refetchInterval: 30000,
+  });
+  const leaderboard = (lbData?.leaderboard || []).slice(0, 5);
+  const myRankIdx = leaderboard.findIndex((r) => r.username === user?.username);
 
   return (
     <div className="space-y-6">
