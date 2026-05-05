@@ -350,6 +350,48 @@ const AgentRanges = () => {
       </div>
 
       {/* ── Empty state when no countries at all ── */}
+      {/* Premium segmented service switcher — top of page, sticky feel.
+          Choosing a service resets country/range so stock stays consistent. */}
+      {services.length > 0 && (
+        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-x-auto">
+          {services.map(s => {
+            const isActive = serviceId === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => {
+                  if (serviceId === s.id) return;
+                  setServiceId(s.id);
+                  setCountry(null);
+                  setRangeId(null);
+                  try { localStorage.removeItem(LS_COUNTRY); localStorage.removeItem(LS_RANGE); } catch {}
+                }}
+                className={cn(
+                  "relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+                  isActive
+                    ? "text-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                )}
+                style={isActive ? {
+                  background: `linear-gradient(135deg, ${s.color}25, ${s.color}10)`,
+                  border: `1px solid ${s.color}55`,
+                  boxShadow: `0 4px 20px -8px ${s.color}80`,
+                } : undefined}
+              >
+                <span className="text-lg leading-none">{s.icon}</span>
+                <span>{s.name}</span>
+                {(s.free_count ?? 0) > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold"
+                    style={{ background: `${s.color}30`, color: s.color }}>
+                    {s.free_count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {!loadingCountries && allCountries.length === 0 ? (
         <GlassCard>
           <div className="text-center py-12 text-muted-foreground">
