@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink, HeartPulse, CheckCircle2, AlertTriangle, Link2 } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Wrench, UserPlus, Clock, Eye, Bot, Trash2, Zap, KeyRound, Cookie, ExternalLink, HeartPulse, CheckCircle2, AlertTriangle, Link2, Gauge } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,9 @@ const AdminSettings = () => {
   const [recentHrs, setRecentHrs] = useState<number>(24);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
+  const [rlPerMin, setRlPerMin] = useState<number>(12);
+  const [rlConcurrent, setRlConcurrent] = useState<number>(5);
+
   const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
@@ -101,6 +104,8 @@ const AdminSettings = () => {
     setXisoraPass(str(s, "xisora_password", "mamun@12aa"));
     setXisoraCookie(str(s, "xisora_cookie_header"));
     setXisoraInterval(Number(str(s, "xisora_otp_interval", "10")) || 10);
+    setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
+    setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
   }, [s]);
 
   useEffect(() => {
