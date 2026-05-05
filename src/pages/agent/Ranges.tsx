@@ -840,33 +840,34 @@ const AgentRanges = () => {
           );
         })()}
         {/* Toolbar */}
-        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3 px-3 sm:px-5 py-3 border-b border-white/[0.06] bg-white/[0.02] flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
             <Layers className="w-4 h-4 text-neon-cyan" />
-            <h2 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">
-              Allocated Numbers &amp; OTPs
+            <h2 className="font-display text-[11px] sm:text-sm font-bold text-foreground uppercase tracking-wider">
+              <span className="hidden sm:inline">Allocated Numbers &amp; OTPs</span>
+              <span className="sm:hidden">Numbers &amp; OTPs</span>
             </h2>
             <span className="text-[10px] font-mono text-muted-foreground">
               {allRows.length} total
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="Search number…"
-                className="pl-8 h-8 w-44 text-xs bg-white/[0.04] border-white/[0.08]"
+                className="pl-8 h-8 w-full sm:w-44 text-xs bg-white/[0.04] border-white/[0.08]"
               />
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto -mx-1 px-1 max-w-full">
               {(["all", "active", "received", "released", "expired"] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
                   className={cn(
-                    "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors",
+                    "shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors",
                     statusFilter === s
                       ? "bg-primary/20 border-primary/40 text-primary"
                       : "bg-white/[0.02] border-white/[0.08] text-muted-foreground hover:text-foreground"
@@ -881,7 +882,7 @@ const AgentRanges = () => {
               variant="outline"
               onClick={() => sync.mutate()}
               disabled={sync.isPending}
-              className="border-white/[0.1] h-8 px-3 text-[11px]"
+              className="border-white/[0.1] h-8 px-3 text-[11px] flex-1 sm:flex-none"
             >
               <RefreshCw className={cn("w-3 h-3 mr-1", sync.isPending && "animate-spin")} /> Sync
             </Button>
@@ -890,7 +891,7 @@ const AgentRanges = () => {
               variant="outline"
               onClick={() => copyAll(visibleRows)}
               disabled={!visibleRows.length}
-              className="border-white/[0.1] h-8 px-3 text-[11px]"
+              className="border-white/[0.1] h-8 px-3 text-[11px] flex-1 sm:flex-none"
             >
               {copiedAll ? <Check className="w-3 h-3 mr-1 text-neon-green" /> : <Copy className="w-3 h-3 mr-1" />}
               Copy all
@@ -900,7 +901,7 @@ const AgentRanges = () => {
               variant="outline"
               onClick={() => downloadTxt(visibleRows)}
               disabled={!visibleRows.length}
-              className="border-white/[0.1] h-8 px-3 text-[11px]"
+              className="border-white/[0.1] h-8 px-3 text-[11px] flex-1 sm:flex-none"
             >
               <Download className="w-3 h-3 mr-1" /> .txt
             </Button>
