@@ -205,7 +205,7 @@ router.get('/leaderboard', (req, res) => {
 router.get('/agents', (req, res) => {
   const agents = db.prepare(`
     SELECT id, username, role, full_name, phone, telegram, balance, otp_count,
-           daily_limit, per_request_limit, status, created_at
+           daily_limit, per_request_limit, rl_per_min, rl_concurrent, status, created_at
     FROM users WHERE role = 'agent'
     ORDER BY
       CASE status WHEN 'pending' THEN 0 WHEN 'active' THEN 1 ELSE 2 END,
@@ -254,12 +254,17 @@ router.post('/agents', (req, res) => {
 
 router.patch('/agents/:id', (req, res) => {
   const id = +req.params.id;
-  const allowed = ['full_name', 'phone', 'telegram', 'daily_limit', 'per_request_limit', 'status', 'balance'];
+  const allowed = ['full_name', 'phone', 'telegram', 'daily_limit', 'per_request_limit', 'rl_per_min', 'rl_concurrent', 'status', 'balance'];
   const sets = [], vals = [];
   for (const k of allowed) {
     if (k in req.body) {
       sets.push(`${k} = ?`);
-      vals.push(k === 'balance' ? +req.body[k] || 0 : req.body[k]);
+      vals.push(
+        k === 'balance' ? +req.body[k] || 0 :
+        (k === 'rl_per_min' || k === 'rl_concurrent')
+          ? (req.body[k] === '' || req.body[k] == null ? null : +req.body[k] || null)
+          : req.body[k]
+      );
     }
   }
   if (req.body.password) {
