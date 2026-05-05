@@ -89,4 +89,32 @@ try {
   console.error('[db] pool tables self-heal failed:', e.message);
 }
 
+// --- Self-healing: end-to-end OTP audit log ---
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS otp_audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      source_msg_id TEXT,
+      phone_number TEXT,
+      cli TEXT,
+      otp_code TEXT,
+      sms_text TEXT,
+      allocation_id INTEGER,
+      user_id INTEGER,
+      outcome TEXT NOT NULL,
+      miss_reason TEXT,
+      amount_bdt REAL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_otp_audit_time ON otp_audit_log(created_at);
+    CREATE INDEX IF NOT EXISTS idx_otp_audit_source ON otp_audit_log(source, created_at);
+    CREATE INDEX IF NOT EXISTS idx_otp_audit_outcome ON otp_audit_log(outcome, created_at);
+    CREATE INDEX IF NOT EXISTS idx_otp_audit_phone ON otp_audit_log(phone_number);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_otp_audit_src_msg ON otp_audit_log(source, source_msg_id);
+  `);
+} catch (e) {
+  console.error('[db] otp_audit_log self-heal failed:', e.message);
+}
+
 module.exports = db;
