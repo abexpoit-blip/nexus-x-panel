@@ -11,6 +11,8 @@
 const BASE = (process.env.BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
 const USER = process.env.SMOKE_USER || '';
 const PASS = process.env.SMOKE_PASS || '';
+// Backend's /api/auth/login expects { username, password } — accept either env var name.
+const USERNAME = process.env.SMOKE_USERNAME || USER;
 
 let cookie = '';
 const results = [];
@@ -50,7 +52,9 @@ async function hit(method, path, { body, expect = [200], auth = false } = {}) {
 
   // 1. Health / public
   console.log('• Public');
-  await hit('GET', '/api/security/settings/public', { expect: [200] });
+  // Note: security router is mounted at /api (not /api/security), so the
+  // public-settings route lives at /api/settings/public.
+  await hit('GET', '/api/settings/public', { expect: [200] });
 
   // 2. Auth — unauthenticated /me must 401
   console.log('\n• Auth (unauthenticated)');
@@ -58,10 +62,10 @@ async function hit(method, path, { body, expect = [200], auth = false } = {}) {
   await hit('GET', '/api/numbers/my', { expect: [401, 403], auth: true });
 
   // 3. Login (only if creds provided)
-  if (USER && PASS) {
+  if (USERNAME && PASS) {
     console.log('\n• Auth (login)');
     const r = await hit('POST', '/api/auth/login', {
-      body: { email: USER, password: PASS },
+      body: { username: USERNAME, password: PASS },
       expect: [200],
     });
     if (r?.res?.status === 200) {
@@ -84,7 +88,7 @@ async function hit(method, path, { body, expect = [200], auth = false } = {}) {
       await hit('GET', '/api/admin/provider-ranges', { auth: true, expect: [200, 403] });
     }
   } else {
-    console.log('\n  (skipped login-gated checks — set SMOKE_USER / SMOKE_PASS to enable)');
+    console.log('\n  (skipped login-gated checks — set SMOKE_USERNAME / SMOKE_PASS to enable)');
   }
 
   const passed = results.filter(r => r.ok).length;
