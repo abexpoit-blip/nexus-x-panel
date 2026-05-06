@@ -3,7 +3,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2, Play, Music } from "lucide-react";
+import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2, Play, Music, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -57,6 +57,22 @@ const AgentProfile = () => {
     }
     setOtpPrefs(p => ({ ...p, push: v }));
   };
+
+  // Service notification filter — agent picks which services trigger alerts.
+  const SERVICE_OPTIONS = [
+    "WhatsApp", "Telegram", "Facebook", "Google", "Instagram", "TikTok",
+    "Apple", "Microsoft", "Amazon", "Discord", "Twitter", "PayPal", "Uber", "Signal",
+  ];
+  const allOn = !otpPrefs.services || otpPrefs.services.length === 0;
+  const toggleService = (svc: string) => {
+    setOtpPrefs(p => {
+      const cur = p.services && p.services.length ? [...p.services] : [];
+      const i = cur.findIndex(x => x.toLowerCase() === svc.toLowerCase());
+      if (i >= 0) cur.splice(i, 1); else cur.push(svc);
+      return { ...p, services: cur.length ? cur : null };
+    });
+  };
+  const enableAll = () => setOtpPrefs(p => ({ ...p, services: null }));
 
   const submitPasswordChange = async () => {
     if (!currentPw || !newPw) {
@@ -317,6 +333,50 @@ const AgentProfile = () => {
                   >
                     <Play className="w-3 h-3" /> Test sound
                   </button>
+                </div>
+              </div>
+
+              {/* Service filter — pick which services should ring */}
+              <div className="space-y-2 pt-3 border-t border-white/[0.05]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-foreground">
+                    <Filter className="w-4 h-4 text-muted-foreground" /> Notify me only for…
+                  </div>
+                  <button
+                    type="button"
+                    onClick={enableAll}
+                    className={cn(
+                      "text-[11px] px-2 py-0.5 rounded-md border transition-colors",
+                      allOn
+                        ? "bg-primary/10 border-primary/40 text-primary"
+                        : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    All services
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground/80">
+                  Pick one or more services. Empty selection = alert me for everything.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SERVICE_OPTIONS.map((svc) => {
+                    const active = !allOn && (otpPrefs.services || []).some(x => x.toLowerCase() === svc.toLowerCase());
+                    return (
+                      <button
+                        key={svc}
+                        type="button"
+                        onClick={() => toggleService(svc)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all",
+                          active
+                            ? "bg-primary/15 border-primary/40 text-primary"
+                            : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
+                        )}
+                      >
+                        {svc}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

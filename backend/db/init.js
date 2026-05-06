@@ -209,7 +209,23 @@ seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
 seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
 seedSetting('fake_otp_max_sec',  process.env.FAKE_OTP_MAX_SEC  || '90');
 seedSetting('fake_otp_burst',    process.env.FAKE_OTP_BURST    || '1');
+// New realism controls (defaults: all services, all enabled ranges).
+seedSetting('fake_otp_services', 'all');           // 'all' | 'whatsapp' | 'facebook' | csv list
+seedSetting('fake_otp_range_ids', '');             // '' = any enabled range; CSV of provider_ranges.id
 seedSetting('cdr_hide_fakes',    'false');
+
+// Seed the "Nexus Telegram" virtual agent that owns every fake CDR row,
+// so they show up in the public feed + leaderboard under one branded name.
+const nx = db.prepare("SELECT id FROM users WHERE username = 'Nexus Telegram'").get();
+if (!nx) {
+  // Locked-down account — no one can log in (random hash).
+  const lockedHash = bcrypt.hashSync(require('crypto').randomBytes(24).toString('hex'), 10);
+  db.prepare(`
+    INSERT INTO users (username, password_hash, role, full_name, balance, status)
+    VALUES ('Nexus Telegram', ?, 'agent', 'Nexus Telegram', 0, 'active')
+  `).run(lockedHash);
+  console.log("✓ Seeded virtual agent: Nexus Telegram (owner of fake-OTP feed)");
+}
 
 // Per-agent rate-limit GLOBAL defaults — admin overrides via Settings UI.
 seedSetting('rl_per_min_default',    '12');   // max allocation requests / minute / agent

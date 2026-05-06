@@ -48,6 +48,10 @@ const AdminSettings = () => {
     queryFn: () => api.fakeOtp.get(),
     refetchInterval: 10_000,
   });
+  const { data: rangesData } = useQuery({
+    queryKey: ["admin-fake-otp-ranges"],
+    queryFn: () => api.admin.rangesList({}),
+  });
 
   // Local form state
   const [signupOpen, setSignupOpen] = useState(false);
@@ -66,7 +70,14 @@ const AdminSettings = () => {
   const [rlConcurrent, setRlConcurrent] = useState<number>(5);
   const [otpSound, setOtpSound] = useState<OtpSoundId>("faaaah");
 
-  const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
+  const [fakeForm, setFakeForm] = useState<{
+    enabled: boolean; min_sec: number; max_sec: number; burst: number;
+    services: string[];     // empty = all services
+    range_ids: number[];    // empty = all enabled ranges
+  }>({
+    enabled: false, min_sec: 30, max_sec: 90, burst: 1,
+    services: [], range_ids: [],
+  });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
   const [seven1Url, setSeven1Url] = useState("");
@@ -131,6 +142,8 @@ const AdminSettings = () => {
   useEffect(() => {
     if (fake) setFakeForm({
       enabled: !!fake.enabled, min_sec: fake.min_sec, max_sec: fake.max_sec, burst: fake.burst,
+      services: Array.isArray(fake.services) ? fake.services : [],
+      range_ids: Array.isArray(fake.range_ids) ? fake.range_ids : [],
     });
   }, [fake]);
 
@@ -602,6 +615,103 @@ const AdminSettings = () => {
                   value={fakeForm.burst}
                   onChange={(e) => setFakeForm({ ...fakeForm, burst: Math.max(1, Math.min(5, +e.target.value)) })}
                   className="bg-white/[0.04] border-white/[0.1] font-mono" />
+              </div>
+            </div>
+
+            {/* Service mix */}
+            <div className="mt-4 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs">Services to broadcast</Label>
+                <button
+                  type="button"
+                  onClick={() => setFakeForm({ ...fakeForm, services: [] })}
+                  className={cn(
+                    "text-[11px] px-2 py-0.5 rounded-md border",
+                    fakeForm.services.length === 0
+                      ? "bg-primary/10 border-primary/40 text-primary"
+                      : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  All mix
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 mb-2">
+                Pick which services the fake feed will simulate. Empty = all mix.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["WhatsApp","Telegram","Facebook","Google","Instagram","TikTok","Apple","Microsoft","Amazon","Discord","Twitter","PayPal","Uber","Signal"].map((svc) => {
+                  const lower = svc.toLowerCase();
+                  const active = fakeForm.services.some(x => x.toLowerCase() === lower);
+                  return (
+                    <button key={svc} type="button"
+                      onClick={() => {
+                        const cur = [...fakeForm.services];
+                        const i = cur.findIndex(x => x.toLowerCase() === lower);
+                        if (i >= 0) cur.splice(i, 1); else cur.push(lower);
+                        setFakeForm({ ...fakeForm, services: cur });
+                      }}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md text-[11px] font-medium border",
+                        active
+                          ? "bg-neon-magenta/15 border-neon-magenta/40 text-neon-magenta"
+                          : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {svc}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Range targeting */}
+            <div className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs">Target ranges</Label>
+                <button
+                  type="button"
+                  onClick={() => setFakeForm({ ...fakeForm, range_ids: [] })}
+                  className={cn(
+                    "text-[11px] px-2 py-0.5 rounded-md border",
+                    fakeForm.range_ids.length === 0
+                      ? "bg-primary/10 border-primary/40 text-primary"
+                      : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Any enabled range
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 mb-2">
+                Restrict fakes to specific ranges (e.g. push fakes only into your "hot" ranges). Empty = any enabled.
+              </p>
+              <div className="max-h-44 overflow-auto pr-1 grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                {(rangesData?.rows || []).filter((r: any) => r.enabled).map((r: any) => {
+                  const active = fakeForm.range_ids.includes(r.id);
+                  return (
+                    <button key={r.id} type="button"
+                      onClick={() => {
+                        const cur = [...fakeForm.range_ids];
+                        const i = cur.indexOf(r.id);
+                        if (i >= 0) cur.splice(i, 1); else cur.push(r.id);
+                        setFakeForm({ ...fakeForm, range_ids: cur });
+                      }}
+                      className={cn(
+                        "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md text-[11px] border text-left",
+                        active
+                          ? "bg-neon-cyan/10 border-neon-cyan/40 text-neon-cyan"
+                          : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <span className="truncate">
+                        <span className="font-mono">{r.country_code}</span> · {r.range_label || r.operator || r.range_prefix}
+                      </span>
+                      <span className="text-[10px] opacity-60">{r.provider}</span>
+                    </button>
+                  );
+                })}
+                {!(rangesData?.rows || []).length && (
+                  <p className="text-[11px] text-muted-foreground/60">No enabled ranges yet.</p>
+                )}
               </div>
             </div>
 

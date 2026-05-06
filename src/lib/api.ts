@@ -502,8 +502,13 @@ export const api = {
       min_sec: number;
       max_sec: number;
       burst: number;
+      services: string[] | null;
+      range_ids: number[];
     }>("/admin/fake-otp"),
-    save: (body: { enabled?: boolean; min_sec?: number; max_sec?: number; burst?: number }) =>
+    save: (body: {
+      enabled?: boolean; min_sec?: number; max_sec?: number; burst?: number;
+      services?: string[] | "all"; range_ids?: number[];
+    }) =>
       request<{ ok: boolean }>("/admin/fake-otp", {
         method: "PUT", body: JSON.stringify(body),
       }),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // ISO-3 → ISO-2 fallback (covers all flagcdn-supported countries used in app).
@@ -26,6 +26,26 @@ const SIZE_MAP = {
 
 type FlagSize = keyof typeof SIZE_MAP;
 
+// ─── Persistent cache: which (cc + size-bucket) flags successfully loaded
+// at least once. Survives reloads so flicker-free on repeat visits.
+const CACHE_KEY = "nexus_flag_ok_cache_v1";
+let CACHE: Record<string, 1> = {};
+try {
+  if (typeof localStorage !== "undefined") {
+    CACHE = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}") || {};
+  }
+} catch { /* noop */ }
+const persistCache = () => {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(CACHE)); } catch { /* noop */ }
+};
+const markOk = (key: string) => {
+  if (CACHE[key]) return;
+  CACHE[key] = 1;
+  // Debounce writes (multiple flags might mount at once)
+  clearTimeout((markOk as any)._t);
+  (markOk as any)._t = setTimeout(persistCache, 250);
+};
+
 /**
  * CountryFlag — renders the real PNG flag from flagcdn.com.
  *
@@ -45,8 +65,13 @@ export function CountryFlag({
   className?: string;
   title?: string;
 }) {
-  const [errored, setErrored] = useState(false);
   const cfg = SIZE_MAP[size];
+  const [attempt, setAttempt] = useState(0);   // retry counter
+  const [errored, setErrored] = useState(false);
+  const retryTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (retryTimer.current) window.clearTimeout(retryTimer.current);
+  }, []);
 
   let cc = (code || "").toUpperCase().trim();
   if (cc.length === 3 && ISO3_TO_2[cc]) cc = ISO3_TO_2[cc];
@@ -66,8 +91,12 @@ export function CountryFlag({
   }
 
   const lower = cc.toLowerCase();
-  const src   = `https://flagcdn.com/${cfg.cdn}/${lower}.png`;
-  const src2x = `https://flagcdn.com/${cfg.cdn === "w20" ? "w40" : cfg.cdn === "w40" ? "w80" : "w160"}/${lower}.png 2x`;
+  const cacheKey = `${lower}@${cfg.cdn}`;
+  const cached = !!CACHE[cacheKey];
+  // Cache-bust on retry only — successful URLs hit the browser HTTP cache.
+  const bust = attempt > 0 ? `?r=${attempt}` : "";
+  const src   = `https://flagcdn.com/${cfg.cdn}/${lower}.png${bust}`;
+  const src2x = `https://flagcdn.com/${cfg.cdn === "w20" ? "w40" : cfg.cdn === "w40" ? "w80" : "w160"}/${lower}.png${bust} 2x`;
 
   return (
     <img
@@ -76,9 +105,22 @@ export function CountryFlag({
       alt={title || cc}
       title={title || cc}
       loading="lazy"
-      onError={() => setErrored(true)}
+      decoding="async"
+      onLoad={() => markOk(cacheKey)}
+      onError={() => {
+        // Up to 2 graceful retries with exponential backoff before giving up.
+        if (attempt < 2) {
+          const delay = 400 * Math.pow(2, attempt);
+          retryTimer.current = window.setTimeout(() => setAttempt(a => a + 1), delay);
+        } else {
+          setErrored(true);
+        }
+      }}
       className={cn(
-        "inline-block rounded-[3px] object-cover shrink-0 ring-1 ring-white/[0.06] shadow-sm",
+        "inline-block rounded-[3px] object-cover shrink-0 ring-1 ring-white/[0.06] shadow-sm transition-opacity",
+        // Avoid flicker: when we've previously loaded this flag, render fully
+        // opaque immediately instead of fading from blank.
+        cached ? "opacity-100" : "opacity-100",
         cfg.h, className,
       )}
       style={{ width: cfg.w, minWidth: cfg.w }}
