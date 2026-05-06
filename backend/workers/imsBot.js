@@ -74,7 +74,7 @@ function writeSetting(k, v) {
   } catch (e) { warn('writeSetting failed:', e.message); }
 }
 function isRateLimitError(msg) {
-  return /rate_limited|cdr_page_503|cdr_http_503|15\s*second/i.test(String(msg || ''));
+  return /rate_limited|cdr_(page|http)_(429|503)|15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(String(msg || ''));
 }
 function normalizeBase(raw) {
   const fb = 'https://www.imssms.org';
@@ -251,8 +251,12 @@ async function login(forceCaptcha = false) {
   // and cookie-only login (admin pasted PHPSESSID, no credentials).
   if (_jar && !forceCaptcha) {
     try {
+      await waitForCdrGate();
       const probe = await _client.get('/client/SMSCDRStats');
       const html = String(probe.data || '');
+      if (probe.status === 429 || probe.status === 503 || /15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(html)) {
+        throw new Error('cdr_rate_limited');
+      }
       if (probe.status === 200 && !/<form[^>]+action=['"]?signin/i.test(html)) {
         const m = html.match(/data_smscdr\.php\?[^'"]*sesskey=([^&'"\s]+)/);
         if (m) {
@@ -263,7 +267,10 @@ async function login(forceCaptcha = false) {
           return true;
         }
       }
-    } catch (_) { /* fall through */ }
+    } catch (e) {
+      if (isRateLimitError(e.message)) throw e;
+      /* fall through */
+    }
   }
 
   // No usable cookie → must have credentials to do the captcha login
