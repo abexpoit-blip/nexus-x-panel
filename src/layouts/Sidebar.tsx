@@ -43,6 +43,7 @@ const adminNav: NavItem[] = [
   { label: "Notifications", path: "/admin/notifications", icon: Bell },
   { label: "Bots Control", path: "/admin/bots", icon: Bot },
   { label: "IMS Health", path: "/admin/ims-health", icon: Stethoscope },
+  { label: "SMS Hadi History", path: "/admin/smshadi-history", icon: History },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 

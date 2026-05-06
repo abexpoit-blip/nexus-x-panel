@@ -41,6 +41,7 @@ const AdminWithdrawals = Pages["/admin/withdrawals"].L;
 const AdminSettings = Pages["/admin/settings"].L;
 const AdminBots = Pages["/admin/bots"].L;
 const AdminIMSHealth = Pages["/admin/ims-health"].L;
+const AdminSMSHadiHistory = Pages["/admin/smshadi-history"].L;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -128,6 +129,7 @@ const AppRoutes = () => {
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/bots" element={<AdminBots />} />
           <Route path="/admin/ims-health" element={<AdminIMSHealth />} />
+          <Route path="/admin/smshadi-history" element={<AdminSMSHadiHistory />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
