@@ -133,8 +133,15 @@ const AgentLeaderboard = () => {
                 )}
               >
                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <div className="w-10 text-center shrink-0">
-                    <span className="font-mono text-muted-foreground text-sm">#{i + 1}</span>
+                  <div className="w-12 shrink-0 flex items-center justify-center">
+                    <span className={cn(
+                      "inline-flex items-center justify-center min-w-[2.25rem] h-7 px-2 rounded-full font-mono text-xs font-bold border",
+                      isMe
+                        ? "bg-primary/20 border-primary/40 text-primary"
+                        : "bg-white/[0.04] border-white/[0.08] text-muted-foreground"
+                    )}>
+                      #{i + 1}
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -143,6 +150,10 @@ const AgentLeaderboard = () => {
                       </p>
                       <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border", tier.className)}>
                         <TierIcon className="w-3 h-3" /> {tier.label}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/[0.04] border-white/[0.08] text-foreground">
+                        <Trophy className="w-3 h-3 text-neon-amber" />
+                        {r.otp_count.toLocaleString()} OTPs
                       </span>
                     </div>
                   </div>
