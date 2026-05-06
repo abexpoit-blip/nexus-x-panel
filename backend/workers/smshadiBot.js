@@ -174,15 +174,29 @@ async function fetchCdrRows() {
     iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
   });
   const r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
-    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports` },
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json, text/javascript, */*; q=0.01',
+      'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports`,
+    },
   });
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
+  if (r.status === 503) {
+    const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 200).replace(/\s+/g, ' ');
+    warn('CDR 503 from panel — preview:', preview);
+    throw new Error('cdr_503');
+  }
   if (r.status === 404 || (typeof r.data === 'string' && /404 Not Found/i.test(r.data))) {
     // sesskey expired
     _sesskey = null;
     throw new Error('cdr_session_lost');
   }
   if (typeof r.data === 'string' && /name=["']password["']/i.test(r.data)) throw new Error('cdr_session_lost');
+  if (r.status >= 400) {
+    const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 200).replace(/\s+/g, ' ');
+    warn('CDR HTTP', r.status, '— preview:', preview);
+    throw new Error('cdr_http_' + r.status);
+  }
   const rows = (r.data && r.data.aaData) || [];
   return rows;
 }
@@ -333,6 +347,11 @@ async function loop() {
       _consecFail++;
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
+      }
+      // 503 often = stale session cookie or anti-bot from cached IP — drop session and re-login
+      if (/cdr_503|cdr_http_5\d\d/i.test(e.message)) {
+        _loggedIn = false; _sesskey = null;
+        try { writeSetting('smshadi_session_cookie', ''); } catch (_) {}
       }
       const backoff = Math.min(60, 5 + _consecFail * 2);
       await new Promise(r => setTimeout(r, backoff * 1000));
