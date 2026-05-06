@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Activity, Bot, Clock, GitCommit, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Activity, Bot, Clock, GitCommit, RefreshCw, CheckCircle2, XCircle, AlertTriangle, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const fmtAgo = (ts: number | null | undefined): string => {
@@ -44,7 +44,11 @@ export const SmsHadiHealthWidget = () => {
   const nextAtMs = bot?.next_cdr_at || 0;
   const cooldownRemainingMs = Math.max(0, nextAtMs - Date.now());
   const cooldownTone = cooldownRemainingMs > 0 ? "warn" : "good";
-  const lastCdrSec = bot?.last_cdr_request_at ? Math.floor(bot.last_cdr_request_at / 1000) : null;
+  const lastCdrSec = bot?.last_cdr_success_at
+    ?? (bot?.last_cdr_request_at ? Math.floor(bot.last_cdr_request_at / 1000) : null);
+  const count503 = bot?.provider_503_count ?? 0;
+  const last503Sec = bot?.last_503_at ?? null;
+  const lastWarmupSec = bot?.last_warmup_at ?? null;
 
   const statusTone = !enabled
     ? "off"
@@ -105,7 +109,7 @@ export const SmsHadiHealthWidget = () => {
       ) : !bot ? (
         <p className="text-xs text-muted-foreground py-3 text-center">Bot status unavailable</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Cooldown */}
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
@@ -134,6 +138,23 @@ export const SmsHadiHealthWidget = () => {
             </div>
             <div className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
               {bot.otps_delivered ?? 0} OTPs · {bot.consec_fail ?? 0} consec fails
+            </div>
+          </div>
+
+          {/* Provider 503 errors */}
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+              <ShieldAlert className="w-3 h-3" />
+              <span>Provider 503s</span>
+            </div>
+            <div className={cn(
+              "text-xl font-display font-bold font-mono",
+              count503 > 0 ? "text-destructive" : "text-neon-green"
+            )}>
+              {count503}
+            </div>
+            <div className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
+              last {fmtAgo(last503Sec)} · warmup {fmtAgo(lastWarmupSec)}
             </div>
           </div>
 
