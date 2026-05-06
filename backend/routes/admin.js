@@ -241,7 +241,7 @@ router.post('/agents/:id/reject', (req, res) => {
 });
 
 router.post('/agents', (req, res) => {
-  const { username, password, full_name, phone, telegram, daily_limit = 100, per_request_limit = 5, status = 'active' } = req.body || {};
+  const { username, password, full_name, phone, telegram, daily_limit = 500, per_request_limit = 5, status = 'active' } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
   if (exists) return res.status(409).json({ error: 'Username already taken' });
