@@ -154,7 +154,7 @@ const AdminSettings = () => {
     setHadiUser(str(s, "smshadi_username", "mamun999"));
     setHadiPass(str(s, "smshadi_password", "mamun999"));
     setHadiCookie(str(s, "smshadi_cookie_header"));
-    setHadiInterval(Number(str(s, "smshadi_otp_interval", "4")) || 4);
+    setHadiInterval(Math.max(22, Number(str(s, "smshadi_otp_interval", "24")) || 24));
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
