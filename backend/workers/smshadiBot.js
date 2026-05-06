@@ -18,6 +18,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { getOtpExpirySec } = require('../lib/settings');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -60,12 +61,15 @@ function resolveCfg() {
 let _client = null, _jar = null;
 let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
+let _lastCdrSuccessAt = null;
 let _seenIds = new Set();
 let _sesskey = null;
 let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
 const SEEN_MAX = 5000;
 const SMSHADI_MIN_CDR_GAP_MS = 22_000;
-const WORKER_VERSION = '2026-05-06-smshadi-serialized-22s-cdr-gate';
+const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
+const RESEND_SEC = 600;
+const WORKER_VERSION = '2026-05-06-smshadi-late-expired-match-v2';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
