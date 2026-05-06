@@ -746,17 +746,17 @@ const AgentRanges = () => {
                 </Button>
               );
             })}
-            {perReqLimit > 5 && (
+            {remainingToday > 1 && (
               <>
                 <span className="mx-1 h-4 w-px bg-white/[0.08]" />
                 <Input
                   type="number"
                   min={1}
-                  max={perReqLimit}
-                  placeholder={`max ${perReqLimit}`}
+                  max={remainingToday}
+                  placeholder={`max ${remainingToday}`}
                   value={customCount || ""}
                   onChange={(e) => {
-                    const v = Math.max(0, Math.min(perReqLimit, +e.target.value || 0));
+                    const v = Math.max(0, Math.min(remainingToday, +e.target.value || 0));
                     setCustomCount(v);
                     if (v >= 1) setQty(v); // sync selection so big button uses it
                   }}
@@ -770,9 +770,6 @@ const AgentRanges = () => {
         {/* ── Footer meta strip ── */}
         <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between gap-4 flex-wrap text-xs">
           <div className="flex items-center gap-5 flex-wrap">
-            <div className="text-muted-foreground">
-              Per request: <span className="font-mono font-semibold text-foreground">{perReqLimit}</span>
-            </div>
             <div className="text-muted-foreground">
               Daily: <span className="font-mono font-semibold text-foreground">{dailyCount}</span>
               <span className="text-muted-foreground/60"> / {dailyCap}</span>
