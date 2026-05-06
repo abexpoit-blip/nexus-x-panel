@@ -456,7 +456,7 @@ async function loop() {
       // Grow penalty exponentially each consecutive hit (20s → 40s → 60s → cap 90s)
       // so we stop hammering and self-recover instead of staying stuck.
       let penalty = 0;
-      if (/rate_limited/i.test(e.message)) {
+      if (isRateLimitError(e.message)) {
         _rateLimitStreak++;
         penalty = registerRateLimitCooldown();
         const { reloginThreshold } = readCooldownCfg();
