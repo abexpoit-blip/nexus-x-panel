@@ -893,7 +893,7 @@ const AdminSettings = () => {
             saving={savingKey?.startsWith("ims_") || false}
           />
 
-          {/* ─── SMS Hadi (2.59.169.96/ints — no rate-limit) ─── */}
+          {/* ─── SMS Hadi (2.59.169.96/ints — provider enforces 15s+ CDR refresh gap) ─── */}
           <BotConfigCard
             tone="cyan"
             title="SMS Hadi Bot (2.59.169.96/ints)"
@@ -903,7 +903,7 @@ const AdminSettings = () => {
             pass={hadiPass} setPass={setHadiPass} passKey="smshadi_password"
             cookie={hadiCookie} setCookie={setHadiCookie} cookieKey="smshadi_cookie_header"
             cookiePlaceholder="PHPSESSID=..."
-            cookieHint="Optional. If set, bot uses this cookie instead of running the captcha login. No rate-limit on this panel — 3-5s interval is safe."
+            cookieHint="Optional. If set, bot uses this cookie instead of running the captcha login. Provider requires a safe 22s+ CDR interval."
             interval={hadiInterval} setInterval={setHadiInterval} intervalKey="smshadi_otp_interval"
             showPw={showPw}
             health={healthState["smshadi"]}
@@ -912,7 +912,7 @@ const AdminSettings = () => {
               await setSetting("smshadi_username", hadiUser);
               await setSetting("smshadi_password", hadiPass);
               await setSetting("smshadi_cookie_header", hadiCookie);
-              await setSetting("smshadi_otp_interval", String(Math.max(3, hadiInterval)));
+              await setSetting("smshadi_otp_interval", String(Math.max(22, hadiInterval)));
             }}
             onHealth={() => runHealth("smshadi")}
             onClearCookies={async () => {
