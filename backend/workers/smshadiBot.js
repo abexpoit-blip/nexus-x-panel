@@ -174,13 +174,24 @@ async function fetchCdrRows() {
     fg: '0', sesskey: _sesskey,
     iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
   });
-  const r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports`,
-    },
-  });
+  let r;
+  try {
+    r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports`,
+      },
+    });
+  } catch (e) {
+    // axios threw despite validateStatus — surface a stable error code so
+    // the loop's cooldown branch can match it.
+    const st = e?.response?.status;
+    if (st === 503) { warn('CDR 503 (thrown) from panel'); throw new Error('cdr_503'); }
+    if (st && st >= 500) throw new Error('cdr_http_' + st);
+    if (st === 401 || st === 403) throw new Error('cdr_unauthorized');
+    throw e;
+  }
   const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 300).replace(/\s+/g, ' ');
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 503) {
@@ -354,7 +365,8 @@ async function loop() {
       }
       // 503 is usually the provider's temporary block/rate page. Keep the login
       // session and back off; do not relogin-loop because that makes the block worse.
-      if (/cdr_503|cdr_http_5\d\d/i.test(e.message)) {
+      // Match both our normalized codes AND raw axios "status code 5xx" messages.
+      if (/cdr_503|cdr_http_5\d\d|status code 5\d\d/i.test(e.message)) {
         const cooldown = Math.min(180, 20 + _consecFail * 20);
         warn(`provider 503 cooldown ${cooldown}s before next CDR fetch`);
         await new Promise(r => setTimeout(r, cooldown * 1000));
