@@ -583,6 +583,7 @@ export interface SystemHealth {
   xisora_bot: ProviderBotStatus | null;
   ims_bot?: ProviderBotStatus | null;
   smshadi_bot?: ProviderBotStatus | null;
+  iprn_bot?: ProviderBotStatus | null;
   fake_otp_bot?: ProviderBotStatus | null;
   cdr_pulse?: { last_real_at: number | null; last_any_at: number | null; total_today: number };
   counts: {

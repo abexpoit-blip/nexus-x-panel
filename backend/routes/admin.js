@@ -125,6 +125,8 @@ router.get('/system-health', (req, res) => {
   try { ims = require('../workers/imsBot').getStatus?.() || null; } catch (_) {}
   let smshadi = null;
   try { smshadi = require('../workers/smshadiBot').getStatus?.() || null; } catch (_) {}
+  let iprn = null;
+  try { iprn = require('../workers/iprnBot').getStatus?.() || null; } catch (_) {}
 
   const pendingWithdrawals = db.prepare("SELECT COUNT(*) c FROM withdrawals WHERE status='pending'").get().c;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE expires_at > strftime('%s','now')").get().c;
