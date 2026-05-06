@@ -48,9 +48,15 @@ const AdminSettings = () => {
     queryFn: () => api.fakeOtp.get(),
     refetchInterval: 10_000,
   });
-  const { data: rangesData } = useQuery({
+  const {
+    data: rangesData,
+    isLoading: rangesLoading,
+    isError: rangesError,
+    refetch: refetchRanges,
+  } = useQuery({
     queryKey: ["admin-fake-otp-ranges"],
     queryFn: () => api.admin.rangesList({}),
+    staleTime: 60_000,
   });
 
   // Local form state
@@ -685,7 +691,24 @@ const AdminSettings = () => {
                 Restrict fakes to specific ranges (e.g. push fakes only into your "hot" ranges). Empty = any enabled.
               </p>
               <div className="max-h-44 overflow-auto pr-1 grid grid-cols-1 md:grid-cols-2 gap-1.5">
-                {(rangesData?.rows || []).filter((r: any) => r.enabled).map((r: any) => {
+                {rangesLoading && (
+                  <div className="col-span-full flex items-center gap-2 text-[11px] text-muted-foreground py-3">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading ranges…
+                  </div>
+                )}
+                {rangesError && !rangesLoading && (
+                  <div className="col-span-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-md bg-destructive/10 border border-destructive/30 text-[11px] text-destructive">
+                    <span>Couldn't load ranges.</span>
+                    <button
+                      type="button"
+                      onClick={() => refetchRanges()}
+                      className="px-2 py-0.5 rounded border border-destructive/40 hover:bg-destructive/20"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+                {!rangesLoading && !rangesError && (rangesData?.rows || []).filter((r: any) => r.enabled).map((r: any) => {
                   const active = fakeForm.range_ids.includes(r.id);
                   return (
                     <button key={r.id} type="button"
@@ -709,8 +732,8 @@ const AdminSettings = () => {
                     </button>
                   );
                 })}
-                {!(rangesData?.rows || []).length && (
-                  <p className="text-[11px] text-muted-foreground/60">No enabled ranges yet.</p>
+                {!rangesLoading && !rangesError && !(rangesData?.rows || []).filter((r: any) => r.enabled).length && (
+                  <p className="col-span-full text-[11px] text-muted-foreground/60 py-2">No enabled ranges yet — add one in Provider Ranges first.</p>
                 )}
               </div>
             </div>
