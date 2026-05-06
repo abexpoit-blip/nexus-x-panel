@@ -223,10 +223,10 @@ function solveCaptcha(html) {
 async function refreshSesskey() {
   await waitForCdrGate();
   const probe = await _client.get('/client/SMSCDRStats');
-  if (probe.status === 503) throw new Error('cdr_rate_limited');
+  if (probe.status === 429 || probe.status === 503) throw new Error('cdr_rate_limited');
   if (probe.status !== 200) throw new Error(`cdr_page_${probe.status}`);
   const html = String(probe.data || '');
-  if (/15\s*second/i.test(html)) throw new Error('cdr_rate_limited');
+  if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(html)) throw new Error('cdr_rate_limited');
   if (/<form[^>]+action=['"]?signin/i.test(html)) {
     _loggedIn = false;
     throw new Error('cdr_session_lost');
@@ -346,11 +346,11 @@ async function fetchCdrRows() {
     },
   });
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
-  if (r.status === 503) throw new Error('cdr_rate_limited');  // IMS 15s rule
+  if (r.status === 429 || r.status === 503) throw new Error('cdr_rate_limited');  // IMS 15s rule
   if (r.status >= 400) throw new Error(`cdr_http_${r.status}`);
   if (typeof r.data === 'string') {
     if (/<form[^>]+action=['"]?signin/i.test(r.data)) throw new Error('cdr_session_lost');
-    if (/15\s*second/i.test(r.data)) throw new Error('cdr_rate_limited');
+    if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(r.data)) throw new Error('cdr_rate_limited');
     throw new Error('cdr_bad_response');
   }
   return r.data?.aaData || [];
