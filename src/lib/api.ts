@@ -100,6 +100,7 @@ export type ProviderRange = {
   service_name?: string | null;
   service_icon?: string | null;
   service_color?: string | null;
+  currency?: "EUR" | "USD" | "GBP" | null;
 };
 
 export type Service = {

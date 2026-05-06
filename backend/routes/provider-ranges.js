@@ -9,7 +9,8 @@ const db_settings = require('../lib/db');
 
 const router = express.Router();
 
-const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims', 'smshadi'];
+const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims', 'smshadi', 'iprn'];
+const ALLOWED_CURRENCIES = ['EUR', 'USD', 'GBP'];
 
 function validate(body, partial = false) {
   const out = {};
@@ -46,6 +47,16 @@ function validate(body, partial = false) {
   }
   if (body.enabled !== undefined) out.enabled = body.enabled ? 1 : 0;
   if (body.hot !== undefined) out.hot = body.hot ? 1 : 0;
+  if (body.currency !== undefined) {
+    if (body.currency === null || body.currency === '') { out.currency = null; }
+    else {
+      const cur = String(body.currency).trim().toUpperCase();
+      if (!ALLOWED_CURRENCIES.includes(cur)) {
+        throw new Error(`currency must be one of: ${ALLOWED_CURRENCIES.join(', ')}`);
+      }
+      out.currency = cur;
+    }
+  }
   if (body.service_id !== undefined) {
     if (body.service_id === null || body.service_id === '') { out.service_id = null; }
     else {
@@ -81,14 +92,15 @@ router.post('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
   try {
     const v = validate(req.body || {});
     const r = db.prepare(`
-      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot, service_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot, service_id, currency)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       v.provider, v.country_code, v.country_name || null, v.range_label,
       v.range_prefix || null, v.operator || null, v.price_bdt || 0,
       v.enabled === undefined ? 1 : v.enabled, v.notes || null,
       v.hot ? 1 : 0,
-      v.service_id ?? null
+      v.service_id ?? null,
+      v.currency ?? null
     );
     logFromReq(req, 'range_create', { meta: { provider: v.provider, country: v.country_code, label: v.range_label } });
     res.json({ id: r.lastInsertRowid });

@@ -85,6 +85,7 @@ try {
   _ensureCol('provider_ranges', 'range_prefix', 'TEXT');
   _ensureCol('provider_ranges', 'operator', 'TEXT');
   _ensureCol('provider_ranges', 'notes', 'TEXT');
+  _ensureCol('provider_ranges', 'currency', 'TEXT');
 } catch (e) {
   console.error('[db] pool tables self-heal failed:', e.message);
 }
