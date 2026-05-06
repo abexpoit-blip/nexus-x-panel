@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   telegram TEXT,
   balance REAL NOT NULL DEFAULT 0,
   otp_count INTEGER NOT NULL DEFAULT 0,
-  daily_limit INTEGER NOT NULL DEFAULT 100,
+  daily_limit INTEGER NOT NULL DEFAULT 500,
   per_request_limit INTEGER NOT NULL DEFAULT 5,
   status TEXT NOT NULL DEFAULT 'active',      -- 'active' | 'suspended'
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
