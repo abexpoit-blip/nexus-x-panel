@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import faaahMp3 from "@/assets/sounds/faaah.mp3";
 
 /**
  * useOtpAlerts — agent-side ambient watcher.
@@ -22,20 +23,25 @@ const PREFS_KEY = "nexus_otp_alert_prefs";
 // (the TikTok/Facebook horn-stab that became a meme in early 2026).
 // We keep the OtpSoundId union as a single literal for backward-compat
 // with stored prefs, but every value collapses to the same player.
-export type OtpSoundId = "faaaah";
+export type OtpSoundId = "faaaah" | "chime" | "pop";
 export type OtpAlertPrefs = { sound: boolean; push: boolean; volume: number; soundId?: OtpSoundId };
 
 export const SOUND_OPTIONS: { id: OtpSoundId; label: string; tag?: string }[] = [
-  { id: "faaaah", label: "Faaaah (viral horn)", tag: "premium" },
+  { id: "faaaah", label: "Faaaah (viral)", tag: "premium" },
+  { id: "chime",  label: "Smooth Chime",   tag: "smart" },
+  { id: "pop",    label: "Soft Pop",       tag: "subtle" },
 ];
+
+const VALID_IDS: OtpSoundId[] = ["faaaah", "chime", "pop"];
+const isValidId = (v: any): v is OtpSoundId => VALID_IDS.includes(v);
 
 export const loadOtpPrefs = (): OtpAlertPrefs => {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Force the only remaining sound regardless of legacy stored value.
-      return { sound: true, push: true, volume: 70, ...parsed, soundId: "faaaah" };
+      const soundId: OtpSoundId = isValidId(parsed?.soundId) ? parsed.soundId : "faaaah";
+      return { sound: true, push: true, volume: 70, ...parsed, soundId };
     }
   } catch { /* noop */ }
   return { sound: true, push: true, volume: 70, soundId: "faaaah" };
@@ -50,7 +56,73 @@ export const saveOtpPrefs = (p: OtpAlertPrefs) => {
  * fall, synthesised in pure Web Audio (no asset, ~0 KB).
  * `_id` kept for back-compat with old call sites.
  */
-export function playOtpSound(_id: OtpSoundId | string, volume: number) {
+/** Smooth two-note chime — rounded sine bell. */
+function playChime(volume: number) {
+  try {
+    const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const t0 = ctx.currentTime;
+    const v = Math.max(0, Math.min(1, volume / 100));
+    const tone = (freq: number, start: number, dur: number, peak = 0.28) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine"; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0, t0 + start);
+      g.gain.linearRampToValueAtTime(peak * v, t0 + start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t0 + start); osc.stop(t0 + start + dur + 0.02);
+    };
+    tone(880, 0.00, 0.45);     // A5
+    tone(1318.5, 0.12, 0.55);  // E6
+    tone(1760, 0.18, 0.40, 0.16);
+    setTimeout(() => ctx.close(), 900);
+  } catch { /* noop */ }
+}
+
+/** Subtle, modern "pop" — short blip, perfect for background notifications. */
+function playPop(volume: number) {
+  try {
+    const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const t0 = ctx.currentTime;
+    const v = Math.max(0, Math.min(1, volume / 100));
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(540, t0);
+    osc.frequency.exponentialRampToValueAtTime(820, t0 + 0.08);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.32 * v, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + 0.25);
+    setTimeout(() => ctx.close(), 400);
+  } catch { /* noop */ }
+}
+
+/** Plays the uploaded "Faaaah" MP3 (viral horn). */
+function playFaaah(volume: number) {
+  try {
+    const a = new Audio(faaahMp3);
+    a.volume = Math.max(0, Math.min(1, volume / 100));
+    void a.play().catch(() => { /* autoplay-blocked, ignore */ });
+  } catch { /* noop */ }
+}
+
+export function playOtpSound(id: OtpSoundId | string, volume: number) {
+  const sid: OtpSoundId = isValidId(id) ? id : "faaaah";
+  if (sid === "chime") return playChime(volume);
+  if (sid === "pop")   return playPop(volume);
+  return playFaaah(volume);
+}
+
+// Legacy synth body kept only as a no-op stub to avoid leaving dead code.
+function _legacyFaaah(_volume: number) { /* removed: replaced by real MP3 */ }
+if (false) _legacyFaaah(0);
+function __unused_synth_block(volume: number) {
   try {
     const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
     if (!Ctx) return;
