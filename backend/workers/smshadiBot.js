@@ -74,7 +74,7 @@ const SMSHADI_503_MAX_COOLDOWN_MS = 30 * 60_000;
 const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
 const RESEND_SEC = 600;
 const SMSHADI_DASHBOARD_WARMUP_DELAY_MS = 15_000;
-const WORKER_VERSION = '2026-05-06-smshadi-dashboard-warmup-v4';
+const WORKER_VERSION = '2026-05-06-smshadi-human-login-v5';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -142,7 +142,13 @@ async function login() {
   const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
   if (!USERNAME || !PASSWORD) throw new Error('smshadi creds missing');
   tel.recordLoginAttempt();
-  if (!_client) _client = buildClient(BASE_URL);
+  // Always rebuild the client to drop any stale PHPSESSID that might still
+  // be carrying a provider 503 block from a previous run. The saved cookie
+  // restore inside buildClient() is intentionally bypassed here by clearing
+  // the persisted cookie first.
+  writeSetting('smshadi_session_cookie', '');
+  _client = buildClient(BASE_URL);
+  _sesskey = null;
 
   const r1 = await _client.get('/login');
   const html = String(r1.data || '');
@@ -175,14 +181,24 @@ async function login() {
   dlog('POST /signin →', r2.status, 'final', r2.request?.res?.responseUrl || '?');
   if (r2.status >= 500) throw new Error('provider_http_' + r2.status + '_signin');
 
-  // Verify by hitting the Reports page (this is what the admin UI mirrors,
-  // and on /ints panels each page issues its own sesskey).
-  let probe = await _client.get('/agent/SMSCDRReports');
+  // HUMAN PATTERN: visit dashboard FIRST, idle 15s, THEN open reports.
+  // Hitting /agent/SMSCDRReports immediately after /signin trips the
+  // provider's bot detection and poisons the session with permanent 503s.
+  const dash = await _client.get('/agent/SMSDashboard', {
+    headers: { 'Referer': `${BASE_URL}/signin` },
+  });
+  dlog('login GET /agent/SMSDashboard →', dash.status);
+  if (dash.status >= 500) throw new Error('provider_http_' + dash.status + '_dash');
+  await sleep(SMSHADI_DASHBOARD_WARMUP_DELAY_MS);
+  let probe = await _client.get('/agent/SMSCDRReports', {
+    headers: { 'Referer': `${BASE_URL}/agent/SMSDashboard` },
+  });
   let phtml = String(probe.data || '');
   let isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
   if (probe.status === 404) {
-    // Fallback to Stats page if Reports route is not present
-    probe = await _client.get('/agent/SMSCDRStats');
+    probe = await _client.get('/agent/SMSCDRStats', {
+      headers: { 'Referer': `${BASE_URL}/agent/SMSDashboard` },
+    });
     phtml = String(probe.data || '');
     isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
   }
