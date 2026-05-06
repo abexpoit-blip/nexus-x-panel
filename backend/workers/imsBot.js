@@ -73,6 +73,9 @@ function writeSetting(k, v) {
     `).run(k, String(v));
   } catch (e) { warn('writeSetting failed:', e.message); }
 }
+function isRateLimitError(msg) {
+  return /rate_limited|cdr_page_503|cdr_http_503|15\s*second/i.test(String(msg || ''));
+}
 function normalizeBase(raw) {
   const fb = 'https://www.imssms.org';
   if (!raw) return fb;
@@ -125,7 +128,6 @@ async function forceRelogin(reason) {
   _jar = null;
   _loggedIn = false;
   _sesskey = null;
-  _rateLimitStreak = 0;
   _nextCdrAllowedAt = Date.now() + 5_000;   // brief settle gap
   _reloginCount++;
   _lastReloginAt = Math.floor(Date.now() / 1000);
@@ -136,7 +138,8 @@ async function forceRelogin(reason) {
   }
   try {
     if (!_client) _client = buildClient(resolveCfg().BASE_URL);
-    await login();
+    await login(true);
+    _rateLimitStreak = 0;
     log('✓ auto-relogin success — fresh PHPSESSID saved');
     return true;
   } catch (e) {
@@ -194,11 +197,12 @@ function buildClient(baseURL) {
   }));
 }
 
-async function persistSessionCookie() {
+async function persistSessionCookie(saveHeader = false) {
   try {
     const cookies = await _jar.getCookies(_client.defaults.baseURL);
     const sess = cookies.find(c => /^PHPSESSID/i.test(c.key));
     if (sess) writeSetting('ims_session_cookie', sess.cookieString());
+    if (saveHeader && cookies.length) writeSetting('ims_cookie_header', cookies.map(c => c.cookieString()).join('; '));
   } catch (e) { warn('persistSession failed:', e.message); }
 }
 
@@ -216,8 +220,10 @@ function solveCaptcha(html) {
 async function refreshSesskey() {
   await waitForCdrGate();
   const probe = await _client.get('/client/SMSCDRStats');
+  if (probe.status === 503) throw new Error('cdr_rate_limited');
   if (probe.status !== 200) throw new Error(`cdr_page_${probe.status}`);
   const html = String(probe.data || '');
+  if (/15\s*second/i.test(html)) throw new Error('cdr_rate_limited');
   if (/<form[^>]+action=['"]?signin/i.test(html)) {
     _loggedIn = false;
     throw new Error('cdr_session_lost');
@@ -229,7 +235,7 @@ async function refreshSesskey() {
   return _sesskey;
 }
 
-async function login() {
+async function login(forceCaptcha = false) {
   const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
   const manualCookie = String(readSetting('ims_cookie_header') || '').trim();
   if (!USERNAME && !PASSWORD && !manualCookie) {
@@ -240,7 +246,7 @@ async function login() {
 
   // Try saved/manual cookie first — covers both auto-resume after restart
   // and cookie-only login (admin pasted PHPSESSID, no credentials).
-  if (_jar) {
+  if (_jar && !forceCaptcha) {
     try {
       const probe = await _client.get('/client/SMSCDRStats');
       const html = String(probe.data || '');
@@ -285,7 +291,7 @@ async function login() {
   dlog('POST /signin →', r2.status, 'final', r2.request?.res?.responseUrl || '?');
 
   await refreshSesskey();
-  await persistSessionCookie();
+  await persistSessionCookie(forceCaptcha);
   _loggedIn = true;
   tel.recordLoginSuccess();
   log('✓ login OK as', USERNAME);
@@ -450,7 +456,7 @@ async function loop() {
       // Grow penalty exponentially each consecutive hit (20s → 40s → 60s → cap 90s)
       // so we stop hammering and self-recover instead of staying stuck.
       let penalty = 0;
-      if (/rate_limited/i.test(e.message)) {
+      if (isRateLimitError(e.message)) {
         _rateLimitStreak++;
         penalty = registerRateLimitCooldown();
         const { reloginThreshold } = readCooldownCfg();
