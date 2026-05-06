@@ -192,6 +192,7 @@ function fmtDate(d) {
 async function fetchCdrRows() {
   if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
   if (!_sesskey) throw new Error('cdr_session_lost'); // forces re-login
+  await waitForCdrGate('bot');
   const now  = new Date(Date.now() + 2 * 60 * 60_000);
   const past = new Date(Date.now() - 2 * 60 * 60_000);
   const params = new URLSearchParams({
@@ -221,6 +222,10 @@ async function fetchCdrRows() {
     throw e;
   }
   const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 300).replace(/\s+/g, ' ');
+  if (typeof r.data === 'string' && /Refresh must be done with atleast 15 second interval/i.test(r.data)) {
+    warn('CDR portal rate warning — preview:', preview);
+    throw new Error('cdr_rate_limited');
+  }
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 503) {
     warn('CDR 503 from panel — preview:', preview);
@@ -251,6 +256,7 @@ async function fetchCdrPage({ fdate1, fdate2, fnum = '', fcli = '', frange = '',
   if (!_loggedIn) await login();
   if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
   if (!_sesskey) await login();
+  await waitForCdrGate('admin history');
   const now  = new Date(Date.now() + 2 * 60 * 60_000);
   const past = new Date(Date.now() - 24 * 60 * 60_000);
   const params = new URLSearchParams({
@@ -269,6 +275,9 @@ async function fetchCdrPage({ fdate1, fdate2, fnum = '', fcli = '', frange = '',
                'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports` },
   });
   let r = await doFetch();
+  if (typeof r.data === 'string' && /Refresh must be done with atleast 15 second interval/i.test(r.data)) {
+    throw new Error('sms_hadi_rate_limited_wait_15s');
+  }
   if (r.status === 401 || r.status === 403 ||
       (typeof r.data === 'string' && (/404 Not Found/i.test(r.data) || /name=["']password["']/i.test(r.data)))) {
     _sesskey = null; _loggedIn = false;
