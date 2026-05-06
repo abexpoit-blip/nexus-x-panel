@@ -27,7 +27,7 @@ type AgentForm = {
   status?: string;
 };
 
-const empty: AgentForm = { username: "", password: "", daily_limit: 100, per_request_limit: 5, status: "active" };
+const empty: AgentForm = { username: "", password: "", daily_limit: 500, per_request_limit: 5, status: "active" };
 
 const AdminAgents = () => {
   const qc = useQueryClient();
