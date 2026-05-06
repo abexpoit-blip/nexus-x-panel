@@ -428,7 +428,7 @@ function start() {
   if (!cfg.ENABLED) { log('disabled (ims_enabled=false) — not starting'); return; }
   if (_running) { log('already running — skip start'); return; }
   _stopFlag = false;
-  log(`starting…  base=${cfg.BASE_URL}  interval=${cfg.INTERVAL}s (min ${MIN_INTERVAL}s enforced)`);
+  log(`starting…  base=${cfg.BASE_URL}  interval=${cfg.INTERVAL}s (min ${cfg.COOLDOWN.minInterval}s, floor ${MIN_INTERVAL_FLOOR}s)`);
   loop().catch(e => warn('fatal:', e.message));
 }
 function stop() { _stopFlag = true; _loggedIn = false; _sesskey = null; }
