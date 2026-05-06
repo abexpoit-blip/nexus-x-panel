@@ -24,7 +24,7 @@ export const HeaderTicker = () => {
   });
   const { data: lb } = useQuery({
     queryKey: ["header-ticker-lb"],
-    queryFn: () => api.leaderboard("today" as any).catch(() => ({ leaderboard: [] as any[] })),
+    queryFn: () => api.leaderboard("today").catch(() => ({ leaderboard: [] as any[] })),
     refetchInterval: 30000,
   });
   const { data: mine } = useQuery({
