@@ -7,7 +7,7 @@ import { prefetchPage } from "@/lib/lazyPages";
 import {
   LayoutDashboard, Hash, MessageSquare, List, BarChart3, Bell, Inbox,
   Users, Server, DollarSign, FileText, LogOut, X, Layers,
-  Wallet, Shield, User, CreditCard, Trophy, Bot, ArrowDownToLine, History, Settings, AppWindow
+  Wallet, Shield, User, CreditCard, Trophy, Bot, ArrowDownToLine, History, Settings, AppWindow, Stethoscope
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -42,6 +42,7 @@ const adminNav: NavItem[] = [
   { label: "SMS CDR", path: "/admin/cdr", icon: FileText },
   { label: "Notifications", path: "/admin/notifications", icon: Bell },
   { label: "Bots Control", path: "/admin/bots", icon: Bot },
+  { label: "IMS Health", path: "/admin/ims-health", icon: Stethoscope },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
