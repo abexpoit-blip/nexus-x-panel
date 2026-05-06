@@ -123,22 +123,29 @@ async function login() {
   });
   dlog('POST /signin →', r2.status, 'final', r2.request?.res?.responseUrl || '?');
 
-  // Verify by hitting CDR Stats — also captures sesskey.
-  const probe = await _client.get('/agent/SMSCDRStats');
-  const phtml = String(probe.data || '');
-  const isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
+  // Verify by hitting the Reports page (this is what the admin UI mirrors,
+  // and on /ints panels each page issues its own sesskey).
+  let probe = await _client.get('/agent/SMSCDRReports');
+  let phtml = String(probe.data || '');
+  let isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
+  if (probe.status === 404) {
+    // Fallback to Stats page if Reports route is not present
+    probe = await _client.get('/agent/SMSCDRStats');
+    phtml = String(probe.data || '');
+    isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
+  }
   if (probe.status !== 200 || isLogin) {
     log('login probe FAIL — status', probe.status, 'preview:', phtml.slice(0, 200).replace(/\s+/g, ' '));
     throw new Error('login_failed');
   }
-  // Pull sesskey out of sAjaxSource URL
+  // Pull sesskey out of sAjaxSource URL on the Reports page
   const sk = phtml.match(/sesskey=([A-Za-z0-9=+/]+)/);
   if (sk) {
     _sesskey = sk[1];
     writeSetting('smshadi_sesskey', _sesskey);
     dlog('captured sesskey', _sesskey);
   } else {
-    warn('sesskey not found on /agent/SMSCDRStats');
+    warn('sesskey not found on /agent/SMSCDRReports');
   }
   await persistSessionCookie();
   _loggedIn = true;
@@ -167,7 +174,7 @@ async function fetchCdrRows() {
     iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
   });
   const r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
-    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_client.defaults.baseURL}/agent/SMSCDRStats` },
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports` },
   });
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 404 || (typeof r.data === 'string' && /404 Not Found/i.test(r.data))) {
