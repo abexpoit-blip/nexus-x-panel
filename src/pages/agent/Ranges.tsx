@@ -308,7 +308,7 @@ const AgentRanges = () => {
 
   // Today's allocation count (best-effort from localStorage; resets on day change).
   const todayKey = `nx.alloc.${new Date().toISOString().slice(0,10)}`;
-  const dailyCap = Math.min(1000, Math.max(perReqLimit, Number((user as any)?.daily_limit) || 100));
+  const dailyCap = Math.min(5000, Math.max(perReqLimit, Number((user as any)?.daily_limit) || 500));
   const [dailyCount, setDailyCount] = useState<number>(() => {
     try { return Number(localStorage.getItem(todayKey)) || 0; } catch { return 0; }
   });
