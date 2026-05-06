@@ -74,6 +74,7 @@ let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
 let _sesskey = null;
 let _seenIds = new Set();
 const SEEN_MAX = 5000;
+let _rateLimitStreak = 0;   // consecutive 503/15s errors → grow interval
 
 function buildClient(baseURL) {
   _jar = new tough.CookieJar();
@@ -343,6 +344,7 @@ async function loop() {
       _lastTickAt = Math.floor(Date.now() / 1000);
       _lastError = null; _consecFail = 0;
       if (n) log('delivered', n, 'OTPs this tick');
+      _rateLimitStreak = 0;   // healthy tick clears the rate-limit streak
     } catch (e) {
       warn('tick error:', e.message);
       _lastError = e.message;
@@ -351,9 +353,18 @@ async function loop() {
       if (/session_lost|unauthorized|login_failed|sesskey/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
       }
-      // IMS rate-limit → wait the full 16s + extra penalty
-      const penalty = /rate_limited/i.test(e.message) ? 20 : 0;
+      // IMS rate-limit handling: portal forbids any action <15s apart.
+      // Grow penalty exponentially each consecutive hit (20s → 40s → 60s → cap 90s)
+      // so we stop hammering and self-recover instead of staying stuck.
+      let penalty = 0;
+      if (/rate_limited/i.test(e.message)) {
+        _rateLimitStreak++;
+        penalty = Math.min(90, 20 * Math.min(_rateLimitStreak, 4));
+      } else {
+        _rateLimitStreak = 0;
+      }
       const backoff = Math.min(60, 5 + _consecFail * 2) + penalty;
+      log(`backoff ${backoff}s (consec=${_consecFail}, rl_streak=${_rateLimitStreak})`);
       await new Promise(r => setTimeout(r, backoff * 1000));
     }
     await new Promise(r => setTimeout(r, cfg.INTERVAL * 1000));
