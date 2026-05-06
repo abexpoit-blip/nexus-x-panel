@@ -221,6 +221,14 @@ seedSetting('smshadi_base_url',     process.env.SMSHADI_BASE_URL     || 'http://
 seedSetting('smshadi_username',     process.env.SMSHADI_USERNAME     || 'mamun999');
 seedSetting('smshadi_password',     process.env.SMSHADI_PASSWORD     || 'mamun999');
 seedSetting('smshadi_otp_interval', process.env.SMSHADI_OTP_INTERVAL || '24');
+// IPRN-SMS bot defaults — scrapes https://panel.iprn-sms.com (CSRF + session).
+// No rate-limit observed; safe at 8s. Currency must be selected per range
+// (EUR/USD/GBP); the bot polls each currency our enabled iprn ranges use.
+seedSetting('iprn_enabled',      process.env.IPRN_ENABLED      || 'false');
+seedSetting('iprn_base_url',     process.env.IPRN_BASE_URL     || 'https://panel.iprn-sms.com');
+seedSetting('iprn_username',     process.env.IPRN_USERNAME     || 'Sam_Shovon');
+seedSetting('iprn_password',     process.env.IPRN_PASSWORD     || 'cuenf3455');
+seedSetting('iprn_otp_interval', process.env.IPRN_OTP_INTERVAL || '8');
 // Fake OTP broadcaster defaults (off by default — admin enables in UI)
 seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
 seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
