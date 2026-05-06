@@ -252,6 +252,17 @@ try {
   if (r.changes) console.log(`✓ Backfilled daily_limit=500 for ${r.changes} agent(s)`);
 } catch (e) { console.warn('daily_limit backfill skipped:', e.message); }
 
+// Per-request limit is no longer enforced — only daily_limit gates allocation.
+// Bump legacy low rate-limit defaults so they don't artificially cap unlimited
+// per-request flow (admin can still override per-agent in the UI).
+try {
+  db.prepare("UPDATE settings SET value='500' WHERE key='rl_per_min_default'    AND value IN ('12','60','100')").run();
+  db.prepare("UPDATE settings SET value='500' WHERE key='rl_concurrent_default' AND value IN ('5','10','50')").run();
+  // Also lift any per-agent overrides that match the historical defaults so
+  // existing accounts feel the same "no per-shot cap" experience.
+  db.prepare("UPDATE users SET per_request_limit = 500 WHERE role='agent' AND per_request_limit <= 5").run();
+} catch (e) { console.warn('rate-limit default bump skipped:', e.message); }
+
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
 

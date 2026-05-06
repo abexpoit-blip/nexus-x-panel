@@ -126,7 +126,8 @@ const AgentRanges = () => {
   const [rangeQ, setRangeQ] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
-  const perReqLimit = Math.min(500, Math.max(1, Number((user as any)?.per_request_limit) || 5));
+  // No more per-request cap — agents can request as many as their daily
+  // budget allows. We compute a soft "remaining today" cap below.
 
   const [allocLoading, setAllocLoading] = useState<number | null>(null); // count being loaded
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -297,18 +298,11 @@ const AgentRanges = () => {
     URL.revokeObjectURL(url);
   };
 
-  const baseOptions = [1, 3, 5].filter(n => n <= perReqLimit);
   const canAllocate = !!selectedRange && free > 0;
-
-  // Keep `qty` valid if the per-request limit drops below it (e.g. agent
-  // settings change while page is open).
-  useEffect(() => {
-    if (qty > perReqLimit) setQty(1);
-  }, [perReqLimit, qty]);
 
   // Today's allocation count (best-effort from localStorage; resets on day change).
   const todayKey = `nx.alloc.${new Date().toISOString().slice(0,10)}`;
-  const dailyCap = Math.min(5000, Math.max(perReqLimit, Number((user as any)?.daily_limit) || 500));
+  const dailyCap = Math.max(1, Number((user as any)?.daily_limit) || 500);
   const [dailyCount, setDailyCount] = useState<number>(() => {
     try { return Number(localStorage.getItem(todayKey)) || 0; } catch { return 0; }
   });
@@ -317,6 +311,15 @@ const AgentRanges = () => {
     setDailyCount(next);
     try { localStorage.setItem(todayKey, String(next)); } catch { /* ignore */ }
   };
+
+  // Remaining quota for today drives the per-shot cap (purely client-side
+  // hint; server enforces the real daily_limit).
+  const remainingToday = Math.max(1, dailyCap - dailyCount);
+  const baseOptions = [1, 5, 10, 25, 50, 100].filter(n => n <= remainingToday);
+  // Keep qty within the remaining daily budget if it shrinks while page is open.
+  useEffect(() => {
+    if (qty > remainingToday) setQty(1);
+  }, [remainingToday, qty]);
 
   // ── Live allocated numbers list ──
   const { data: myData, refetch: refetchMy } = useQuery({
@@ -743,17 +746,17 @@ const AgentRanges = () => {
                 </Button>
               );
             })}
-            {perReqLimit > 5 && (
+            {remainingToday > 1 && (
               <>
                 <span className="mx-1 h-4 w-px bg-white/[0.08]" />
                 <Input
                   type="number"
                   min={1}
-                  max={perReqLimit}
-                  placeholder={`max ${perReqLimit}`}
+                  max={remainingToday}
+                  placeholder={`max ${remainingToday}`}
                   value={customCount || ""}
                   onChange={(e) => {
-                    const v = Math.max(0, Math.min(perReqLimit, +e.target.value || 0));
+                    const v = Math.max(0, Math.min(remainingToday, +e.target.value || 0));
                     setCustomCount(v);
                     if (v >= 1) setQty(v); // sync selection so big button uses it
                   }}
@@ -767,9 +770,6 @@ const AgentRanges = () => {
         {/* ── Footer meta strip ── */}
         <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between gap-4 flex-wrap text-xs">
           <div className="flex items-center gap-5 flex-wrap">
-            <div className="text-muted-foreground">
-              Per request: <span className="font-mono font-semibold text-foreground">{perReqLimit}</span>
-            </div>
             <div className="text-muted-foreground">
               Daily: <span className="font-mono font-semibold text-foreground">{dailyCount}</span>
               <span className="text-muted-foreground/60"> / {dailyCap}</span>
