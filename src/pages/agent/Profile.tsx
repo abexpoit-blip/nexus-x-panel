@@ -3,7 +3,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2, Play, Music } from "lucide-react";
+import { User, Lock, Mail, Phone, Shield, Save, Eye, EyeOff, BellRing, Volume2, Play, Music, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -57,6 +57,22 @@ const AgentProfile = () => {
     }
     setOtpPrefs(p => ({ ...p, push: v }));
   };
+
+  // Service notification filter — agent picks which services trigger alerts.
+  const SERVICE_OPTIONS = [
+    "WhatsApp", "Telegram", "Facebook", "Google", "Instagram", "TikTok",
+    "Apple", "Microsoft", "Amazon", "Discord", "Twitter", "PayPal", "Uber", "Signal",
+  ];
+  const allOn = !otpPrefs.services || otpPrefs.services.length === 0;
+  const toggleService = (svc: string) => {
+    setOtpPrefs(p => {
+      const cur = p.services && p.services.length ? [...p.services] : [];
+      const i = cur.findIndex(x => x.toLowerCase() === svc.toLowerCase());
+      if (i >= 0) cur.splice(i, 1); else cur.push(svc);
+      return { ...p, services: cur.length ? cur : null };
+    });
+  };
+  const enableAll = () => setOtpPrefs(p => ({ ...p, services: null }));
 
   const submitPasswordChange = async () => {
     if (!currentPw || !newPw) {
