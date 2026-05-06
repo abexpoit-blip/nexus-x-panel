@@ -10,9 +10,10 @@ import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { History, Search, RotateCw, Loader2, MessageSquare, X } from "lucide-react";
+import { History, Search, RotateCw, Loader2, MessageSquare, X, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePageParam } from "@/hooks/usePageParam";
+import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 50;
 
@@ -22,12 +23,45 @@ const fmtDate = (s: string) => {
   return s.replace("T", " ").slice(0, 19);
 };
 
-const highlightOtp = (msg: string | null) => {
+const OtpCopyChip = ({ code }: { code: string }) => {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const onCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      toast({ title: "OTP copied", description: code });
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      title="Copy OTP"
+      className={cn(
+        "inline-flex items-center gap-1 align-middle px-2 py-0.5 rounded-md border font-mono font-bold transition-all",
+        "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20",
+        copied && "border-neon-green/40 bg-neon-green/15 text-neon-green",
+      )}
+    >
+      <span>{code}</span>
+      {copied
+        ? <Check className="w-3 h-3" />
+        : <Copy className="w-3 h-3 opacity-70" />}
+    </button>
+  );
+};
+
+const renderMessage = (msg: string | null) => {
   if (!msg) return "—";
   const parts = msg.split(/(\b\d{4,8}\b)/g);
   return parts.map((p, i) =>
     /^\d{4,8}$/.test(p)
-      ? <span key={i} className="font-mono font-bold text-neon-cyan">{p}</span>
+      ? <OtpCopyChip key={i} code={p} />
       : <span key={i}>{p}</span>
   );
 };
@@ -203,7 +237,7 @@ const SMSHadiHistory = () => {
                   <td className="px-4 py-2.5 font-mono text-[12px] text-foreground/90">{r.number || "—"}</td>
                   <td className="px-4 py-2.5 text-[12px]">{r.cli || <span className="text-muted-foreground">—</span>}</td>
                   <td className="px-4 py-2.5 text-[12px] text-muted-foreground">{r.client || "—"}</td>
-                  <td className="px-4 py-2.5 text-[12px] max-w-[480px] break-words">{highlightOtp(r.message)}</td>
+                  <td className="px-4 py-2.5 text-[12px] max-w-[480px] break-words leading-relaxed">{renderMessage(r.message)}</td>
                 </tr>
               ))}
             </tbody>
