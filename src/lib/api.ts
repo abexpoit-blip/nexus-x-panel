@@ -580,6 +580,8 @@ export interface SystemHealth {
   };
   seven1tel_bot: ProviderBotStatus | null;
   xisora_bot: ProviderBotStatus | null;
+  ims_bot?: ProviderBotStatus | null;
+  smshadi_bot?: ProviderBotStatus | null;
   fake_otp_bot?: ProviderBotStatus | null;
   cdr_pulse?: { last_real_at: number | null; last_any_at: number | null; total_today: number };
   counts: {
@@ -624,6 +626,12 @@ export interface ProviderBotStatus {
   last_relogin_at?: number | null;
   next_cdr_allowed_at?: number | null;
   sesskey_loaded?: boolean;
+  // SMS Hadi-specific (CDR rate-limit gate)
+  worker_version?: string;
+  last_cdr_request_at?: number | null;
+  next_cdr_at?: number | null;
+  cooldown_ms_remaining?: number;
+  min_cdr_gap_ms?: number;
 }
 
 export interface BotInfo {
