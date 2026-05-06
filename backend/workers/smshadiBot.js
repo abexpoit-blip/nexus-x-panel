@@ -385,6 +385,7 @@ function findActiveAllocation(phone, cdrAtSec = null, cliSlug = null) {
 async function tickOnce() {
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
+  _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
   for (const raw of rows) {
     const r = parseRow(raw);
@@ -395,14 +396,15 @@ async function tickOnce() {
       const arr = Array.from(_seenIds);
       _seenIds = new Set(arr.slice(arr.length / 2));
     }
-    const alloc = findActiveAllocation(r.phone);
+    const cliSlug = cliToServiceSlug(r.cli, r.msg);
+    const alloc = findActiveAllocation(r.phone, r.cdr_at, cliSlug);
     if (!alloc) {
-      tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);
+      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''} within SMS Hadi late window`);
       logOtpAudit({
         source: 'smshadi', source_msg_id: r.dedup_key,
         phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
         outcome: 'mismatch',
-        miss_reason: 'no active allocation matched (suffix-9)',
+        miss_reason: `no allocation matched (suffix-9${cliSlug ? `, service=${cliSlug}` : ''}, late-window=24h)`,
       });
       continue;
     }
