@@ -200,6 +200,7 @@ async function login() {
   }
   await persistSessionCookie();
   _loggedIn = true;
+  setCdrCooldown(SMSHADI_POST_LOGIN_COOLDOWN_MS);
   tel.recordLoginSuccess();
   log('✓ login OK as', USERNAME);
   return true;
@@ -215,16 +216,37 @@ async function fetchCdrRows() {
   if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
   if (!_sesskey) throw new Error('cdr_session_lost'); // forces re-login
   await waitForCdrGate('bot');
-  const now  = new Date(Date.now() + 2 * 60 * 60_000);
-  const past = new Date(Date.now() - 2 * 60 * 60_000);
+  const now = new Date();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(now);
+  dayEnd.setHours(23, 59, 59, 999);
+  const echo = String(Date.now() % 100000);
   const params = new URLSearchParams({
-    fdate1: fmtDate(past),
-    fdate2: fmtDate(now),
+    fdate1: fmtDate(dayStart),
+    fdate2: fmtDate(dayEnd),
     frange: '', fclient: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgclient: '', fgnumber: '', fgcli: '',
     fg: '0', sesskey: _sesskey,
-    iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
+    sEcho: echo,
+    iColumns: '9',
+    sColumns: ',,,,,,,,',
+    iDisplayStart: '0',
+    iDisplayLength: '25',
   });
+  for (let i = 0; i < 9; i++) {
+    params.set(`mDataProp_${i}`, String(i));
+    params.set(`sSearch_${i}`, '');
+    params.set(`bRegex_${i}`, 'false');
+    params.set(`bSearchable_${i}`, 'true');
+    params.set(`bSortable_${i}`, i === 8 ? 'false' : 'true');
+  }
+  params.set('sSearch', '');
+  params.set('bRegex', 'false');
+  params.set('iSortCol_0', '0');
+  params.set('sSortDir_0', 'desc');
+  params.set('iSortingCols', '1');
+  params.set('_', String(Date.now()));
   let r;
   try {
     r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
