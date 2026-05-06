@@ -39,7 +39,7 @@ const MIN_INTERVAL_FLOOR = 15; // absolute minimum admin can configure
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
-const DEFAULT_CDR_MIN_INTERVAL = 16;     // gap between any two CDR calls (sec)
+const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — IMS 15s + safety
 const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
@@ -476,8 +476,11 @@ async function loop() {
       if (isRateLimitError(e.message)) log('tick cooldown:', e.message);
       else warn('tick error:', e.message);
       _lastError = e.message;
-      if (!isRateLimitError(e.message)) tel.recordError(e.message);
-      _consecFail++;
+      const rl = isRateLimitError(e.message);
+      if (!rl) {
+        tel.recordError(e.message);
+        _consecFail++;
+      }
       if (/session_lost|unauthorized|login_failed|sesskey/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
       }
@@ -485,7 +488,7 @@ async function loop() {
       // Grow penalty exponentially each consecutive hit (20s → 40s → 60s → cap 90s)
       // so we stop hammering and self-recover instead of staying stuck.
       let penalty = 0;
-      if (isRateLimitError(e.message)) {
+      if (rl) {
         _rateLimitStreak++;
         penalty = registerRateLimitCooldown();
         const { reloginThreshold, reloginStaleSec } = readCooldownCfg();
