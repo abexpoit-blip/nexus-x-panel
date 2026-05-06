@@ -458,6 +458,31 @@ export const api = {
           };
         }>(`/admin/bots/${bot}/logs?level=${level}&limit=${limit}`),
     },
+
+    // ─── SMS Hadi OTP history (SMSCDRReports proxy) ───────────────
+    smshadiCdr: (params: {
+      page?: number; page_size?: number;
+      from?: string; to?: string;
+      number?: string; cli?: string; range?: string;
+    } = {}) => {
+      const qs = new URLSearchParams();
+      if (params.page) qs.set("page", String(params.page));
+      if (params.page_size) qs.set("page_size", String(params.page_size));
+      if (params.from) qs.set("from", params.from);
+      if (params.to) qs.set("to", params.to);
+      if (params.number) qs.set("number", params.number);
+      if (params.cli) qs.set("cli", params.cli);
+      if (params.range) qs.set("range", params.range);
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      return request<{
+        rows: Array<{
+          date: string; range: string | null; number: string;
+          cli: string | null; client: string | null; message: string | null;
+        }>;
+        page: number; page_size: number;
+        total: number; filtered: number; total_pages: number;
+      }>(`/admin/smshadi/cdr${suffix}`);
+    },
   },
 
   // ===== Agent v2 ranges =====
