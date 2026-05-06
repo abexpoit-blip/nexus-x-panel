@@ -73,6 +73,9 @@ function writeSetting(k, v) {
     `).run(k, String(v));
   } catch (e) { warn('writeSetting failed:', e.message); }
 }
+function isRateLimitError(msg) {
+  return /rate_limited|cdr_page_503|cdr_http_503|15\s*second/i.test(String(msg || ''));
+}
 function normalizeBase(raw) {
   const fb = 'https://www.imssms.org';
   if (!raw) return fb;
@@ -194,11 +197,12 @@ function buildClient(baseURL) {
   }));
 }
 
-async function persistSessionCookie() {
+async function persistSessionCookie(saveHeader = false) {
   try {
     const cookies = await _jar.getCookies(_client.defaults.baseURL);
     const sess = cookies.find(c => /^PHPSESSID/i.test(c.key));
     if (sess) writeSetting('ims_session_cookie', sess.cookieString());
+    if (saveHeader && cookies.length) writeSetting('ims_cookie_header', cookies.map(c => c.cookieString()).join('; '));
   } catch (e) { warn('persistSession failed:', e.message); }
 }
 
