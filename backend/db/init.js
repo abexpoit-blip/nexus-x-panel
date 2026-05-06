@@ -236,6 +236,16 @@ seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocat
 // Premium single-sound mode — every agent gets the viral "Faaaah" horn.
 seedSetting('otp_sound_default', 'faaaah');
 
+// One-time backfill: bump existing agents from the legacy default of 100
+// to the new platform default of 500. Only touches rows that still match
+// the old default — admin-customised limits are left untouched.
+try {
+  const r = db.prepare(
+    "UPDATE users SET daily_limit = 500 WHERE role = 'agent' AND daily_limit = 100"
+  ).run();
+  if (r.changes) console.log(`✓ Backfilled daily_limit=500 for ${r.changes} agent(s)`);
+} catch (e) { console.warn('daily_limit backfill skipped:', e.message); }
+
 console.log(`✓ Database ready at ${DB_PATH}`);
 db.close();
 
