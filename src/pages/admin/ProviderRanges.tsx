@@ -23,6 +23,7 @@ import type { Service } from "@/lib/api";
 const PROVIDERS = [
   { id: "seven1tel", name: "Seven1Tel" },
   { id: "xisora",    name: "XISORA" },
+  { id: "ims",       name: "IMS" },
 ];
 
 type Form = Partial<ProviderRange> & { id?: number };
