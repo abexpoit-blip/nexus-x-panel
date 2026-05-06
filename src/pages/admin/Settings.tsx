@@ -880,6 +880,76 @@ const AdminSettings = () => {
             saving={savingKey?.startsWith("ims_") || false}
           />
 
+          {/* ─── IMS CDR cooldown / backoff (no redeploy needed) ─── */}
+          <div className="rounded-xl border border-border/60 bg-card/40 p-4 space-y-3">
+            <div>
+              <h4 className="text-sm font-bold tracking-wide text-foreground">IMS CDR Cooldown & Backoff</h4>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Tune how the IMS bot paces CDR refreshes and recovers from <span className="text-neon-magenta">rate_limited</span> errors.
+                Floor is 15s — IMS portal warns at &lt;15s. Changes apply on the next tick (no restart needed).
+              </p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Min interval (sec)</span>
+                <input type="number" min={15} max={120}
+                  className="w-full bg-background/60 border border-border/60 rounded-md px-2 py-1.5 text-sm"
+                  value={imsMinInterval}
+                  onChange={(e) => setImsMinInterval(Number(e.target.value) || 16)}
+                />
+              </label>
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Penalty base (sec)</span>
+                <input type="number" min={5} max={300}
+                  className="w-full bg-background/60 border border-border/60 rounded-md px-2 py-1.5 text-sm"
+                  value={imsRlBase}
+                  onChange={(e) => setImsRlBase(Number(e.target.value) || 20)}
+                />
+              </label>
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Penalty max (sec)</span>
+                <input type="number" min={10} max={600}
+                  className="w-full bg-background/60 border border-border/60 rounded-md px-2 py-1.5 text-sm"
+                  value={imsRlMax}
+                  onChange={(e) => setImsRlMax(Number(e.target.value) || 90)}
+                />
+              </label>
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Penalty steps</span>
+                <input type="number" min={1} max={10}
+                  className="w-full bg-background/60 border border-border/60 rounded-md px-2 py-1.5 text-sm"
+                  value={imsRlSteps}
+                  onChange={(e) => setImsRlSteps(Number(e.target.value) || 4)}
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={savingKey?.startsWith("ims_cdr_") || savingKey?.startsWith("ims_rl_")}
+                className="px-3 py-1.5 rounded-md bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan text-xs font-bold hover:bg-neon-cyan/20 disabled:opacity-50"
+                onClick={async () => {
+                  await setSetting("ims_cdr_min_interval_sec", String(Math.max(15, imsMinInterval)));
+                  await setSetting("ims_rl_penalty_base_sec", String(Math.max(1, imsRlBase)));
+                  await setSetting("ims_rl_penalty_max_sec", String(Math.max(imsRlBase, imsRlMax)));
+                  await setSetting("ims_rl_penalty_steps", String(Math.max(1, Math.floor(imsRlSteps))));
+                  toast({ title: "IMS cooldown updated" });
+                }}
+              >
+                Save cooldown
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-md border border-border/60 text-xs hover:bg-card/60"
+                onClick={() => {
+                  setImsMinInterval(16); setImsRlBase(20); setImsRlMax(90); setImsRlSteps(4);
+                }}
+              >
+                Reset defaults
+              </button>
+            </div>
+          </div>
+
           <p className="text-[11px] text-muted-foreground">
             After saving, go to <span className="text-foreground">Bots Control</span> → <span className="text-neon-cyan">Restart</span> so changes take effect right away.
           </p>
