@@ -507,6 +507,41 @@ router.get('/bots/:bot/logs', (req, res) => {
   });
 });
 
+// =============================================================
+// SMS Hadi — admin OTP history (SMSCDRReports proxy with paging)
+// No 15s rate-limit on this panel, so we can serve filtered pages live.
+// =============================================================
+router.get('/smshadi/cdr', async (req, res) => {
+  let mod;
+  try { mod = require('../workers/smshadiBot'); }
+  catch (e) { return res.status(500).json({ error: 'smshadi worker not loaded: ' + e.message }); }
+  if (typeof mod.fetchCdrPage !== 'function') {
+    return res.status(500).json({ error: 'smshadi worker missing fetchCdrPage' });
+  }
+  const page = Math.max(1, +req.query.page || 1);
+  const pageSize = Math.max(10, Math.min(200, +req.query.page_size || 50));
+  try {
+    const out = await mod.fetchCdrPage({
+      fdate1: req.query.from || '',
+      fdate2: req.query.to || '',
+      fnum:   req.query.number || '',
+      fcli:   req.query.cli || '',
+      frange: req.query.range || '',
+      start:  (page - 1) * pageSize,
+      length: pageSize,
+    });
+    res.json({
+      rows: out.rows,
+      page, page_size: pageSize,
+      total: out.total,
+      filtered: out.filtered,
+      total_pages: Math.max(1, Math.ceil(out.filtered / pageSize)),
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message || String(e) });
+  }
+});
+
 
 // =============================================================
 // GET /api/admin/otp-audit — end-to-end OTP audit log.

@@ -180,6 +180,56 @@ async function fetchCdrRows() {
   return rows;
 }
 
+// Authenticated paginated fetch — used by admin OTP history UI (SMSCDRReports).
+// No rate-limit on this panel, so we can serve filtered pages on-demand.
+async function fetchCdrPage({ fdate1, fdate2, fnum = '', fcli = '', frange = '',
+                              start = 0, length = 50 } = {}) {
+  if (!_loggedIn) await login();
+  if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
+  if (!_sesskey) await login();
+  const now  = new Date(Date.now() + 2 * 60 * 60_000);
+  const past = new Date(Date.now() - 24 * 60 * 60_000);
+  const params = new URLSearchParams({
+    fdate1: fdate1 || fmtDate(past),
+    fdate2: fdate2 || fmtDate(now),
+    frange: String(frange || ''), fclient: '',
+    fnum: String(fnum || ''), fcli: String(fcli || ''),
+    fgdate: '', fgmonth: '', fgrange: '', fgclient: '', fgnumber: '', fgcli: '',
+    fg: '0', sesskey: _sesskey,
+    iDisplayLength: String(Math.max(10, Math.min(500, +length || 50))),
+    iDisplayStart:  String(Math.max(0, +start || 0)),
+    sEcho: String(Date.now() % 100000),
+  });
+  const doFetch = () => _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest',
+               'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports` },
+  });
+  let r = await doFetch();
+  if (r.status === 401 || r.status === 403 ||
+      (typeof r.data === 'string' && (/404 Not Found/i.test(r.data) || /name=["']password["']/i.test(r.data)))) {
+    _sesskey = null; _loggedIn = false;
+    await login();
+    params.set('sesskey', _sesskey || '');
+    r = await doFetch();
+  }
+  const data = r.data || {};
+  const rows = Array.isArray(data.aaData) ? data.aaData : [];
+  return {
+    rows: rows.map((row) => ({
+      date:    String(row[0] || ''),
+      range:   row[1] ? String(row[1]) : null,
+      number:  String(row[2] || '').replace(/\D/g, ''),
+      cli:     row[3] ? String(row[3]) : null,
+      client:  row[4] ? String(row[4]) : null,
+      message: row[5] ? String(row[5]) : null,
+    })),
+    total: +data.iTotalRecords || 0,
+    filtered: +data.iTotalDisplayRecords || rows.length,
+    start: +params.get('iDisplayStart'),
+    length: +params.get('iDisplayLength'),
+  };
+}
+
 // Row shape observed: [date, range, number, cli, client_name, message, null, 0, 0]
 function parseRow(row) {
   if (!Array.isArray(row) || row.length < 6) return null;
@@ -313,4 +363,4 @@ function getStatus() {
   };
 }
 
-module.exports = { start, stop, login, tickOnce, getStatus };
+module.exports = { start, stop, login, tickOnce, getStatus, fetchCdrPage };
