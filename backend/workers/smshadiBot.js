@@ -8,7 +8,7 @@
 //   smshadi_base_url           http://2.59.169.96/ints
 //   smshadi_username           mamun999
 //   smshadi_password           mamun999
-//   smshadi_otp_interval       4   (sec between CDR polls — min 3; no 15s gate)
+//   smshadi_otp_interval       18  (sec between CDR polls — portal enforces 15s min)
 //   smshadi_session_cookie     (auto-saved PHPSESSID for fast restart)
 //   smshadi_sesskey            (auto-saved sesskey for the AJAX endpoint)
 
@@ -53,7 +53,7 @@ function resolveCfg() {
     BASE_URL: normalizeBase(readSetting('smshadi_base_url') || process.env.SMSHADI_BASE_URL),
     USERNAME: readSetting('smshadi_username') || process.env.SMSHADI_USERNAME || 'mamun999',
     PASSWORD: readSetting('smshadi_password') || process.env.SMSHADI_PASSWORD || 'mamun999',
-    INTERVAL: Math.max(3, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 4)),
+    INTERVAL: Math.max(16, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 18)),
   };
 }
 
@@ -62,9 +62,10 @@ let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
 let _seenIds = new Set();
 let _sesskey = null;
-let _nextCdrAt = 0;
+let _nextCdrAt = 0, _lastCdrRequestAt = 0;
 const SEEN_MAX = 5000;
-const WORKER_VERSION = '2026-05-06-smshadi-503-backoff-v2';
+const SMSHADI_MIN_CDR_GAP_MS = 16_000;
+const WORKER_VERSION = '2026-05-06-smshadi-real-15s-rate-limit';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -76,6 +77,16 @@ function providerStatus(e) {
 function isProvider5xxError(e) {
   const st = providerStatus(e);
   return (st >= 500 && st < 600) || /cdr_503|cdr_http_5\d\d|provider_http_5\d\d|status code 5\d\d/i.test(String(e?.message || e || ''));
+}
+async function waitForCdrGate(reason = 'CDR') {
+  const until = Math.max(_nextCdrAt, _lastCdrRequestAt + SMSHADI_MIN_CDR_GAP_MS);
+  const waitMs = until - Date.now();
+  if (waitMs > 0) {
+    const waitSec = Math.ceil(waitMs / 1000);
+    warn(`${reason} rate gate — waiting ${waitSec}s before SMS Hadi CDR request`);
+    await sleep(waitMs);
+  }
+  _lastCdrRequestAt = Date.now();
 }
 
 function buildClient(baseURL) {
