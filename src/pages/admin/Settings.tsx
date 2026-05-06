@@ -109,6 +109,12 @@ const AdminSettings = () => {
   const [imsRlMax, setImsRlMax] = useState<number>(90);
   const [imsRlSteps, setImsRlSteps] = useState<number>(4);
   const [imsRlReloginThreshold, setImsRlReloginThreshold] = useState<number>(6);
+  // SMS Hadi (2.59.169.96/ints)
+  const [hadiUrl, setHadiUrl] = useState("");
+  const [hadiUser, setHadiUser] = useState("");
+  const [hadiPass, setHadiPass] = useState("");
+  const [hadiCookie, setHadiCookie] = useState("");
+  const [hadiInterval, setHadiInterval] = useState<number>(4);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
@@ -144,6 +150,11 @@ const AdminSettings = () => {
     setImsRlMax(Number(str(s, "ims_rl_penalty_max_sec", "90")) || 90);
     setImsRlSteps(Number(str(s, "ims_rl_penalty_steps", "4")) || 4);
     setImsRlReloginThreshold(Number(str(s, "ims_rl_relogin_threshold", "6")) || 6);
+    setHadiUrl(str(s, "smshadi_base_url", "http://2.59.169.96/ints"));
+    setHadiUser(str(s, "smshadi_username", "mamun999"));
+    setHadiPass(str(s, "smshadi_password", "mamun999"));
+    setHadiCookie(str(s, "smshadi_cookie_header"));
+    setHadiInterval(Number(str(s, "smshadi_otp_interval", "4")) || 4);
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
@@ -880,6 +891,37 @@ const AdminSettings = () => {
               toast({ title: "IMS session cleared" });
             }}
             saving={savingKey?.startsWith("ims_") || false}
+          />
+
+          {/* ─── SMS Hadi (2.59.169.96/ints — no rate-limit) ─── */}
+          <BotConfigCard
+            tone="cyan"
+            title="SMS Hadi Bot (2.59.169.96/ints)"
+            urlKey="smshadi_base_url"
+            url={hadiUrl} setUrl={setHadiUrl}
+            user={hadiUser} setUser={setHadiUser} userKey="smshadi_username"
+            pass={hadiPass} setPass={setHadiPass} passKey="smshadi_password"
+            cookie={hadiCookie} setCookie={setHadiCookie} cookieKey="smshadi_cookie_header"
+            cookiePlaceholder="PHPSESSID=..."
+            cookieHint="Optional. If set, bot uses this cookie instead of running the captcha login. No rate-limit on this panel — 3-5s interval is safe."
+            interval={hadiInterval} setInterval={setHadiInterval} intervalKey="smshadi_otp_interval"
+            showPw={showPw}
+            health={healthState["smshadi"]}
+            onSave={async () => {
+              await setSetting("smshadi_base_url", hadiUrl);
+              await setSetting("smshadi_username", hadiUser);
+              await setSetting("smshadi_password", hadiPass);
+              await setSetting("smshadi_cookie_header", hadiCookie);
+              await setSetting("smshadi_otp_interval", String(Math.max(3, hadiInterval)));
+            }}
+            onHealth={() => runHealth("smshadi")}
+            onClearCookies={async () => {
+              if (!confirm("Clear saved SMS Hadi session cookie + sesskey? Next tick re-logs in.")) return;
+              await setSetting("smshadi_session_cookie", "");
+              await setSetting("smshadi_sesskey", "");
+              toast({ title: "SMS Hadi session cleared" });
+            }}
+            saving={savingKey?.startsWith("smshadi_") || false}
           />
 
           {/* ─── IMS CDR cooldown / backoff (no redeploy needed) ─── */}

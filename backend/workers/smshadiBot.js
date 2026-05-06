@@ -1,0 +1,316 @@
+// SMS Hadi Bot — axios + tough-cookie scraper for the "ints" SMS panel
+// at http://2.59.169.96/ints (SMS Hadi). Same software family as Seven1Tel
+// but the AJAX CDR endpoint requires a per-session `sesskey` token scraped
+// from /agent/SMSCDRStats and lives under /agent/res/, not /res/.
+//
+// Settings (DB first, .env fallback):
+//   smshadi_enabled            true|false
+//   smshadi_base_url           http://2.59.169.96/ints
+//   smshadi_username           mamun999
+//   smshadi_password           mamun999
+//   smshadi_otp_interval       4   (sec between CDR polls — min 3; no 15s gate)
+//   smshadi_session_cookie     (auto-saved PHPSESSID for fast restart)
+//   smshadi_sesskey            (auto-saved sesskey for the AJAX endpoint)
+
+const axios = require('axios');
+const tough = require('tough-cookie');
+const { wrapper } = require('axios-cookiejar-support');
+const db = require('../lib/db');
+const { markOtpReceived } = require('../routes/numbers');
+const { logOtpAudit } = require('../lib/otpAudit');
+const { Telemetry } = require('./_botTelemetry');
+const tel = new Telemetry();
+
+const QUIET = process.env.NODE_ENV === 'production';
+const log  = (...a) => console.log('[smshadi-bot]', ...a);
+const dlog = (...a) => { if (!QUIET) console.log('[smshadi-bot]', ...a); };
+const warn = (...a) => console.warn('[smshadi-bot]', ...a);
+
+function readSetting(key) {
+  try { return db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value || null; }
+  catch (_) { return null; }
+}
+function writeSetting(key, value) {
+  try {
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+    `).run(key, String(value));
+  } catch (e) { warn('writeSetting failed:', e.message); }
+}
+function normalizeBase(raw) {
+  const fb = 'http://2.59.169.96/ints';
+  if (!raw) return fb;
+  let s = String(raw).trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(s)) s = `http://${s}`;
+  return s;
+}
+function resolveCfg() {
+  const dbEnabled = readSetting('smshadi_enabled');
+  return {
+    ENABLED: (dbEnabled !== null ? dbEnabled : (process.env.SMSHADI_ENABLED || 'false'))
+              .toString().toLowerCase() === 'true',
+    BASE_URL: normalizeBase(readSetting('smshadi_base_url') || process.env.SMSHADI_BASE_URL),
+    USERNAME: readSetting('smshadi_username') || process.env.SMSHADI_USERNAME || 'mamun999',
+    PASSWORD: readSetting('smshadi_password') || process.env.SMSHADI_PASSWORD || 'mamun999',
+    INTERVAL: Math.max(3, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 4)),
+  };
+}
+
+let _client = null, _jar = null;
+let _loggedIn = false, _running = false, _stopFlag = false;
+let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
+let _seenIds = new Set();
+let _sesskey = null;
+const SEEN_MAX = 5000;
+
+function buildClient(baseURL) {
+  _jar = new tough.CookieJar();
+  const saved = readSetting('smshadi_session_cookie');
+  if (saved) { try { _jar.setCookieSync(saved, baseURL); dlog('restored saved session cookie'); }
+              catch (e) { warn('cookie restore failed:', e.message); } }
+  const c = wrapper(axios.create({
+    baseURL, jar: _jar, withCredentials: true, timeout: 15000, maxRedirects: 5,
+    validateStatus: (s) => s < 500,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  }));
+  return c;
+}
+
+async function persistSessionCookie() {
+  try {
+    const cookies = await _jar.getCookies(_client.defaults.baseURL);
+    const sess = cookies.find(c => /^PHPSESSID/i.test(c.key));
+    if (sess) writeSetting('smshadi_session_cookie', sess.cookieString());
+  } catch (e) { warn('persistSession failed:', e.message); }
+}
+
+async function login() {
+  const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
+  if (!USERNAME || !PASSWORD) throw new Error('smshadi creds missing');
+  tel.recordLoginAttempt();
+  if (!_client) _client = buildClient(BASE_URL);
+
+  const r1 = await _client.get('/login');
+  const html = String(r1.data || '');
+  dlog('GET /login →', r1.status, 'len', html.length);
+
+  // Math captcha: "What is 4 + 9 = ? :"
+  const m = html.match(/What\s+is\s+(\d+)\s*([+\-*x\/])\s*(\d+)\s*=/i);
+  let captAns = null;
+  if (m) {
+    const a = +m[1], b = +m[3], op = m[2].toLowerCase();
+    captAns = op === '+' ? a + b : op === '-' ? a - b
+            : (op === '*' || op === 'x') ? a * b
+            : op === '/' ? Math.floor(a / b) : null;
+  }
+  const captName = html.match(/<input[^>]+name=["']([^"']+)["'][^>]+placeholder=["']Answer["']/i)?.[1] || 'capt';
+
+  const form = new URLSearchParams();
+  form.set('username', USERNAME);
+  form.set('password', PASSWORD);
+  if (captAns != null) form.set(captName, String(captAns));
+
+  const r2 = await _client.post('/signin', form.toString(), {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Referer': `${BASE_URL}/login`,
+      'Origin': BASE_URL,
+    },
+  });
+  dlog('POST /signin →', r2.status, 'final', r2.request?.res?.responseUrl || '?');
+
+  // Verify by hitting CDR Stats — also captures sesskey.
+  const probe = await _client.get('/agent/SMSCDRStats');
+  const phtml = String(probe.data || '');
+  const isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
+  if (probe.status !== 200 || isLogin) {
+    log('login probe FAIL — status', probe.status, 'preview:', phtml.slice(0, 200).replace(/\s+/g, ' '));
+    throw new Error('login_failed');
+  }
+  // Pull sesskey out of sAjaxSource URL
+  const sk = phtml.match(/sesskey=([A-Za-z0-9=+/]+)/);
+  if (sk) {
+    _sesskey = sk[1];
+    writeSetting('smshadi_sesskey', _sesskey);
+    dlog('captured sesskey', _sesskey);
+  } else {
+    warn('sesskey not found on /agent/SMSCDRStats');
+  }
+  await persistSessionCookie();
+  _loggedIn = true;
+  tel.recordLoginSuccess();
+  log('✓ login OK as', USERNAME);
+  return true;
+}
+
+function fmtDate(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ` +
+         `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+async function fetchCdrRows() {
+  if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
+  if (!_sesskey) throw new Error('cdr_session_lost'); // forces re-login
+  const now  = new Date(Date.now() + 2 * 60 * 60_000);
+  const past = new Date(Date.now() - 2 * 60 * 60_000);
+  const params = new URLSearchParams({
+    fdate1: fmtDate(past),
+    fdate2: fmtDate(now),
+    frange: '', fclient: '', fnum: '', fcli: '',
+    fgdate: '', fgmonth: '', fgrange: '', fgclient: '', fgnumber: '', fgcli: '',
+    fg: '0', sesskey: _sesskey,
+    iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
+  });
+  const r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Referer': `${_client.defaults.baseURL}/agent/SMSCDRStats` },
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
+  if (r.status === 404 || (typeof r.data === 'string' && /404 Not Found/i.test(r.data))) {
+    // sesskey expired
+    _sesskey = null;
+    throw new Error('cdr_session_lost');
+  }
+  if (typeof r.data === 'string' && /name=["']password["']/i.test(r.data)) throw new Error('cdr_session_lost');
+  const rows = (r.data && r.data.aaData) || [];
+  return rows;
+}
+
+// Row shape observed: [date, range, number, cli, client_name, message, null, 0, 0]
+function parseRow(row) {
+  if (!Array.isArray(row) || row.length < 6) return null;
+  const dateCol = String(row[0] || '');
+  if (!/^\d{4}-\d{2}-\d{2}/.test(dateCol)) return null;
+  const range = row[1] ? String(row[1]) : null;
+  const phone = String(row[2] || '').replace(/\D/g, '');
+  const cli = row[3] ? String(row[3]) : null;
+  const msg = row[5] ? String(row[5]) : null;
+  if (!phone || !msg) return null;
+  const otpMatch = msg.match(/\b(\d{4,8})\b/);
+  return {
+    phone, cli, range, msg,
+    otp: otpMatch ? otpMatch[1] : null,
+    dedup_key: `${phone}|${msg.slice(0, 60)}|${dateCol}`,
+  };
+}
+
+function findActiveAllocation(phone) {
+  const GRACE_SEC = 300, RESEND_SEC = 600;
+  const tail = phone.slice(-9);
+  const nowSec = Math.floor(Date.now() / 1000);
+  return db.prepare(`
+    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
+    FROM allocations
+    WHERE phone_number LIKE ?
+      AND ( status='active'
+         OR (status='expired'  AND allocated_at >= ?)
+         OR (status='received' AND allocated_at >= ?) )
+    ORDER BY allocated_at DESC LIMIT 1
+  `).get(`%${tail}`, nowSec - GRACE_SEC, nowSec - RESEND_SEC);
+}
+
+async function tickOnce() {
+  if (!_loggedIn) await login();
+  const rows = await fetchCdrRows();
+  let delivered = 0;
+  for (const raw of rows) {
+    const r = parseRow(raw);
+    if (!r || !r.otp) continue;
+    if (_seenIds.has(r.dedup_key)) continue;
+    _seenIds.add(r.dedup_key);
+    if (_seenIds.size > SEEN_MAX) {
+      const arr = Array.from(_seenIds);
+      _seenIds = new Set(arr.slice(arr.length / 2));
+    }
+    const alloc = findActiveAllocation(r.phone);
+    if (!alloc) {
+      tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);
+      logOtpAudit({
+        source: 'smshadi', source_msg_id: r.dedup_key,
+        phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
+        outcome: 'mismatch',
+        miss_reason: 'no active allocation matched (suffix-9)',
+      });
+      continue;
+    }
+    try {
+      await markOtpReceived(alloc, r.otp, r.cli, r.msg || null,
+        { source: 'smshadi', source_msg_id: r.dedup_key });
+      delivered++; _otpDelivered++;
+      tel.recordOtpDelivered();
+      log(`✓ OTP ${r.phone} → ${r.otp} (alloc#${alloc.id}, agent#${alloc.user_id})`);
+    } catch (e) {
+      warn('markOtpReceived failed:', e.message);
+      tel.recordError(`markOtpReceived: ${e.message}`);
+      logOtpAudit({
+        source: 'smshadi', source_msg_id: r.dedup_key,
+        phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
+        allocation_id: alloc.id, user_id: alloc.user_id,
+        outcome: 'error', miss_reason: `markOtpReceived: ${e.message}`,
+      });
+    }
+  }
+  return delivered;
+}
+
+async function loop() {
+  if (_running) return;
+  _running = true;
+  while (!_stopFlag) {
+    const cfg = resolveCfg();
+    if (!cfg.ENABLED) { _running = false; log('disabled — stopping'); return; }
+    try {
+      const n = await tickOnce();
+      tel.recordTick();
+      _lastTickAt = Math.floor(Date.now() / 1000);
+      _lastError = null; _consecFail = 0;
+      if (n) log('delivered', n, 'OTPs this tick');
+    } catch (e) {
+      warn('tick error:', e.message);
+      _lastError = e.message;
+      tel.recordError(e.message);
+      _consecFail++;
+      if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
+        _loggedIn = false; _sesskey = null;
+      }
+      const backoff = Math.min(60, 5 + _consecFail * 2);
+      await new Promise(r => setTimeout(r, backoff * 1000));
+    }
+    await new Promise(r => setTimeout(r, cfg.INTERVAL * 1000));
+  }
+  _running = false;
+}
+
+function start() {
+  const cfg = resolveCfg();
+  if (!cfg.ENABLED) { log('disabled (smshadi_enabled=false) — not starting'); return; }
+  if (_running) { log('already running — skip start'); return; }
+  _stopFlag = false;
+  log('starting…  base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's');
+  loop().catch(e => warn('fatal:', e.message));
+}
+function stop() { _stopFlag = true; _loggedIn = false; }
+function getStatus() {
+  const cfg = resolveCfg();
+  return {
+    enabled: cfg.ENABLED,
+    running: _running,
+    logged_in: _loggedIn,
+    base_url: cfg.BASE_URL,
+    username: cfg.USERNAME ? cfg.USERNAME.replace(/.(?=.{2})/g, '*') : null,
+    last_tick_at: _lastTickAt,
+    last_error: _lastError,
+    consec_fail: _consecFail,
+    otps_delivered: _otpDelivered,
+    interval_sec: cfg.INTERVAL,
+    sesskey_loaded: !!_sesskey,
+    portal_url: cfg.BASE_URL + '/agent/SMSCDRStats',
+    ...tel.snapshot(),
+  };
+}
+
+module.exports = { start, stop, login, tickOnce, getStatus };
