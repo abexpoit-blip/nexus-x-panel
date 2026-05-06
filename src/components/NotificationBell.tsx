@@ -60,13 +60,14 @@ export const NotificationBell = () => {
   const { togglePanel, setUnreadFromServer, preferences } = useNotifications();
   const { user } = useAuth();
 
-  // Poll real backend notifications every 5 s when logged in (real-time-ish)
+  // Poll backend notifications every 20 s when logged in. The bell only shows
+  // an unread badge — sub-20s freshness isn't worth the constant re-render.
   const { data } = useQuery({
     queryKey: ["nav-notifications", user?.id],
     queryFn: () => api.notifications.list(),
     enabled: !!user,
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 20_000,
+    staleTime: 15_000,
   });
 
   const unread = data?.unread ?? 0;
