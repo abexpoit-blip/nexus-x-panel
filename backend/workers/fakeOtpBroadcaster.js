@@ -136,6 +136,15 @@ let _running = false;
 let _stopFlag = false;
 let _lastFireAt = null;
 let _totalFired = 0;
+let _wakeResolve = null;   // lets start() interrupt the idle/sleep wait
+
+function sleepInterruptible(ms) {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => { _wakeResolve = null; resolve(); }, ms);
+    _wakeResolve = () => { clearTimeout(t); _wakeResolve = null; resolve(); };
+  });
+}
+function wake() { if (_wakeResolve) try { _wakeResolve(); } catch {} }
 
 async function loop() {
   if (_running) return;
@@ -143,8 +152,8 @@ async function loop() {
   while (!_stopFlag) {
     const c = cfg();
     if (!c.enabled) {
-      // Idle check every 10s while disabled (so re-enabling is responsive)
-      await new Promise(r => setTimeout(r, 10_000));
+      // Idle while disabled — wake immediately when start() flips the flag
+      await sleepInterruptible(10_000);
       continue;
     }
     try {
@@ -165,18 +174,23 @@ async function loop() {
 
     // Sleep a randomized interval in [min, max]
     const sleepSec = c.minSec + Math.random() * (c.maxSec - c.minSec);
-    await new Promise(r => setTimeout(r, sleepSec * 1000));
+    await sleepInterruptible(sleepSec * 1000);
   }
   _running = false;
 }
 
 function start() {
-  if (_running) { log('already running — skip start'); return; }
   _stopFlag = false;
+  if (_running) {
+    // Loop already alive — wake it so it picks up the new enabled flag now
+    log('already running — waking idle loop');
+    wake();
+    return;
+  }
   log('starting (will idle until fake_otp_enabled=true)…');
   loop().catch(e => warn('fatal:', e.message));
 }
-function stop() { _stopFlag = true; }
+function stop() { _stopFlag = true; wake(); }
 function getStatus() {
   const c = cfg();
   return {

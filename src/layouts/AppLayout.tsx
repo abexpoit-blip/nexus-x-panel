@@ -9,6 +9,7 @@ import { Menu, Wallet, Search, Wrench, ShieldAlert, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useOtpAlerts } from "@/hooks/useOtpAlerts";
+import { HeaderTicker } from "@/components/HeaderTicker";
 
 interface AppLayoutProps {
   requiredRole: UserRole;
@@ -67,12 +68,12 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex-1 flex items-center">
+          <div className="flex items-center shrink-0">
             <button
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
               }}
-              className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.06] hover:border-white/[0.1] transition-colors w-80 group"
+              className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.06] hover:border-white/[0.1] transition-colors w-64 lg:w-72 group"
               aria-label="Open command palette"
             >
               <Search className="w-3.5 h-3.5 group-hover:text-primary transition-colors" />
@@ -81,7 +82,10 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Live ticker fills middle space (desktop) + compact chip (mobile) */}
+          <HeaderTicker />
+
+          <div className="flex items-center gap-3 shrink-0">
             {maintenanceMode && (
               <div
                 title={maintenanceMessage}
