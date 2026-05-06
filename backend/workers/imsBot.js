@@ -75,6 +75,27 @@ let _sesskey = null;
 let _seenIds = new Set();
 const SEEN_MAX = 5000;
 let _rateLimitStreak = 0;   // consecutive 503/15s errors → grow interval
+let _nextCdrAllowedAt = 0;   // IMS forbids CDR/stats refreshes inside the cooldown window
+let _lastRateLimitWarnAt = 0;
+
+async function waitForCdrGate() {
+  const now = Date.now();
+  if (_nextCdrAllowedAt > now) {
+    await new Promise(r => setTimeout(r, _nextCdrAllowedAt - now));
+  }
+  _nextCdrAllowedAt = Date.now() + (MIN_INTERVAL * 1000);
+}
+
+function registerRateLimitCooldown() {
+  const penaltyMs = Math.min(90_000, 20_000 * Math.min(Math.max(_rateLimitStreak, 1), 4));
+  _nextCdrAllowedAt = Math.max(_nextCdrAllowedAt, Date.now() + penaltyMs);
+  const now = Date.now();
+  if (now - _lastRateLimitWarnAt > 60_000) {
+    warn(`IMS CDR rate-limited — cooling down ${Math.ceil(penaltyMs / 1000)}s`);
+    _lastRateLimitWarnAt = now;
+  }
+  return Math.ceil(penaltyMs / 1000);
+}
 
 function buildClient(baseURL) {
   _jar = new tough.CookieJar();
@@ -123,6 +144,7 @@ function solveCaptcha(html) {
 }
 
 async function refreshSesskey() {
+  await waitForCdrGate();
   const probe = await _client.get('/client/SMSCDRStats');
   if (probe.status !== 200) throw new Error(`cdr_page_${probe.status}`);
   const html = String(probe.data || '');
@@ -229,6 +251,7 @@ async function fetchCdrRows() {
     params.set(`bSearchable_${i}`, 'true');
     params.set(`bSortable_${i}`, 'true');
   }
+  await waitForCdrGate();
   const r = await _client.get(`/client/res/data_smscdr.php?${params.toString()}`, {
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
@@ -359,7 +382,7 @@ async function loop() {
       let penalty = 0;
       if (/rate_limited/i.test(e.message)) {
         _rateLimitStreak++;
-        penalty = Math.min(90, 20 * Math.min(_rateLimitStreak, 4));
+        penalty = registerRateLimitCooldown();
       } else {
         _rateLimitStreak = 0;
       }
