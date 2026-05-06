@@ -62,6 +62,7 @@ let _client = null, _jar = null;
 let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
 let _lastCdrSuccessAt = null;
+let _provider503Count = 0, _last503At = null, _lastWarmupAt = null, _warmupCount = 0;
 let _seenIds = new Set();
 let _sesskey = null;
 let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
@@ -72,7 +73,8 @@ const SMSHADI_503_BASE_COOLDOWN_MS = 5 * 60_000;
 const SMSHADI_503_MAX_COOLDOWN_MS = 30 * 60_000;
 const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
 const RESEND_SEC = 600;
-const WORKER_VERSION = '2026-05-06-smshadi-browser-datatables-cooldown-v3';
+const SMSHADI_DASHBOARD_WARMUP_DELAY_MS = 15_000;
+const WORKER_VERSION = '2026-05-06-smshadi-dashboard-warmup-v4';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -204,6 +206,39 @@ async function login() {
   tel.recordLoginSuccess();
   log('✓ login OK as', USERNAME);
   return true;
+}
+
+// Mimic a real agent: open SMSDashboard, idle ~15s, then open SMSCDRReports
+// (which refreshes the per-page sesskey). The provider serves the AJAX CDR
+// endpoint much more reliably right after this navigation pattern.
+async function dashboardWarmup() {
+  if (!_client) return false;
+  try {
+    const dash = await _client.get('/agent/SMSDashboard', {
+      headers: { 'Referer': `${_client.defaults.baseURL}/agent/SMSDashboard` },
+    });
+    dlog('warmup GET /agent/SMSDashboard →', dash.status);
+    if (dash.status >= 500) { warn('warmup dashboard HTTP', dash.status); return false; }
+    await sleep(SMSHADI_DASHBOARD_WARMUP_DELAY_MS);
+    const rep = await _client.get('/agent/SMSCDRReports', {
+      headers: { 'Referer': `${_client.defaults.baseURL}/agent/SMSDashboard` },
+    });
+    dlog('warmup GET /agent/SMSCDRReports →', rep.status);
+    if (rep.status >= 500) { warn('warmup reports HTTP', rep.status); return false; }
+    const html = String(rep.data || '');
+    const sk = html.match(/sesskey=([A-Za-z0-9=+/]+)/);
+    if (sk) {
+      _sesskey = sk[1];
+      writeSetting('smshadi_sesskey', _sesskey);
+      dlog('warmup refreshed sesskey', _sesskey);
+    }
+    _lastWarmupAt = Math.floor(Date.now() / 1000);
+    _warmupCount++;
+    return true;
+  } catch (e) {
+    warn('warmup failed:', e.message);
+    return false;
+  }
 }
 
 function fmtDate(d) {
@@ -491,12 +526,19 @@ async function loop() {
       // Match both our normalized codes AND raw axios "status code 5xx" messages.
       if (isProvider5xxError(e)) {
         const status = providerStatus(e) || 503;
+        if (status === 503) { _provider503Count++; _last503At = Math.floor(Date.now() / 1000); }
         const cooldown = setCdrCooldown(Math.min(
           SMSHADI_503_MAX_COOLDOWN_MS,
           SMSHADI_503_BASE_COOLDOWN_MS * Math.max(1, _consecFail),
         ));
         warn(`provider ${status} cooldown active: next SMS Hadi request in ${cooldown}s`);
         await sleep(cooldown * 1000);
+        // Try the human navigation pattern (Dashboard → 15s → Reports) before
+        // hammering the AJAX endpoint again. This usually clears the 503.
+        if (_loggedIn) {
+          log('attempting dashboard→reports warmup to clear provider 503');
+          await dashboardWarmup();
+        }
         continue;
       }
       const backoff = Math.min(60, 5 + _consecFail * 2);
@@ -538,6 +580,10 @@ function getStatus() {
     cooldown_ms_remaining: Math.max(0, (_nextCdrAt || 0) - Date.now()),
     min_cdr_gap_ms: SMSHADI_MIN_CDR_GAP_MS,
     provider_503_base_cooldown_ms: SMSHADI_503_BASE_COOLDOWN_MS,
+    provider_503_count: _provider503Count,
+    last_503_at: _last503At,
+    last_warmup_at: _lastWarmupAt,
+    warmup_count: _warmupCount,
     ...tel.snapshot(),
   };
 }
