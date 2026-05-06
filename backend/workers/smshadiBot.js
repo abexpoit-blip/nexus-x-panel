@@ -54,7 +54,7 @@ function resolveCfg() {
     BASE_URL: normalizeBase(readSetting('smshadi_base_url') || process.env.SMSHADI_BASE_URL),
     USERNAME: readSetting('smshadi_username') || process.env.SMSHADI_USERNAME || 'mamun999',
     PASSWORD: readSetting('smshadi_password') || process.env.SMSHADI_PASSWORD || 'mamun999',
-    INTERVAL: Math.max(22, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 24)),
+    INTERVAL: Math.max(60, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 60)),
   };
 }
 
@@ -66,10 +66,13 @@ let _seenIds = new Set();
 let _sesskey = null;
 let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
 const SEEN_MAX = 5000;
-const SMSHADI_MIN_CDR_GAP_MS = 22_000;
+const SMSHADI_MIN_CDR_GAP_MS = 60_000;
+const SMSHADI_POST_LOGIN_COOLDOWN_MS = 20_000;
+const SMSHADI_503_BASE_COOLDOWN_MS = 5 * 60_000;
+const SMSHADI_503_MAX_COOLDOWN_MS = 30 * 60_000;
 const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
 const RESEND_SEC = 600;
-const WORKER_VERSION = '2026-05-06-smshadi-late-expired-match-v2';
+const WORKER_VERSION = '2026-05-06-smshadi-browser-datatables-cooldown-v3';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -82,12 +85,19 @@ function isProvider5xxError(e) {
   const st = providerStatus(e);
   return (st >= 500 && st < 600) || /cdr_503|cdr_http_5\d\d|provider_http_5\d\d|status code 5\d\d/i.test(String(e?.message || e || ''));
 }
+function setCdrCooldown(ms) {
+  _nextCdrAt = Math.max(_nextCdrAt || 0, Date.now() + Math.max(0, ms));
+  writeSetting('smshadi_next_cdr_at_ms', String(_nextCdrAt));
+  return Math.ceil(Math.max(0, _nextCdrAt - Date.now()) / 1000);
+}
 async function waitForCdrGate(reason = 'CDR') {
   const previousGate = _cdrGate.catch(() => {});
   let releaseGate;
   _cdrGate = new Promise(resolve => { releaseGate = resolve; });
   await previousGate;
   try {
+    const persistedNext = +(readSetting('smshadi_next_cdr_at_ms') || 0);
+    if (persistedNext > _nextCdrAt) _nextCdrAt = persistedNext;
     const until = Math.max(_nextCdrAt, _lastCdrRequestAt + SMSHADI_MIN_CDR_GAP_MS);
     const waitMs = until - Date.now();
     if (waitMs > 0) {
