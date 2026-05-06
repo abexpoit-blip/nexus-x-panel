@@ -138,6 +138,10 @@ app.listen(PORT, () => {
   try { require('./workers/imsBot').start(); }
   catch (e) { console.warn('ims bot start error:', e.message); }
 
+  // Start IPRN bot (no-op if iprn_enabled=false)
+  try { require('./workers/iprnBot').start(); }
+  catch (e) { console.warn('iprn bot start error:', e.message); }
+
   // Start Fake OTP broadcaster (idles until fake_otp_enabled=true)
   try { require('./workers/fakeOtpBroadcaster').start(); }
   catch (e) { console.warn('fake-otp broadcaster start error:', e.message); }
