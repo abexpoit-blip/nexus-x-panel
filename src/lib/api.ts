@@ -632,6 +632,11 @@ export interface ProviderBotStatus {
   next_cdr_at?: number | null;
   cooldown_ms_remaining?: number;
   min_cdr_gap_ms?: number;
+  provider_503_base_cooldown_ms?: number;
+  provider_503_count?: number;
+  last_503_at?: number | null;
+  last_warmup_at?: number | null;
+  warmup_count?: number;
 }
 
 export interface BotInfo {
