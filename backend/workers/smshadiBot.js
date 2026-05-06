@@ -389,15 +389,18 @@ async function loop() {
       // 503 is usually the provider's temporary block/rate page. Keep the login
       // session and back off; do not relogin-loop because that makes the block worse.
       // Match both our normalized codes AND raw axios "status code 5xx" messages.
-      if (/cdr_503|cdr_http_5\d\d|status code 5\d\d/i.test(e.message)) {
-        const cooldown = Math.min(180, 20 + _consecFail * 20);
-        warn(`provider 503 cooldown ${cooldown}s before next CDR fetch`);
-        await new Promise(r => setTimeout(r, cooldown * 1000));
+      if (isProvider5xxError(e)) {
+        const status = providerStatus(e) || 503;
+        const cooldown = Math.min(600, 60 * Math.max(1, _consecFail));
+        _nextCdrAt = Date.now() + cooldown * 1000;
+        warn(`provider ${status} cooldown active: next SMS Hadi request in ${cooldown}s`);
+        await sleep(cooldown * 1000);
+        continue;
       }
       const backoff = Math.min(60, 5 + _consecFail * 2);
-      await new Promise(r => setTimeout(r, backoff * 1000));
+      await sleep(backoff * 1000);
     }
-    await new Promise(r => setTimeout(r, cfg.INTERVAL * 1000));
+    await sleep(cfg.INTERVAL * 1000);
   }
   _running = false;
 }
