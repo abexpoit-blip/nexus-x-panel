@@ -117,6 +117,7 @@ async function forceRelogin(reason) {
   const { USERNAME, PASSWORD } = resolveCfg();
   const manualCookie = String(readSetting('ims_cookie_header') || '').trim();
   const haveCreds = !!(USERNAME && PASSWORD);
+  const { minInterval } = readCooldownCfg();
 
   warn(`auto-relogin triggered: ${reason}`);
   writeSetting('ims_session_cookie', '');
@@ -128,7 +129,9 @@ async function forceRelogin(reason) {
   _jar = null;
   _loggedIn = false;
   _sesskey = null;
-  _nextCdrAllowedAt = Date.now() + 5_000;   // brief settle gap
+  // Do not shorten an existing rate-limit penalty. A fresh login still needs
+  // /client/SMSCDRStats to obtain sesskey, so respect the IMS 15s CDR gate.
+  _nextCdrAllowedAt = Math.max(_nextCdrAllowedAt, Date.now() + (minInterval * 1000));
   _reloginCount++;
   _lastReloginAt = Math.floor(Date.now() / 1000);
 
@@ -461,10 +464,12 @@ async function loop() {
         penalty = registerRateLimitCooldown();
         const { reloginThreshold } = readCooldownCfg();
         if (_rateLimitStreak >= reloginThreshold) {
-          await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
+          const relogged = await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
           // forceRelogin already reset the streak; skip the long backoff below
-          await new Promise(r => setTimeout(r, 2_000));
-          continue;
+          if (relogged) {
+            await new Promise(r => setTimeout(r, 2_000));
+            continue;
+          }
         }
       } else {
         _rateLimitStreak = 0;
