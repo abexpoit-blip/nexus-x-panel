@@ -54,7 +54,7 @@ function resolveCfg() {
     BASE_URL: normalizeBase(readSetting('smshadi_base_url') || process.env.SMSHADI_BASE_URL),
     USERNAME: readSetting('smshadi_username') || process.env.SMSHADI_USERNAME || 'mamun999',
     PASSWORD: readSetting('smshadi_password') || process.env.SMSHADI_PASSWORD || 'mamun999',
-    INTERVAL: Math.max(22, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 24)),
+    INTERVAL: Math.max(60, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 60)),
   };
 }
 
@@ -66,10 +66,13 @@ let _seenIds = new Set();
 let _sesskey = null;
 let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
 const SEEN_MAX = 5000;
-const SMSHADI_MIN_CDR_GAP_MS = 22_000;
+const SMSHADI_MIN_CDR_GAP_MS = 60_000;
+const SMSHADI_POST_LOGIN_COOLDOWN_MS = 20_000;
+const SMSHADI_503_BASE_COOLDOWN_MS = 5 * 60_000;
+const SMSHADI_503_MAX_COOLDOWN_MS = 30 * 60_000;
 const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
 const RESEND_SEC = 600;
-const WORKER_VERSION = '2026-05-06-smshadi-late-expired-match-v2';
+const WORKER_VERSION = '2026-05-06-smshadi-browser-datatables-cooldown-v3';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -82,12 +85,19 @@ function isProvider5xxError(e) {
   const st = providerStatus(e);
   return (st >= 500 && st < 600) || /cdr_503|cdr_http_5\d\d|provider_http_5\d\d|status code 5\d\d/i.test(String(e?.message || e || ''));
 }
+function setCdrCooldown(ms) {
+  _nextCdrAt = Math.max(_nextCdrAt || 0, Date.now() + Math.max(0, ms));
+  writeSetting('smshadi_next_cdr_at_ms', String(_nextCdrAt));
+  return Math.ceil(Math.max(0, _nextCdrAt - Date.now()) / 1000);
+}
 async function waitForCdrGate(reason = 'CDR') {
   const previousGate = _cdrGate.catch(() => {});
   let releaseGate;
   _cdrGate = new Promise(resolve => { releaseGate = resolve; });
   await previousGate;
   try {
+    const persistedNext = +(readSetting('smshadi_next_cdr_at_ms') || 0);
+    if (persistedNext > _nextCdrAt) _nextCdrAt = persistedNext;
     const until = Math.max(_nextCdrAt, _lastCdrRequestAt + SMSHADI_MIN_CDR_GAP_MS);
     const waitMs = until - Date.now();
     if (waitMs > 0) {
@@ -190,6 +200,7 @@ async function login() {
   }
   await persistSessionCookie();
   _loggedIn = true;
+  setCdrCooldown(SMSHADI_POST_LOGIN_COOLDOWN_MS);
   tel.recordLoginSuccess();
   log('✓ login OK as', USERNAME);
   return true;
@@ -205,16 +216,37 @@ async function fetchCdrRows() {
   if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
   if (!_sesskey) throw new Error('cdr_session_lost'); // forces re-login
   await waitForCdrGate('bot');
-  const now  = new Date(Date.now() + 2 * 60 * 60_000);
-  const past = new Date(Date.now() - 2 * 60 * 60_000);
+  const now = new Date();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(now);
+  dayEnd.setHours(23, 59, 59, 999);
+  const echo = String(Date.now() % 100000);
   const params = new URLSearchParams({
-    fdate1: fmtDate(past),
-    fdate2: fmtDate(now),
+    fdate1: fmtDate(dayStart),
+    fdate2: fmtDate(dayEnd),
     frange: '', fclient: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgclient: '', fgnumber: '', fgcli: '',
     fg: '0', sesskey: _sesskey,
-    iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
+    sEcho: echo,
+    iColumns: '9',
+    sColumns: ',,,,,,,,',
+    iDisplayStart: '0',
+    iDisplayLength: '25',
   });
+  for (let i = 0; i < 9; i++) {
+    params.set(`mDataProp_${i}`, String(i));
+    params.set(`sSearch_${i}`, '');
+    params.set(`bRegex_${i}`, 'false');
+    params.set(`bSearchable_${i}`, 'true');
+    params.set(`bSortable_${i}`, i === 8 ? 'false' : 'true');
+  }
+  params.set('sSearch', '');
+  params.set('bRegex', 'false');
+  params.set('iSortCol_0', '0');
+  params.set('sSortDir_0', 'desc');
+  params.set('iSortingCols', '1');
+  params.set('_', String(Date.now()));
   let r;
   try {
     r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
@@ -449,8 +481,7 @@ async function loop() {
         _loggedIn = false; _sesskey = null;
       }
       if (/cdr_rate_limited|rate_limited_wait_15s/i.test(e.message)) {
-        const cooldown = Math.max(18, Math.min(120, 18 + _consecFail * 10));
-        _nextCdrAt = Date.now() + cooldown * 1000;
+        const cooldown = setCdrCooldown(Math.max(60_000, Math.min(5 * 60_000, 60_000 + _consecFail * 30_000)));
         warn(`SMS Hadi portal 15s rate-limit hit: next CDR request in ${cooldown}s`);
         await sleep(cooldown * 1000);
         continue;
@@ -460,8 +491,10 @@ async function loop() {
       // Match both our normalized codes AND raw axios "status code 5xx" messages.
       if (isProvider5xxError(e)) {
         const status = providerStatus(e) || 503;
-        const cooldown = Math.min(600, 60 * Math.max(1, _consecFail));
-        _nextCdrAt = Date.now() + cooldown * 1000;
+        const cooldown = setCdrCooldown(Math.min(
+          SMSHADI_503_MAX_COOLDOWN_MS,
+          SMSHADI_503_BASE_COOLDOWN_MS * Math.max(1, _consecFail),
+        ));
         warn(`provider ${status} cooldown active: next SMS Hadi request in ${cooldown}s`);
         await sleep(cooldown * 1000);
         continue;
@@ -504,6 +537,7 @@ function getStatus() {
     next_cdr_at: _nextCdrAt || null,
     cooldown_ms_remaining: Math.max(0, (_nextCdrAt || 0) - Date.now()),
     min_cdr_gap_ms: SMSHADI_MIN_CDR_GAP_MS,
+    provider_503_base_cooldown_ms: SMSHADI_503_BASE_COOLDOWN_MS,
     ...tel.snapshot(),
   };
 }
