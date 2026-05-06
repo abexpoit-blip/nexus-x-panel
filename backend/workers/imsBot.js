@@ -473,9 +473,10 @@ async function loop() {
       if (n) log('delivered', n, 'OTPs this tick');
       _rateLimitStreak = 0;   // healthy tick clears the rate-limit streak
     } catch (e) {
-      warn('tick error:', e.message);
+      if (isRateLimitError(e.message)) log('tick cooldown:', e.message);
+      else warn('tick error:', e.message);
       _lastError = e.message;
-      tel.recordError(e.message);
+      if (!isRateLimitError(e.message)) tel.recordError(e.message);
       _consecFail++;
       if (/session_lost|unauthorized|login_failed|sesskey/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
@@ -487,8 +488,10 @@ async function loop() {
       if (isRateLimitError(e.message)) {
         _rateLimitStreak++;
         penalty = registerRateLimitCooldown();
-        const { reloginThreshold } = readCooldownCfg();
-        if (_rateLimitStreak >= reloginThreshold) {
+        const { reloginThreshold, reloginStaleSec } = readCooldownCfg();
+        const nowSec = Math.floor(Date.now() / 1000);
+        const scrapeStale = !_lastCdrSuccessAt || (nowSec - _lastCdrSuccessAt) >= reloginStaleSec;
+        if (_rateLimitStreak >= reloginThreshold && scrapeStale) {
           const relogged = await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
           // forceRelogin already reset the streak; skip the long backoff below
           if (relogged) {
@@ -533,6 +536,9 @@ function getStatus() {
     rl_penalty_steps: cfg.COOLDOWN.penaltySteps,
     rl_streak: _rateLimitStreak,
     rl_relogin_threshold: cfg.COOLDOWN.reloginThreshold,
+    rl_relogin_stale_sec: cfg.COOLDOWN.reloginStaleSec,
+    last_rate_limit_at: _lastRateLimitAt,
+    last_cdr_success_at: _lastCdrSuccessAt,
     relogin_count: _reloginCount,
     last_relogin_at: _lastReloginAt,
     next_cdr_allowed_at: _nextCdrAllowedAt || null,
