@@ -335,6 +335,50 @@ const AgentProfile = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Service filter — pick which services should ring */}
+              <div className="space-y-2 pt-3 border-t border-white/[0.05]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-foreground">
+                    <Filter className="w-4 h-4 text-muted-foreground" /> Notify me only for…
+                  </div>
+                  <button
+                    type="button"
+                    onClick={enableAll}
+                    className={cn(
+                      "text-[11px] px-2 py-0.5 rounded-md border transition-colors",
+                      allOn
+                        ? "bg-primary/10 border-primary/40 text-primary"
+                        : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    All services
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground/80">
+                  Pick one or more services. Empty selection = alert me for everything.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SERVICE_OPTIONS.map((svc) => {
+                    const active = !allOn && (otpPrefs.services || []).some(x => x.toLowerCase() === svc.toLowerCase());
+                    return (
+                      <button
+                        key={svc}
+                        type="button"
+                        onClick={() => toggleService(svc)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all",
+                          active
+                            ? "bg-primary/15 border-primary/40 text-primary"
+                            : "bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
+                        )}
+                      >
+                        {svc}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </GlassCard>
