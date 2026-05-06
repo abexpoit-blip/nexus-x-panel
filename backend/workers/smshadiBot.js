@@ -62,10 +62,10 @@ let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
 let _seenIds = new Set();
 let _sesskey = null;
-let _nextCdrAt = 0, _lastCdrRequestAt = 0;
+let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
 const SEEN_MAX = 5000;
-const SMSHADI_MIN_CDR_GAP_MS = 16_000;
-const WORKER_VERSION = '2026-05-06-smshadi-real-15s-rate-limit';
+const SMSHADI_MIN_CDR_GAP_MS = 22_000;
+const WORKER_VERSION = '2026-05-06-smshadi-serialized-22s-cdr-gate';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -79,14 +79,22 @@ function isProvider5xxError(e) {
   return (st >= 500 && st < 600) || /cdr_503|cdr_http_5\d\d|provider_http_5\d\d|status code 5\d\d/i.test(String(e?.message || e || ''));
 }
 async function waitForCdrGate(reason = 'CDR') {
-  const until = Math.max(_nextCdrAt, _lastCdrRequestAt + SMSHADI_MIN_CDR_GAP_MS);
-  const waitMs = until - Date.now();
-  if (waitMs > 0) {
-    const waitSec = Math.ceil(waitMs / 1000);
-    warn(`${reason} rate gate — waiting ${waitSec}s before SMS Hadi CDR request`);
-    await sleep(waitMs);
+  const previousGate = _cdrGate.catch(() => {});
+  let releaseGate;
+  _cdrGate = new Promise(resolve => { releaseGate = resolve; });
+  await previousGate;
+  try {
+    const until = Math.max(_nextCdrAt, _lastCdrRequestAt + SMSHADI_MIN_CDR_GAP_MS);
+    const waitMs = until - Date.now();
+    if (waitMs > 0) {
+      const waitSec = Math.ceil(waitMs / 1000);
+      warn(`${reason} rate gate — waiting ${waitSec}s before SMS Hadi CDR request`);
+      await sleep(waitMs);
+    }
+    _lastCdrRequestAt = Date.now();
+  } finally {
+    releaseGate();
   }
-  _lastCdrRequestAt = Date.now();
 }
 
 function buildClient(baseURL) {
