@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Bot, Play, Square, RotateCw, AlertTriangle, CheckCircle2, Activity, Loader2,
-  Stethoscope, ShieldCheck, ShieldAlert, History, Clock,
+  Stethoscope, ShieldCheck, ShieldAlert, History, Clock, Radar,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -47,12 +47,16 @@ const StatusPill = ({ running, enabled }: { running?: boolean; enabled?: boolean
   );
 };
 
-const BotCard = ({ info, onAction, onHealth, busy, healthResult }: {
+type PingResult = { ok: boolean; ms: number; error?: string; delivered?: number | null; last_otp_at?: number | null };
+
+const BotCard = ({ info, onAction, onHealth, onPing, busy, healthResult, pingResult }: {
   info: BotInfo;
   onAction: (a: "start" | "stop" | "restart") => void;
   onHealth: () => void;
+  onPing: () => void;
   busy: string | null;
   healthResult: { ok: boolean; ms: number; error?: string } | null;
+  pingResult: PingResult | null;
 }) => {
   const s = info.status || {};
   const enabled = !!s.enabled;
@@ -112,6 +116,29 @@ const BotCard = ({ info, onAction, onHealth, busy, healthResult }: {
             </div>
             {healthResult.error && (
               <div className="text-[11px] font-mono text-foreground/80 mt-0.5 break-words">{healthResult.error}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Scrape ping result */}
+      {pingResult && (
+        <div className={cn(
+          "mb-3 p-2.5 rounded-lg border flex items-start gap-2 text-xs relative",
+          pingResult.ok ? "bg-neon-cyan/[0.06] border-neon-cyan/30" : "bg-destructive/[0.06] border-destructive/30",
+        )}>
+          <Radar className={cn("w-3.5 h-3.5 mt-0.5 shrink-0", pingResult.ok ? "text-neon-cyan" : "text-destructive")} />
+          <div className="min-w-0">
+            <div className={cn("font-semibold", pingResult.ok ? "text-neon-cyan" : "text-destructive")}>
+              {pingResult.ok
+                ? `Scrape OK · ${pingResult.ms}ms · ${pingResult.delivered ?? 0} delivered`
+                : `Scrape failed · ${pingResult.ms}ms`}
+            </div>
+            {pingResult.ok && pingResult.last_otp_at != null && (
+              <div className="text-[11px] text-foreground/70 mt-0.5">Last OTP: {fmtAgo(pingResult.last_otp_at)}</div>
+            )}
+            {pingResult.error && (
+              <div className="text-[11px] font-mono text-foreground/80 mt-0.5 break-words">{pingResult.error}</div>
             )}
           </div>
         </div>
@@ -201,6 +228,18 @@ const BotCard = ({ info, onAction, onHealth, busy, healthResult }: {
             Test
           </Button>
         )}
+        {info.key !== "fake_otp" && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onPing}
+            disabled={busy !== null}
+            className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
+          >
+            {busy === "ping" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Radar className="w-3.5 h-3.5 mr-1.5" />}
+            Ping scrape
+          </Button>
+        )}
         {s.base_url && (
           <span className="ml-auto text-[10px] font-mono text-muted-foreground/60 self-center truncate max-w-[200px]">
             {s.base_url}
@@ -230,6 +269,7 @@ const AdminBots = () => {
   const { toast } = useToast();
   const [busy, setBusy] = useState<{ key: string; action: string } | null>(null);
   const [healthResults, setHealthResults] = useState<Record<string, { ok: boolean; ms: number; error?: string }>>({});
+  const [pingResults, setPingResults] = useState<Record<string, PingResult>>({});
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-bots"],
@@ -271,6 +311,28 @@ const AdminBots = () => {
       const msg = (e as Error).message;
       setHealthResults((prev) => ({ ...prev, [key]: { ok: false, ms: 0, error: msg } }));
       toast({ title: "Health check failed", description: msg, variant: "destructive" });
+    } finally {
+      setTimeout(() => setBusy(null), 400);
+    }
+  };
+
+  const runPing = async (key: string) => {
+    setBusy({ key, action: "ping" });
+    try {
+      const r = await api.admin.bots.ping(key);
+      setPingResults((prev) => ({ ...prev, [key]: { ok: r.ok, ms: r.ms, error: r.error, delivered: r.delivered ?? null, last_otp_at: r.last_otp_at ?? null } }));
+      toast({
+        title: r.ok ? "Scrape OK" : "Scrape failed",
+        description: r.ok
+          ? `${data?.bots[key]?.label} · ${r.ms}ms · ${r.delivered ?? 0} delivered`
+          : (r.error || "unknown"),
+        variant: r.ok ? "default" : "destructive",
+      });
+      qc.invalidateQueries({ queryKey: ["admin-bots"] });
+    } catch (e) {
+      const msg = (e as Error).message;
+      setPingResults((prev) => ({ ...prev, [key]: { ok: false, ms: 0, error: msg } }));
+      toast({ title: "Scrape ping failed", description: msg, variant: "destructive" });
     } finally {
       setTimeout(() => setBusy(null), 400);
     }
@@ -364,7 +426,9 @@ const AdminBots = () => {
               busy={busy?.key === b.key ? busy.action : null}
               onAction={(a) => run(b.key, a)}
               onHealth={() => runHealth(b.key)}
+              onPing={() => runPing(b.key)}
               healthResult={healthResults[b.key] || null}
+              pingResult={pingResults[b.key] || null}
             />
           ))}
         </div>

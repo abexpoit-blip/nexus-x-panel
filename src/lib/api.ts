@@ -445,6 +445,11 @@ export const api = {
           `/admin/bots/${bot}/health`,
           { method: "POST" }
         ),
+      ping: (bot: string) =>
+        request<{ ok: boolean; bot: string; ms: number; error?: string; delivered?: number | null; last_otp_at?: number | null; consec_fail?: number }>(
+          `/admin/bots/${bot}/ping`,
+          { method: "POST" }
+        ),
       logs: (bot: string, level: "all" | "error" | "warn" | "miss" = "all", limit = 80) =>
         request<{
           bot: string;

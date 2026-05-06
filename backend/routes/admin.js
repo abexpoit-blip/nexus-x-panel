@@ -479,6 +479,38 @@ router.post('/bots/:bot/health', async (req, res) => {
   }
 });
 
+// POST /api/admin/bots/:bot/ping
+// Live-tests the actual CDR scrape endpoint (not just login). Returns latency,
+// delivered-rows count from this tick, and last_otp_at from worker status.
+// Use this when agents complain "no OTPs are arriving" — it confirms whether
+// the provider's AJAX endpoint is reachable, returning data, and whether any
+// row matched an active allocation.
+router.post('/bots/:bot/ping', async (req, res) => {
+  const { bot } = req.params;
+  const bots = loadBots();
+  const mod = bots[bot];
+  if (!mod) return res.status(404).json({ error: `Unknown bot: ${bot}` });
+  if (typeof mod.tickOnce !== 'function') {
+    return res.status(400).json({ error: 'bot does not support scrape ping' });
+  }
+  const t0 = Date.now();
+  try {
+    const delivered = await mod.tickOnce();
+    const status = mod.getStatus?.() || {};
+    logFromReq(req, 'bot_ping_ok', { meta: { bot, ms: Date.now() - t0, delivered } });
+    res.json({
+      ok: true, bot, ms: Date.now() - t0,
+      delivered: typeof delivered === 'number' ? delivered : null,
+      last_otp_at: status.last_otp_at || null,
+      last_login_at: status.last_login_at || null,
+      consec_fail: status.consec_fail || 0,
+    });
+  } catch (e) {
+    logFromReq(req, 'bot_ping_fail', { meta: { bot, error: e.message } });
+    res.status(200).json({ ok: false, bot, ms: Date.now() - t0, error: e.message });
+  }
+});
+
 // GET /api/admin/bots/:bot/logs?level=error|warn|miss|all&limit=80
 // Returns the failure-only event ring captured by the bot's Telemetry.
 // Used by Provider Ranges → "Logs" dialog so admins can see *why* an OTP
