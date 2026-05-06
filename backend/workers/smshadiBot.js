@@ -365,7 +365,8 @@ async function loop() {
       }
       // 503 is usually the provider's temporary block/rate page. Keep the login
       // session and back off; do not relogin-loop because that makes the block worse.
-      if (/cdr_503|cdr_http_5\d\d/i.test(e.message)) {
+      // Match both our normalized codes AND raw axios "status code 5xx" messages.
+      if (/cdr_503|cdr_http_5\d\d|status code 5\d\d/i.test(e.message)) {
         const cooldown = Math.min(180, 20 + _consecFail * 20);
         warn(`provider 503 cooldown ${cooldown}s before next CDR fetch`);
         await new Promise(r => setTimeout(r, cooldown * 1000));
