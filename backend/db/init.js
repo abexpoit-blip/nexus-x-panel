@@ -205,12 +205,13 @@ seedSetting('ims_password',      process.env.IMS_PASSWORD      || '');
 seedSetting('ims_cookie_header', process.env.IMS_COOKIE_HEADER || '');
 seedSetting('ims_otp_interval',  process.env.IMS_OTP_INTERVAL  || '18');
 // SMS Hadi bot defaults — scrapes http://2.59.169.96/ints. CDR page enforces
-// "Refresh must be done with atleast 15 second interval", so worker min is 16s.
+// "Refresh must be done with atleast 15 second interval", so worker min is 22s
+// to leave room for slow provider responses and admin-history requests.
 seedSetting('smshadi_enabled',      process.env.SMSHADI_ENABLED      || 'true');
 seedSetting('smshadi_base_url',     process.env.SMSHADI_BASE_URL     || 'http://2.59.169.96/ints');
 seedSetting('smshadi_username',     process.env.SMSHADI_USERNAME     || 'mamun999');
 seedSetting('smshadi_password',     process.env.SMSHADI_PASSWORD     || 'mamun999');
-seedSetting('smshadi_otp_interval', process.env.SMSHADI_OTP_INTERVAL || '18');
+seedSetting('smshadi_otp_interval', process.env.SMSHADI_OTP_INTERVAL || '24');
 // Fake OTP broadcaster defaults (off by default — admin enables in UI)
 seedSetting('fake_otp_enabled',  process.env.FAKE_OTP_ENABLED  || 'false');
 seedSetting('fake_otp_min_sec',  process.env.FAKE_OTP_MIN_SEC  || '15');
