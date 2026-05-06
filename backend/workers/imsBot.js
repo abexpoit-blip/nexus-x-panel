@@ -44,6 +44,7 @@ const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (se
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
 const DEFAULT_RL_RELOGIN_THRESHOLD = 6;  // consecutive 503s → force fresh login
+const DEFAULT_RL_RELOGIN_STALE_SEC = 300; // only relogin if no successful CDR scrape for 5m
 
 function num(v, fb) {
   const n = Number(v);
@@ -58,7 +59,8 @@ function readCooldownCfg() {
   const penaltyMax  = Math.max(penaltyBase, num(readSetting('ims_rl_penalty_max_sec'), DEFAULT_RL_PENALTY_MAX));
   const penaltySteps = Math.max(1, Math.floor(num(readSetting('ims_rl_penalty_steps'), DEFAULT_RL_PENALTY_STEPS)));
   const reloginThreshold = Math.max(2, Math.floor(num(readSetting('ims_rl_relogin_threshold'), DEFAULT_RL_RELOGIN_THRESHOLD)));
-  return { minInterval, penaltyBase, penaltyMax, penaltySteps, reloginThreshold };
+  const reloginStaleSec = Math.max(60, Math.floor(num(readSetting('ims_rl_relogin_stale_sec'), DEFAULT_RL_RELOGIN_STALE_SEC)));
+  return { minInterval, penaltyBase, penaltyMax, penaltySteps, reloginThreshold, reloginStaleSec };
 }
 
 function readSetting(k) {
@@ -106,7 +108,10 @@ let _seenIds = new Set();
 const SEEN_MAX = 5000;
 let _rateLimitStreak = 0;   // consecutive 503/15s errors → grow interval
 let _nextCdrAllowedAt = 0;   // IMS forbids CDR/stats refreshes inside the cooldown window
+let _cdrGateQueue = Promise.resolve();
 let _lastRateLimitWarnAt = 0;
+let _lastRateLimitAt = null;
+let _lastCdrSuccessAt = null;
 let _reloginCount = 0;       // # of automatic re-logins triggered
 let _lastReloginAt = null;
 
@@ -135,8 +140,8 @@ async function forceRelogin(reason) {
   _reloginCount++;
   _lastReloginAt = Math.floor(Date.now() / 1000);
 
-  if (!haveCreds && !manualCookie) {
-    warn('cannot auto-relogin: no credentials AND no manual cookie configured');
+  if (!haveCreds) {
+    warn('cannot auto-relogin: username/password missing; cookie-only mode must wait for pasted fresh PHPSESSID');
     return false;
   }
   try {
@@ -152,12 +157,19 @@ async function forceRelogin(reason) {
 }
 
 async function waitForCdrGate() {
-  const now = Date.now();
-  if (_nextCdrAllowedAt > now) {
-    await new Promise(r => setTimeout(r, _nextCdrAllowedAt - now));
-  }
-  const { minInterval } = readCooldownCfg();
-  _nextCdrAllowedAt = Date.now() + (minInterval * 1000);
+  // Serialize all CDR/stats access across the worker and admin health probes.
+  // Without this, two callers can pass the timestamp check together and trigger
+  // IMS' 15s protection even when the configured interval is correct.
+  const previous = _cdrGateQueue.catch(() => {});
+  _cdrGateQueue = previous.then(async () => {
+    const now = Date.now();
+    if (_nextCdrAllowedAt > now) {
+      await new Promise(r => setTimeout(r, _nextCdrAllowedAt - now));
+    }
+    const { minInterval } = readCooldownCfg();
+    _nextCdrAllowedAt = Date.now() + (minInterval * 1000);
+  });
+  return _cdrGateQueue;
 }
 
 function registerRateLimitCooldown() {
@@ -165,9 +177,10 @@ function registerRateLimitCooldown() {
   const step = Math.min(Math.max(_rateLimitStreak, 1), penaltySteps);
   const penaltyMs = Math.min(penaltyMax * 1000, penaltyBase * 1000 * step);
   _nextCdrAllowedAt = Math.max(_nextCdrAllowedAt, Date.now() + penaltyMs);
+  _lastRateLimitAt = Math.floor(Date.now() / 1000);
   const now = Date.now();
   if (now - _lastRateLimitWarnAt > 60_000) {
-    warn(`IMS CDR rate-limited — cooling down ${Math.ceil(penaltyMs / 1000)}s`);
+    log(`IMS CDR cooldown — waiting ${Math.ceil(penaltyMs / 1000)}s before next scrape`);
     _lastRateLimitWarnAt = now;
   }
   return Math.ceil(penaltyMs / 1000);
@@ -246,6 +259,10 @@ async function login(forceCaptcha = false) {
   }
   tel.recordLoginAttempt();
   if (!_client) _client = buildClient(BASE_URL);
+
+  if (forceCaptcha && (!USERNAME || !PASSWORD)) {
+    throw new Error('ims_creds_missing (fresh login requires username/password)');
+  }
 
   // Try saved/manual cookie first — covers both auto-resume after restart
   // and cookie-only login (admin pasted PHPSESSID, no credentials).
@@ -394,6 +411,7 @@ function findActiveAllocation(phone) {
 async function tickOnce() {
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
+  _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
   for (const raw of rows) {
     const r = parseRow(raw);
@@ -455,9 +473,10 @@ async function loop() {
       if (n) log('delivered', n, 'OTPs this tick');
       _rateLimitStreak = 0;   // healthy tick clears the rate-limit streak
     } catch (e) {
-      warn('tick error:', e.message);
+      if (isRateLimitError(e.message)) log('tick cooldown:', e.message);
+      else warn('tick error:', e.message);
       _lastError = e.message;
-      tel.recordError(e.message);
+      if (!isRateLimitError(e.message)) tel.recordError(e.message);
       _consecFail++;
       if (/session_lost|unauthorized|login_failed|sesskey/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
@@ -469,8 +488,10 @@ async function loop() {
       if (isRateLimitError(e.message)) {
         _rateLimitStreak++;
         penalty = registerRateLimitCooldown();
-        const { reloginThreshold } = readCooldownCfg();
-        if (_rateLimitStreak >= reloginThreshold) {
+        const { reloginThreshold, reloginStaleSec } = readCooldownCfg();
+        const nowSec = Math.floor(Date.now() / 1000);
+        const scrapeStale = !_lastCdrSuccessAt || (nowSec - _lastCdrSuccessAt) >= reloginStaleSec;
+        if (_rateLimitStreak >= reloginThreshold && scrapeStale) {
           const relogged = await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
           // forceRelogin already reset the streak; skip the long backoff below
           if (relogged) {
@@ -515,6 +536,9 @@ function getStatus() {
     rl_penalty_steps: cfg.COOLDOWN.penaltySteps,
     rl_streak: _rateLimitStreak,
     rl_relogin_threshold: cfg.COOLDOWN.reloginThreshold,
+    rl_relogin_stale_sec: cfg.COOLDOWN.reloginStaleSec,
+    last_rate_limit_at: _lastRateLimitAt,
+    last_cdr_success_at: _lastCdrSuccessAt,
     relogin_count: _reloginCount,
     last_relogin_at: _lastReloginAt,
     next_cdr_allowed_at: _nextCdrAllowedAt || null,
