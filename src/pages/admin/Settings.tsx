@@ -108,6 +108,7 @@ const AdminSettings = () => {
   const [imsRlBase, setImsRlBase] = useState<number>(20);
   const [imsRlMax, setImsRlMax] = useState<number>(90);
   const [imsRlSteps, setImsRlSteps] = useState<number>(4);
+  const [imsRlReloginThreshold, setImsRlReloginThreshold] = useState<number>(6);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
@@ -142,6 +143,7 @@ const AdminSettings = () => {
     setImsRlBase(Number(str(s, "ims_rl_penalty_base_sec", "20")) || 20);
     setImsRlMax(Number(str(s, "ims_rl_penalty_max_sec", "90")) || 90);
     setImsRlSteps(Number(str(s, "ims_rl_penalty_steps", "4")) || 4);
+    setImsRlReloginThreshold(Number(str(s, "ims_rl_relogin_threshold", "6")) || 6);
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
@@ -922,6 +924,17 @@ const AdminSettings = () => {
                   onChange={(e) => setImsRlSteps(Number(e.target.value) || 4)}
                 />
               </label>
+              <label className="space-y-1 text-xs col-span-2 md:col-span-4">
+                <span className="text-muted-foreground">
+                  Auto re-login after N consecutive rate-limit hits
+                  <span className="ml-1 text-[10px] text-neon-magenta">(clears stale PHPSESSID, runs captcha login)</span>
+                </span>
+                <input type="number" min={2} max={30}
+                  className="w-full bg-background/60 border border-border/60 rounded-md px-2 py-1.5 text-sm"
+                  value={imsRlReloginThreshold}
+                  onChange={(e) => setImsRlReloginThreshold(Number(e.target.value) || 6)}
+                />
+              </label>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -933,6 +946,7 @@ const AdminSettings = () => {
                   await setSetting("ims_rl_penalty_base_sec", String(Math.max(1, imsRlBase)));
                   await setSetting("ims_rl_penalty_max_sec", String(Math.max(imsRlBase, imsRlMax)));
                   await setSetting("ims_rl_penalty_steps", String(Math.max(1, Math.floor(imsRlSteps))));
+                  await setSetting("ims_rl_relogin_threshold", String(Math.max(2, Math.floor(imsRlReloginThreshold))));
                   toast({ title: "IMS cooldown updated" });
                 }}
               >
@@ -942,7 +956,7 @@ const AdminSettings = () => {
                 type="button"
                 className="px-3 py-1.5 rounded-md border border-border/60 text-xs hover:bg-card/60"
                 onClick={() => {
-                  setImsMinInterval(16); setImsRlBase(20); setImsRlMax(90); setImsRlSteps(4);
+                  setImsMinInterval(16); setImsRlBase(20); setImsRlMax(90); setImsRlSteps(4); setImsRlReloginThreshold(6);
                 }}
               >
                 Reset defaults
