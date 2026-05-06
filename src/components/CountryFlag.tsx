@@ -68,13 +68,18 @@ export function CountryFlag({
   const cfg = SIZE_MAP[size];
   const [attempt, setAttempt] = useState(0);   // retry counter
   const [errored, setErrored] = useState(false);
+  // `cached` is captured ONCE so a tiny race (cache write completes mid-render)
+  // can't flip us from cached→uncached. Cleared `loaded` flag drives fade-in.
+  const cc0 = (code || "").toUpperCase().trim();
+  const cc = cc0.length === 3 && ISO3_TO_2[cc0] ? ISO3_TO_2[cc0] : cc0;
+  const cacheKey = cc.length === 2 ? `${cc.toLowerCase()}@${cfg.cdn}` : "";
+  const wasCached = useRef(!!CACHE[cacheKey]).current;
+  const [loaded, setLoaded] = useState(wasCached);
   const retryTimer = useRef<number | null>(null);
   useEffect(() => () => {
     if (retryTimer.current) window.clearTimeout(retryTimer.current);
   }, []);
 
-  let cc = (code || "").toUpperCase().trim();
-  if (cc.length === 3 && ISO3_TO_2[cc]) cc = ISO3_TO_2[cc];
   if (cc.length !== 2 || errored) {
     return (
       <span
@@ -91,8 +96,6 @@ export function CountryFlag({
   }
 
   const lower = cc.toLowerCase();
-  const cacheKey = `${lower}@${cfg.cdn}`;
-  const cached = !!CACHE[cacheKey];
   // Cache-bust on retry only — successful URLs hit the browser HTTP cache.
   const bust = attempt > 0 ? `?r=${attempt}` : "";
   const src   = `https://flagcdn.com/${cfg.cdn}/${lower}.png${bust}`;
@@ -106,7 +109,7 @@ export function CountryFlag({
       title={title || cc}
       loading="lazy"
       decoding="async"
-      onLoad={() => markOk(cacheKey)}
+      onLoad={() => { markOk(cacheKey); setLoaded(true); }}
       onError={() => {
         // Up to 2 graceful retries with exponential backoff before giving up.
         if (attempt < 2) {
@@ -117,10 +120,9 @@ export function CountryFlag({
         }
       }}
       className={cn(
-        "inline-block rounded-[3px] object-cover shrink-0 ring-1 ring-white/[0.06] shadow-sm transition-opacity",
-        // Avoid flicker: when we've previously loaded this flag, render fully
-        // opaque immediately instead of fading from blank.
-        cached ? "opacity-100" : "opacity-100",
+        "inline-block rounded-[3px] object-cover shrink-0 ring-1 ring-white/[0.06] shadow-sm",
+        // Smooth fade-in only on first paint — cached flags render instantly.
+        loaded ? "opacity-100" : "opacity-0 transition-opacity duration-200",
         cfg.h, className,
       )}
       style={{ width: cfg.w, minWidth: cfg.w }}
