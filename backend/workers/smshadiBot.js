@@ -458,6 +458,11 @@ function getStatus() {
     interval_sec: cfg.INTERVAL,
     sesskey_loaded: !!_sesskey,
     portal_url: cfg.BASE_URL + '/agent/SMSCDRReports',
+    worker_version: WORKER_VERSION,
+    last_cdr_request_at: _lastCdrRequestAt || null,
+    next_cdr_at: _nextCdrAt || null,
+    cooldown_ms_remaining: Math.max(0, (_nextCdrAt || 0) - Date.now()),
+    min_cdr_gap_ms: SMSHADI_MIN_CDR_GAP_MS,
     ...tel.snapshot(),
   };
 }
