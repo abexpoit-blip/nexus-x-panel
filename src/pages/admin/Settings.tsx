@@ -685,7 +685,7 @@ const AdminSettings = () => {
                 Restrict fakes to specific ranges (e.g. push fakes only into your "hot" ranges). Empty = any enabled.
               </p>
               <div className="max-h-44 overflow-auto pr-1 grid grid-cols-1 md:grid-cols-2 gap-1.5">
-                {(rangesData?.ranges || []).filter((r: any) => r.enabled).map((r: any) => {
+                {(rangesData?.rows || []).filter((r: any) => r.enabled).map((r: any) => {
                   const active = fakeForm.range_ids.includes(r.id);
                   return (
                     <button key={r.id} type="button"
@@ -709,7 +709,7 @@ const AdminSettings = () => {
                     </button>
                   );
                 })}
-                {!(rangesData?.ranges || []).length && (
+                {!(rangesData?.rows || []).length && (
                   <p className="text-[11px] text-muted-foreground/60">No enabled ranges yet.</p>
                 )}
               </div>
