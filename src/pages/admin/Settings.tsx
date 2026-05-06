@@ -103,6 +103,11 @@ const AdminSettings = () => {
   const [imsPass, setImsPass] = useState("");
   const [imsCookie, setImsCookie] = useState("");
   const [imsInterval, setImsInterval] = useState<number>(18);
+  // IMS CDR cooldown / rate-limit backoff (admin-tunable)
+  const [imsMinInterval, setImsMinInterval] = useState<number>(16);
+  const [imsRlBase, setImsRlBase] = useState<number>(20);
+  const [imsRlMax, setImsRlMax] = useState<number>(90);
+  const [imsRlSteps, setImsRlSteps] = useState<number>(4);
   const [showPw, setShowPw] = useState(false);
   const [healthState, setHealthState] = useState<Record<string, { ok: boolean; ms: number; error?: string } | "checking">>({});
 
@@ -133,6 +138,10 @@ const AdminSettings = () => {
     setImsPass(str(s, "ims_password"));
     setImsCookie(str(s, "ims_cookie_header"));
     setImsInterval(Number(str(s, "ims_otp_interval", "18")) || 18);
+    setImsMinInterval(Number(str(s, "ims_cdr_min_interval_sec", "16")) || 16);
+    setImsRlBase(Number(str(s, "ims_rl_penalty_base_sec", "20")) || 20);
+    setImsRlMax(Number(str(s, "ims_rl_penalty_max_sec", "90")) || 90);
+    setImsRlSteps(Number(str(s, "ims_rl_penalty_steps", "4")) || 4);
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
