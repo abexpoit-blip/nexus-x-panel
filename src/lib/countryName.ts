@@ -1,5 +1,3 @@
-import React from "react";
-
 // ISO-3 → ISO-2 (subset; mirrors CountryFlag map)
 const ISO3_TO_2: Record<string, string> = {
   AFG:"AF",ALB:"AL",DZA:"DZ",AND:"AD",AGO:"AO",ATG:"AG",ARG:"AR",ARM:"AM",AUS:"AU",AUT:"AT",AZE:"AZ",
