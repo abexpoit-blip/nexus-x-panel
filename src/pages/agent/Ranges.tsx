@@ -21,6 +21,7 @@ import { GradientMesh } from "@/components/premium";
 import { Globe, ChevronDown, Search, Hash, Loader2, Inbox, Flame, Copy, Check, Download, Layers, TrendingUp, X, RefreshCw, Timer, MessageSquare, History } from "lucide-react";
 import { BrandIcon } from "@/components/BrandIcon";
 import { OtpThreadDrawer } from "@/components/OtpThreadDrawer";
+import { CountryFlag } from "@/components/CountryFlag";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -491,7 +492,7 @@ const AgentRanges = () => {
                     )}
                     title={`${c.country_name} · ${c.label}`}
                   >
-                    <span className="text-sm leading-none">{flagEmoji(c.country)}</span>
+                    <CountryFlag code={c.country} size="sm" />
                     <span className="font-mono">{c.label}</span>
                   </button>
                 );
@@ -519,7 +520,7 @@ const AgentRanges = () => {
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <span className="text-3xl leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">{flagEmoji(selectedCountry.country_code)}</span>
+                        <CountryFlag code={selectedCountry.country_code} size="lg" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
@@ -569,7 +570,7 @@ const AgentRanges = () => {
                         country === c.country_code && "bg-primary/10"
                       )}
                     >
-                      <span className="text-2xl leading-none">{flagEmoji(c.country_code)}</span>
+                      <CountryFlag code={c.country_code} size="md" />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-foreground truncate">{c.country_name}</div>
                       </div>
@@ -975,7 +976,7 @@ const AgentRanges = () => {
 
                   {/* Country / operator */}
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {r.country_code && <span className="text-base leading-none">{flagEmoji(r.country_code)}</span>}
+                    {r.country_code && <CountryFlag code={r.country_code} size="sm" />}
                     <span className="truncate">{r.operator || "—"}</span>
                   </div>
 
@@ -1082,7 +1083,7 @@ const AgentRanges = () => {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2 text-[12px]">
-                          {r.country_code && <span className="text-xl leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">{flagEmoji(r.country_code)}</span>}
+                          {r.country_code && <CountryFlag code={r.country_code} size="md" />}
                           <div className="min-w-0">
                             <div className="text-foreground truncate">{r.operator || "—"}</div>
                           </div>
