@@ -25,7 +25,10 @@ const PROVIDERS = [
   { id: "xisora",    name: "XISORA" },
   { id: "ims",       name: "IMS" },
   { id: "smshadi",   name: "SMS Hadi" },
+  { id: "iprn",      name: "IPRN-SMS" },
 ];
+
+const CURRENCIES = ["EUR", "USD", "GBP"] as const;
 
 type Form = Partial<ProviderRange> & { id?: number };
 
