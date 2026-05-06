@@ -53,7 +53,7 @@ function resolveCfg() {
     BASE_URL: normalizeBase(readSetting('smshadi_base_url') || process.env.SMSHADI_BASE_URL),
     USERNAME: readSetting('smshadi_username') || process.env.SMSHADI_USERNAME || 'mamun999',
     PASSWORD: readSetting('smshadi_password') || process.env.SMSHADI_PASSWORD || 'mamun999',
-    INTERVAL: Math.max(16, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 18)),
+    INTERVAL: Math.max(22, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 24)),
   };
 }
 
