@@ -24,6 +24,7 @@ const PROVIDERS = [
   { id: "seven1tel", name: "Seven1Tel" },
   { id: "xisora",    name: "XISORA" },
   { id: "ims",       name: "IMS" },
+  { id: "smshadi",   name: "SMS Hadi" },
 ];
 
 type Form = Partial<ProviderRange> & { id?: number };

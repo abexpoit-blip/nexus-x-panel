@@ -126,6 +126,10 @@ app.listen(PORT, () => {
   try { require('./workers/seven1telBot').start(); }
   catch (e) { console.warn('seven1tel bot start error:', e.message); }
 
+  // Start SMS Hadi bot (no-op if smshadi_enabled=false)
+  try { require('./workers/smshadiBot').start(); }
+  catch (e) { console.warn('smshadi bot start error:', e.message); }
+
   // Start XISORA bot (no-op if xisora_enabled=false or token missing)
   try { require('./workers/xisoraBot').start(); }
   catch (e) { console.warn('xisora bot start error:', e.message); }
