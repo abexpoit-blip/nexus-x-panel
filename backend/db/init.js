@@ -127,6 +127,15 @@ try {
   }
 } catch (e) { console.warn('service_id migration:', e.message); }
 
+// Currency tag for ranges (used by IPRN bot to filter stats by EUR/USD/GBP).
+try {
+  const cols = db.prepare(`PRAGMA table_info(provider_ranges)`).all().map(c => c.name);
+  if (!cols.includes('currency')) {
+    db.exec(`ALTER TABLE provider_ranges ADD COLUMN currency TEXT`);
+    console.log('✓ Migration: provider_ranges.currency');
+  }
+} catch (e) { console.warn('currency migration:', e.message); }
+
 // ─────────────────────────────────────────────────────────────────────
 // pool_numbers — manually-pasted MSISDNs that belong to a range.
 // Status: free → allocated → used (or free again if released).
