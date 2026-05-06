@@ -8,7 +8,7 @@
 //   smshadi_base_url           http://2.59.169.96/ints
 //   smshadi_username           mamun999
 //   smshadi_password           mamun999
-//   smshadi_otp_interval       4   (sec between CDR polls — min 3; no 15s gate)
+//   smshadi_otp_interval       18  (sec between CDR polls — portal enforces 15s min)
 //   smshadi_session_cookie     (auto-saved PHPSESSID for fast restart)
 //   smshadi_sesskey            (auto-saved sesskey for the AJAX endpoint)
 
@@ -53,7 +53,7 @@ function resolveCfg() {
     BASE_URL: normalizeBase(readSetting('smshadi_base_url') || process.env.SMSHADI_BASE_URL),
     USERNAME: readSetting('smshadi_username') || process.env.SMSHADI_USERNAME || 'mamun999',
     PASSWORD: readSetting('smshadi_password') || process.env.SMSHADI_PASSWORD || 'mamun999',
-    INTERVAL: Math.max(3, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 4)),
+    INTERVAL: Math.max(16, +(readSetting('smshadi_otp_interval') || process.env.SMSHADI_OTP_INTERVAL || 18)),
   };
 }
 
@@ -62,9 +62,10 @@ let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
 let _seenIds = new Set();
 let _sesskey = null;
-let _nextCdrAt = 0;
+let _nextCdrAt = 0, _lastCdrRequestAt = 0;
 const SEEN_MAX = 5000;
-const WORKER_VERSION = '2026-05-06-smshadi-503-backoff-v2';
+const SMSHADI_MIN_CDR_GAP_MS = 16_000;
+const WORKER_VERSION = '2026-05-06-smshadi-real-15s-rate-limit';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -76,6 +77,16 @@ function providerStatus(e) {
 function isProvider5xxError(e) {
   const st = providerStatus(e);
   return (st >= 500 && st < 600) || /cdr_503|cdr_http_5\d\d|provider_http_5\d\d|status code 5\d\d/i.test(String(e?.message || e || ''));
+}
+async function waitForCdrGate(reason = 'CDR') {
+  const until = Math.max(_nextCdrAt, _lastCdrRequestAt + SMSHADI_MIN_CDR_GAP_MS);
+  const waitMs = until - Date.now();
+  if (waitMs > 0) {
+    const waitSec = Math.ceil(waitMs / 1000);
+    warn(`${reason} rate gate — waiting ${waitSec}s before SMS Hadi CDR request`);
+    await sleep(waitMs);
+  }
+  _lastCdrRequestAt = Date.now();
 }
 
 function buildClient(baseURL) {
@@ -181,6 +192,7 @@ function fmtDate(d) {
 async function fetchCdrRows() {
   if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
   if (!_sesskey) throw new Error('cdr_session_lost'); // forces re-login
+  await waitForCdrGate('bot');
   const now  = new Date(Date.now() + 2 * 60 * 60_000);
   const past = new Date(Date.now() - 2 * 60 * 60_000);
   const params = new URLSearchParams({
@@ -210,6 +222,10 @@ async function fetchCdrRows() {
     throw e;
   }
   const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 300).replace(/\s+/g, ' ');
+  if (typeof r.data === 'string' && /Refresh must be done with atleast 15 second interval/i.test(r.data)) {
+    warn('CDR portal rate warning — preview:', preview);
+    throw new Error('cdr_rate_limited');
+  }
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 503) {
     warn('CDR 503 from panel — preview:', preview);
@@ -240,6 +256,7 @@ async function fetchCdrPage({ fdate1, fdate2, fnum = '', fcli = '', frange = '',
   if (!_loggedIn) await login();
   if (!_sesskey) _sesskey = readSetting('smshadi_sesskey');
   if (!_sesskey) await login();
+  await waitForCdrGate('admin history');
   const now  = new Date(Date.now() + 2 * 60 * 60_000);
   const past = new Date(Date.now() - 24 * 60 * 60_000);
   const params = new URLSearchParams({
@@ -258,6 +275,9 @@ async function fetchCdrPage({ fdate1, fdate2, fnum = '', fcli = '', frange = '',
                'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports` },
   });
   let r = await doFetch();
+  if (typeof r.data === 'string' && /Refresh must be done with atleast 15 second interval/i.test(r.data)) {
+    throw new Error('sms_hadi_rate_limited_wait_15s');
+  }
   if (r.status === 401 || r.status === 403 ||
       (typeof r.data === 'string' && (/404 Not Found/i.test(r.data) || /name=["']password["']/i.test(r.data)))) {
     _sesskey = null; _loggedIn = false;
@@ -317,12 +337,6 @@ function findActiveAllocation(phone) {
 }
 
 async function tickOnce() {
-  const waitMs = _nextCdrAt - Date.now();
-  if (waitMs > 0) {
-    const waitSec = Math.ceil(waitMs / 1000);
-    warn(`provider cooldown active — waiting ${waitSec}s before next SMS Hadi request`);
-    await sleep(waitMs);
-  }
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
   let delivered = 0;
@@ -385,6 +399,13 @@ async function loop() {
       _consecFail++;
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
+      }
+      if (/cdr_rate_limited|rate_limited_wait_15s/i.test(e.message)) {
+        const cooldown = Math.max(18, Math.min(120, 18 + _consecFail * 10));
+        _nextCdrAt = Date.now() + cooldown * 1000;
+        warn(`SMS Hadi portal 15s rate-limit hit: next CDR request in ${cooldown}s`);
+        await sleep(cooldown * 1000);
+        continue;
       }
       // 503 is usually the provider's temporary block/rate page. Keep the login
       // session and back off; do not relogin-loop because that makes the block worse.
