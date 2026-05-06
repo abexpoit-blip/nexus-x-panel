@@ -44,6 +44,7 @@ const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (se
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
 const DEFAULT_RL_RELOGIN_THRESHOLD = 6;  // consecutive 503s → force fresh login
+const DEFAULT_RL_RELOGIN_STALE_SEC = 300; // only relogin if no successful CDR scrape for 5m
 
 function num(v, fb) {
   const n = Number(v);
@@ -58,7 +59,8 @@ function readCooldownCfg() {
   const penaltyMax  = Math.max(penaltyBase, num(readSetting('ims_rl_penalty_max_sec'), DEFAULT_RL_PENALTY_MAX));
   const penaltySteps = Math.max(1, Math.floor(num(readSetting('ims_rl_penalty_steps'), DEFAULT_RL_PENALTY_STEPS)));
   const reloginThreshold = Math.max(2, Math.floor(num(readSetting('ims_rl_relogin_threshold'), DEFAULT_RL_RELOGIN_THRESHOLD)));
-  return { minInterval, penaltyBase, penaltyMax, penaltySteps, reloginThreshold };
+  const reloginStaleSec = Math.max(60, Math.floor(num(readSetting('ims_rl_relogin_stale_sec'), DEFAULT_RL_RELOGIN_STALE_SEC)));
+  return { minInterval, penaltyBase, penaltyMax, penaltySteps, reloginThreshold, reloginStaleSec };
 }
 
 function readSetting(k) {
@@ -106,7 +108,10 @@ let _seenIds = new Set();
 const SEEN_MAX = 5000;
 let _rateLimitStreak = 0;   // consecutive 503/15s errors → grow interval
 let _nextCdrAllowedAt = 0;   // IMS forbids CDR/stats refreshes inside the cooldown window
+let _cdrGateQueue = Promise.resolve();
 let _lastRateLimitWarnAt = 0;
+let _lastRateLimitAt = null;
+let _lastCdrSuccessAt = null;
 let _reloginCount = 0;       // # of automatic re-logins triggered
 let _lastReloginAt = null;
 
@@ -152,12 +157,19 @@ async function forceRelogin(reason) {
 }
 
 async function waitForCdrGate() {
-  const now = Date.now();
-  if (_nextCdrAllowedAt > now) {
-    await new Promise(r => setTimeout(r, _nextCdrAllowedAt - now));
-  }
-  const { minInterval } = readCooldownCfg();
-  _nextCdrAllowedAt = Date.now() + (minInterval * 1000);
+  // Serialize all CDR/stats access across the worker and admin health probes.
+  // Without this, two callers can pass the timestamp check together and trigger
+  // IMS' 15s protection even when the configured interval is correct.
+  const previous = _cdrGateQueue.catch(() => {});
+  _cdrGateQueue = previous.then(async () => {
+    const now = Date.now();
+    if (_nextCdrAllowedAt > now) {
+      await new Promise(r => setTimeout(r, _nextCdrAllowedAt - now));
+    }
+    const { minInterval } = readCooldownCfg();
+    _nextCdrAllowedAt = Date.now() + (minInterval * 1000);
+  });
+  return _cdrGateQueue;
 }
 
 function registerRateLimitCooldown() {
@@ -165,9 +177,10 @@ function registerRateLimitCooldown() {
   const step = Math.min(Math.max(_rateLimitStreak, 1), penaltySteps);
   const penaltyMs = Math.min(penaltyMax * 1000, penaltyBase * 1000 * step);
   _nextCdrAllowedAt = Math.max(_nextCdrAllowedAt, Date.now() + penaltyMs);
+  _lastRateLimitAt = Math.floor(Date.now() / 1000);
   const now = Date.now();
   if (now - _lastRateLimitWarnAt > 60_000) {
-    warn(`IMS CDR rate-limited — cooling down ${Math.ceil(penaltyMs / 1000)}s`);
+    log(`IMS CDR cooldown — waiting ${Math.ceil(penaltyMs / 1000)}s before next scrape`);
     _lastRateLimitWarnAt = now;
   }
   return Math.ceil(penaltyMs / 1000);
