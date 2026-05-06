@@ -499,6 +499,7 @@ function getStatus() {
     sesskey_loaded: !!_sesskey,
     portal_url: cfg.BASE_URL + '/agent/SMSCDRReports',
     worker_version: WORKER_VERSION,
+    last_cdr_success_at: _lastCdrSuccessAt,
     last_cdr_request_at: _lastCdrRequestAt || null,
     next_cdr_at: _nextCdrAt || null,
     cooldown_ms_remaining: Math.max(0, (_nextCdrAt || 0) - Date.now()),
