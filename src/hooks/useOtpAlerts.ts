@@ -24,7 +24,14 @@ const PREFS_KEY = "nexus_otp_alert_prefs";
 // We keep the OtpSoundId union as a single literal for backward-compat
 // with stored prefs, but every value collapses to the same player.
 export type OtpSoundId = "faaaah" | "chime" | "pop";
-export type OtpAlertPrefs = { sound: boolean; push: boolean; volume: number; soundId?: OtpSoundId };
+export type OtpAlertPrefs = {
+  sound: boolean;
+  push: boolean;
+  volume: number;
+  soundId?: OtpSoundId;
+  /** Allowed service tags (CLI). Empty array OR null = ALL services. */
+  services?: string[] | null;
+};
 
 export const SOUND_OPTIONS: { id: OtpSoundId; label: string; tag?: string }[] = [
   { id: "faaaah", label: "Faaaah (viral)", tag: "premium" },
@@ -41,10 +48,11 @@ export const loadOtpPrefs = (): OtpAlertPrefs => {
     if (raw) {
       const parsed = JSON.parse(raw);
       const soundId: OtpSoundId = isValidId(parsed?.soundId) ? parsed.soundId : "faaaah";
-      return { sound: true, push: true, volume: 70, ...parsed, soundId };
+      const services = Array.isArray(parsed?.services) ? parsed.services : null;
+      return { sound: true, push: true, volume: 70, ...parsed, soundId, services };
     }
   } catch { /* noop */ }
-  return { sound: true, push: true, volume: 70, soundId: "faaaah" };
+  return { sound: true, push: true, volume: 70, soundId: "faaaah", services: null };
 };
 
 export const saveOtpPrefs = (p: OtpAlertPrefs) => {
@@ -153,6 +161,14 @@ export function useOtpAlerts(enabled: boolean) {
 
     fresh.forEach((n: any) => {
       seen.current.add(n.id);
+      // Service-filter: if the agent has an explicit allow-list and this
+      // OTP's CLI/service is not in it, record-as-seen but skip alerting.
+      const wanted = prefs.services;
+      if (wanted && wanted.length > 0) {
+        const cli = String(n.cli || n.service_slug || n.service_name || "").toLowerCase();
+        const allowed = wanted.some(s => cli.includes(String(s).toLowerCase()));
+        if (!allowed) return;
+      }
       const masked = String(n.phone_number || "").replace(/(?<=^.{6})\d(?=\d{2})/g, "•");
       const body = `${masked}\nOTP: ${n.otp}`;
       if (prefs.sound) playOtpSound(prefs.soundId || "chime", prefs.volume);
