@@ -140,8 +140,8 @@ async function forceRelogin(reason) {
   _reloginCount++;
   _lastReloginAt = Math.floor(Date.now() / 1000);
 
-  if (!haveCreds && !manualCookie) {
-    warn('cannot auto-relogin: no credentials AND no manual cookie configured');
+  if (!haveCreds) {
+    warn('cannot auto-relogin: username/password missing; cookie-only mode must wait for pasted fresh PHPSESSID');
     return false;
   }
   try {
@@ -259,6 +259,10 @@ async function login(forceCaptcha = false) {
   }
   tel.recordLoginAttempt();
   if (!_client) _client = buildClient(BASE_URL);
+
+  if (forceCaptcha && (!USERNAME || !PASSWORD)) {
+    throw new Error('ims_creds_missing (fresh login requires username/password)');
+  }
 
   // Try saved/manual cookie first — covers both auto-resume after restart
   // and cookie-only login (admin pasted PHPSESSID, no credentials).
@@ -407,6 +411,7 @@ function findActiveAllocation(phone) {
 async function tickOnce() {
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
+  _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
   for (const raw of rows) {
     const r = parseRow(raw);
