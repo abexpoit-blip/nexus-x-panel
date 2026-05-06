@@ -352,10 +352,12 @@ async function loop() {
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
       }
-      // 503 often = stale session cookie or anti-bot from cached IP — drop session and re-login
+      // 503 is usually the provider's temporary block/rate page. Keep the login
+      // session and back off; do not relogin-loop because that makes the block worse.
       if (/cdr_503|cdr_http_5\d\d/i.test(e.message)) {
-        _loggedIn = false; _sesskey = null;
-        try { writeSetting('smshadi_session_cookie', ''); } catch (_) {}
+        const cooldown = Math.min(180, 20 + _consecFail * 20);
+        warn(`provider 503 cooldown ${cooldown}s before next CDR fetch`);
+        await new Promise(r => setTimeout(r, cooldown * 1000));
       }
       const backoff = Math.min(60, 5 + _consecFail * 2);
       await new Promise(r => setTimeout(r, backoff * 1000));
