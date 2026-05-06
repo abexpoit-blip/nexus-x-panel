@@ -22,6 +22,8 @@ router.get('/', authRequired, (req, res) => {
 
   // Count OTPs delivered per agent within the period.
   // Use cdr table (one row per delivered OTP) for accurate period counts.
+  // Include real agents AND the "Nexus Telegram" virtual broadcaster so the
+  // public leaderboard reflects all OTP traffic (real + fake feed).
   const rows = db.prepare(`
     SELECT u.id, u.username,
       COUNT(c.id) AS otp_count,
@@ -31,7 +33,8 @@ router.get('/', authRequired, (req, res) => {
       AND c.status IN ('billed', 'delivered', 'received')
       AND (c.otp_code IS NOT NULL AND c.otp_code != '')
       ${since ? 'AND c.created_at >= ?' : ''}
-    WHERE u.role = 'agent' AND u.status = 'active'
+    WHERE (u.role = 'agent' OR u.username = 'Nexus Telegram')
+      AND (u.status = 'active' OR u.username = 'Nexus Telegram')
     GROUP BY u.id
     HAVING otp_count > 0
     ORDER BY otp_count DESC, earnings_bdt DESC
