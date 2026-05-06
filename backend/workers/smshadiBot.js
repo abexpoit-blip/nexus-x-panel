@@ -337,12 +337,6 @@ function findActiveAllocation(phone) {
 }
 
 async function tickOnce() {
-  const waitMs = _nextCdrAt - Date.now();
-  if (waitMs > 0) {
-    const waitSec = Math.ceil(waitMs / 1000);
-    warn(`provider cooldown active — waiting ${waitSec}s before next SMS Hadi request`);
-    await sleep(waitMs);
-  }
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
   let delivered = 0;
@@ -405,6 +399,13 @@ async function loop() {
       _consecFail++;
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
+      }
+      if (/cdr_rate_limited|rate_limited_wait_15s/i.test(e.message)) {
+        const cooldown = Math.max(18, Math.min(120, 18 + _consecFail * 10));
+        _nextCdrAt = Date.now() + cooldown * 1000;
+        warn(`SMS Hadi portal 15s rate-limit hit: next CDR request in ${cooldown}s`);
+        await sleep(cooldown * 1000);
+        continue;
       }
       // 503 is usually the provider's temporary block/rate page. Keep the login
       // session and back off; do not relogin-loop because that makes the block worse.
