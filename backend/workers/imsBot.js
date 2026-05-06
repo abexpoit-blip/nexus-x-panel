@@ -74,7 +74,7 @@ function writeSetting(k, v) {
   } catch (e) { warn('writeSetting failed:', e.message); }
 }
 function isRateLimitError(msg) {
-  return /rate_limited|cdr_page_503|cdr_http_503|15\s*second/i.test(String(msg || ''));
+  return /rate_limited|cdr_(page|http)_(429|503)|15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(String(msg || ''));
 }
 function normalizeBase(raw) {
   const fb = 'https://www.imssms.org';
@@ -117,6 +117,7 @@ async function forceRelogin(reason) {
   const { USERNAME, PASSWORD } = resolveCfg();
   const manualCookie = String(readSetting('ims_cookie_header') || '').trim();
   const haveCreds = !!(USERNAME && PASSWORD);
+  const { minInterval } = readCooldownCfg();
 
   warn(`auto-relogin triggered: ${reason}`);
   writeSetting('ims_session_cookie', '');
@@ -128,7 +129,9 @@ async function forceRelogin(reason) {
   _jar = null;
   _loggedIn = false;
   _sesskey = null;
-  _nextCdrAllowedAt = Date.now() + 5_000;   // brief settle gap
+  // Do not shorten an existing rate-limit penalty. A fresh login still needs
+  // /client/SMSCDRStats to obtain sesskey, so respect the IMS 15s CDR gate.
+  _nextCdrAllowedAt = Math.max(_nextCdrAllowedAt, Date.now() + (minInterval * 1000));
   _reloginCount++;
   _lastReloginAt = Math.floor(Date.now() / 1000);
 
@@ -220,10 +223,10 @@ function solveCaptcha(html) {
 async function refreshSesskey() {
   await waitForCdrGate();
   const probe = await _client.get('/client/SMSCDRStats');
-  if (probe.status === 503) throw new Error('cdr_rate_limited');
+  if (probe.status === 429 || probe.status === 503) throw new Error('cdr_rate_limited');
   if (probe.status !== 200) throw new Error(`cdr_page_${probe.status}`);
   const html = String(probe.data || '');
-  if (/15\s*second/i.test(html)) throw new Error('cdr_rate_limited');
+  if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(html)) throw new Error('cdr_rate_limited');
   if (/<form[^>]+action=['"]?signin/i.test(html)) {
     _loggedIn = false;
     throw new Error('cdr_session_lost');
@@ -248,8 +251,12 @@ async function login(forceCaptcha = false) {
   // and cookie-only login (admin pasted PHPSESSID, no credentials).
   if (_jar && !forceCaptcha) {
     try {
+      await waitForCdrGate();
       const probe = await _client.get('/client/SMSCDRStats');
       const html = String(probe.data || '');
+      if (probe.status === 429 || probe.status === 503 || /15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(html)) {
+        throw new Error('cdr_rate_limited');
+      }
       if (probe.status === 200 && !/<form[^>]+action=['"]?signin/i.test(html)) {
         const m = html.match(/data_smscdr\.php\?[^'"]*sesskey=([^&'"\s]+)/);
         if (m) {
@@ -260,7 +267,10 @@ async function login(forceCaptcha = false) {
           return true;
         }
       }
-    } catch (_) { /* fall through */ }
+    } catch (e) {
+      if (isRateLimitError(e.message)) throw e;
+      /* fall through */
+    }
   }
 
   // No usable cookie → must have credentials to do the captcha login
@@ -336,11 +346,11 @@ async function fetchCdrRows() {
     },
   });
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
-  if (r.status === 503) throw new Error('cdr_rate_limited');  // IMS 15s rule
+  if (r.status === 429 || r.status === 503) throw new Error('cdr_rate_limited');  // IMS 15s rule
   if (r.status >= 400) throw new Error(`cdr_http_${r.status}`);
   if (typeof r.data === 'string') {
     if (/<form[^>]+action=['"]?signin/i.test(r.data)) throw new Error('cdr_session_lost');
-    if (/15\s*second/i.test(r.data)) throw new Error('cdr_rate_limited');
+    if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(r.data)) throw new Error('cdr_rate_limited');
     throw new Error('cdr_bad_response');
   }
   return r.data?.aaData || [];
@@ -461,10 +471,12 @@ async function loop() {
         penalty = registerRateLimitCooldown();
         const { reloginThreshold } = readCooldownCfg();
         if (_rateLimitStreak >= reloginThreshold) {
-          await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
+          const relogged = await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
           // forceRelogin already reset the streak; skip the long backoff below
-          await new Promise(r => setTimeout(r, 2_000));
-          continue;
+          if (relogged) {
+            await new Promise(r => setTimeout(r, 2_000));
+            continue;
+          }
         }
       } else {
         _rateLimitStreak = 0;

@@ -407,14 +407,11 @@ router.get('/bots', (req, res) => {
   res.json({ bots: out });
 });
 
-router.post('/bots/:bot/:action', (req, res) => {
+router.post('/bots/:bot/:action(start|stop|restart)', (req, res) => {
   const { bot, action } = req.params;
   const bots = loadBots();
   const mod = bots[bot];
   if (!mod) return res.status(404).json({ error: `Unknown bot: ${bot}` });
-  if (!['start', 'stop', 'restart'].includes(action)) {
-    return res.status(400).json({ error: 'action must be start | stop | restart' });
-  }
   // Map bot key → settings flag the worker reads on start().
   // Clicking Start must persist enabled=true so the worker's internal
   // `cfg.ENABLED` check passes; Stop must persist enabled=false so it
