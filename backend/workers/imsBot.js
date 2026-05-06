@@ -128,7 +128,6 @@ async function forceRelogin(reason) {
   _jar = null;
   _loggedIn = false;
   _sesskey = null;
-  _rateLimitStreak = 0;
   _nextCdrAllowedAt = Date.now() + 5_000;   // brief settle gap
   _reloginCount++;
   _lastReloginAt = Math.floor(Date.now() / 1000);
@@ -139,7 +138,8 @@ async function forceRelogin(reason) {
   }
   try {
     if (!_client) _client = buildClient(resolveCfg().BASE_URL);
-    await login();
+    await login(true);
+    _rateLimitStreak = 0;
     log('✓ auto-relogin success — fresh PHPSESSID saved');
     return true;
   } catch (e) {
@@ -220,8 +220,10 @@ function solveCaptcha(html) {
 async function refreshSesskey() {
   await waitForCdrGate();
   const probe = await _client.get('/client/SMSCDRStats');
+  if (probe.status === 503) throw new Error('cdr_rate_limited');
   if (probe.status !== 200) throw new Error(`cdr_page_${probe.status}`);
   const html = String(probe.data || '');
+  if (/15\s*second/i.test(html)) throw new Error('cdr_rate_limited');
   if (/<form[^>]+action=['"]?signin/i.test(html)) {
     _loggedIn = false;
     throw new Error('cdr_session_lost');
