@@ -71,9 +71,10 @@ function buildClient(baseURL) {
               catch (e) { warn('cookie restore failed:', e.message); } }
   const c = wrapper(axios.create({
     baseURL, jar: _jar, withCredentials: true, timeout: 15000, maxRedirects: 5,
-    validateStatus: (s) => s < 500,
+    validateStatus: (s) => s < 600,
     headers: {
       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
     },
   }));
@@ -180,9 +181,9 @@ async function fetchCdrRows() {
       'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports`,
     },
   });
+  const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 300).replace(/\s+/g, ' ');
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 503) {
-    const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 200).replace(/\s+/g, ' ');
     warn('CDR 503 from panel — preview:', preview);
     throw new Error('cdr_503');
   }
@@ -193,9 +194,12 @@ async function fetchCdrRows() {
   }
   if (typeof r.data === 'string' && /name=["']password["']/i.test(r.data)) throw new Error('cdr_session_lost');
   if (r.status >= 400) {
-    const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 200).replace(/\s+/g, ' ');
     warn('CDR HTTP', r.status, '— preview:', preview);
     throw new Error('cdr_http_' + r.status);
+  }
+  if (!r.data || !Array.isArray(r.data.aaData)) {
+    warn('CDR unexpected response — status', r.status, 'preview:', preview);
+    throw new Error('cdr_bad_response');
   }
   const rows = (r.data && r.data.aaData) || [];
   return rows;
@@ -348,10 +352,12 @@ async function loop() {
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
       }
-      // 503 often = stale session cookie or anti-bot from cached IP — drop session and re-login
+      // 503 is usually the provider's temporary block/rate page. Keep the login
+      // session and back off; do not relogin-loop because that makes the block worse.
       if (/cdr_503|cdr_http_5\d\d/i.test(e.message)) {
-        _loggedIn = false; _sesskey = null;
-        try { writeSetting('smshadi_session_cookie', ''); } catch (_) {}
+        const cooldown = Math.min(180, 20 + _consecFail * 20);
+        warn(`provider 503 cooldown ${cooldown}s before next CDR fetch`);
+        await new Promise(r => setTimeout(r, cooldown * 1000));
       }
       const backoff = Math.min(60, 5 + _consecFail * 2);
       await new Promise(r => setTimeout(r, backoff * 1000));
