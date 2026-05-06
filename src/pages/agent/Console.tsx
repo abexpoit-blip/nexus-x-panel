@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { cliBadgeClass } from "@/lib/cliBadge";
 import { usePagination } from "@/components/Pagination";
 import { BrandIcon } from "@/components/BrandIcon";
+import { countryName } from "@/lib/countryName";
 
 // Shorten provider range names like "Peru Bitel TF04" → "TF04"
 const shortRange = (operator?: string | null) => {
@@ -39,29 +40,29 @@ const AgentConsole = () => {
     );
   }, [data, search]);
 
-  // Count OTPs per range (short label) in the last 1 hour — agents instantly
-  // see which range is hottest right now. Sorted desc, top 8 shown as chips.
-  const hotRanges = useMemo(() => {
+  // Count OTPs per country in the last 1 hour — agents instantly see which
+  // country is hottest right now. Sorted desc, top 8 shown as chips.
+  const hotCountries = useMemo(() => {
     const feed = data?.feed || [];
     const cutoff = Math.floor(Date.now() / 1000) - 3600;
-    const counts = new Map<string, { count: number; isSeven1Tel: boolean }>();
+    const counts = new Map<string, { count: number; name: string }>();
     for (const c of feed) {
       if (c.created_at < cutoff) continue;
-      const isSeven1Tel = c.provider === "seven1tel";
-      const key = isSeven1Tel ? shortRange(c.operator) : (c.operator || c.country_code || "—");
-      if (!key) continue;
-      const cur = counts.get(key) || { count: 0, isSeven1Tel };
+      const cc = (c.country_code || "").trim().toUpperCase();
+      if (!cc) continue;
+      const cur = counts.get(cc) || { count: 0, name: countryName(cc) || cc };
       cur.count += 1;
-      counts.set(key, cur);
+      counts.set(cc, cur);
     }
     return Array.from(counts.entries())
-      .map(([label, v]) => ({ label, ...v }))
+      .map(([code, v]) => ({ code, ...v }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
   }, [data]);
 
-  const countFor = (label: string) =>
-    hotRanges.find((r) => r.label === label)?.count || 0;
+  // Per-row hot-count keyed by country code (used for the "🔥 N in 1h" chip).
+  const countForCountry = (cc: string) =>
+    hotCountries.find((r) => r.code === cc)?.count || 0;
 
   const { items: pagedItems, controls: pagedControls } = usePagination(items, 25);
 
@@ -96,27 +97,25 @@ const AgentConsole = () => {
         />
       </div>
 
-      {hotRanges.length > 0 && (
+      {hotCountries.length > 0 && (
         <GlassCard className="!p-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">🔥 Hot ranges · last 1h</span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">🔥 Hot countries · last 1h</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {hotRanges.map((r, idx) => (
+            {hotCountries.map((r, idx) => (
               <button
-                key={r.label}
-                onClick={() => setSearch(r.label)}
+                key={r.code}
+                onClick={() => setSearch(r.code)}
                 className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all",
                   idx === 0
                     ? "bg-neon-green/15 text-neon-green border border-neon-green/40"
-                    : r.isSeven1Tel
-                      ? "bg-neon-magenta/10 text-neon-magenta hover:bg-neon-magenta/20"
-                      : "bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20"
+                    : "bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20"
                 )}
-                title={`Filter feed by ${r.label}`}
+                title={`Filter feed by ${r.name}`}
               >
-                <span>{r.label}</span>
+                <span>{r.name}</span>
                 <span className="px-1.5 py-0.5 rounded-full bg-background/40 font-mono">{r.count}</span>
               </button>
             ))}
@@ -134,7 +133,7 @@ const AgentConsole = () => {
           const labelStyle = isSeven1Tel
             ? "bg-neon-magenta/10 text-neon-magenta"
             : "bg-neon-cyan/10 text-neon-cyan";
-          const hotCount = countFor(label);
+          const hotCount = countForCountry((c.country_code || "").toUpperCase());
           // Slug guess from CLI for brand icon (e.g. "WhatsApp" → "whatsapp").
           const cliSlug = (c.cli || "").toLowerCase();
           return (
