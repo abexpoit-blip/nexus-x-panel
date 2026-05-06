@@ -317,6 +317,12 @@ function findActiveAllocation(phone) {
 }
 
 async function tickOnce() {
+  const waitMs = _nextCdrAt - Date.now();
+  if (waitMs > 0) {
+    const waitSec = Math.ceil(waitMs / 1000);
+    warn(`provider cooldown active — waiting ${waitSec}s before next SMS Hadi request`);
+    await sleep(waitMs);
+  }
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
   let delivered = 0;
@@ -401,7 +407,7 @@ function start() {
   if (!cfg.ENABLED) { log('disabled (smshadi_enabled=false) — not starting'); return; }
   if (_running) { log('already running — skip start'); return; }
   _stopFlag = false;
-  log('starting…  base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's');
+  log('starting…  version=', WORKER_VERSION, 'base=', cfg.BASE_URL, 'interval=', cfg.INTERVAL, 's');
   loop().catch(e => warn('fatal:', e.message));
 }
 function stop() { _stopFlag = true; _loggedIn = false; }
