@@ -15,15 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { cliBadgeClass } from "@/lib/cliBadge";
 import { toast } from "sonner";
-
-// Country code → flag emoji.
-function flagEmoji(code: string): string {
-  if (!code) return "🌐";
-  const cc = code.toUpperCase();
-  if (cc.length !== 2) return "🌐";
-  const A = 0x1f1e6;
-  return String.fromCodePoint(A + cc.charCodeAt(0) - 65, A + cc.charCodeAt(1) - 65);
-}
+import { CountryFlag } from "@/components/CountryFlag";
 
 type StatusKey = "billed" | "refunded";
 const STATUS_OPTIONS: { key: StatusKey; label: string; tone: string }[] = [
@@ -262,7 +254,7 @@ const AgentHistory = () => {
                       <span className="w-3 h-3 rounded border border-white/20 flex items-center justify-center shrink-0">
                         {on && <Check className="w-2.5 h-2.5 text-primary" />}
                       </span>
-                      <span className="text-base leading-none">{flagEmoji(c.value)}</span>
+                      <CountryFlag code={c.value} size="sm" />
                       <span className="flex-1 font-mono uppercase text-foreground">{c.value}</span>
                       <span className="text-[10px] font-mono text-muted-foreground">{c.count}</span>
                     </button>
