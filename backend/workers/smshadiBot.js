@@ -481,8 +481,7 @@ async function loop() {
         _loggedIn = false; _sesskey = null;
       }
       if (/cdr_rate_limited|rate_limited_wait_15s/i.test(e.message)) {
-        const cooldown = Math.max(18, Math.min(120, 18 + _consecFail * 10));
-        _nextCdrAt = Date.now() + cooldown * 1000;
+        const cooldown = setCdrCooldown(Math.max(60_000, Math.min(5 * 60_000, 60_000 + _consecFail * 30_000)));
         warn(`SMS Hadi portal 15s rate-limit hit: next CDR request in ${cooldown}s`);
         await sleep(cooldown * 1000);
         continue;
@@ -492,8 +491,10 @@ async function loop() {
       // Match both our normalized codes AND raw axios "status code 5xx" messages.
       if (isProvider5xxError(e)) {
         const status = providerStatus(e) || 503;
-        const cooldown = Math.min(600, 60 * Math.max(1, _consecFail));
-        _nextCdrAt = Date.now() + cooldown * 1000;
+        const cooldown = setCdrCooldown(Math.min(
+          SMSHADI_503_MAX_COOLDOWN_MS,
+          SMSHADI_503_BASE_COOLDOWN_MS * Math.max(1, _consecFail),
+        ));
         warn(`provider ${status} cooldown active: next SMS Hadi request in ${cooldown}s`);
         await sleep(cooldown * 1000);
         continue;
