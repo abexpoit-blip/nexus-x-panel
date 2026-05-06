@@ -92,14 +92,15 @@ router.post('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
   try {
     const v = validate(req.body || {});
     const r = db.prepare(`
-      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot, service_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot, service_id, currency)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       v.provider, v.country_code, v.country_name || null, v.range_label,
       v.range_prefix || null, v.operator || null, v.price_bdt || 0,
       v.enabled === undefined ? 1 : v.enabled, v.notes || null,
       v.hot ? 1 : 0,
-      v.service_id ?? null
+      v.service_id ?? null,
+      v.currency ?? null
     );
     logFromReq(req, 'range_create', { meta: { provider: v.provider, country: v.country_code, label: v.range_label } });
     res.json({ id: r.lastInsertRowid });
