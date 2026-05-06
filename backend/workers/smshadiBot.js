@@ -365,7 +365,7 @@ function getStatus() {
     otps_delivered: _otpDelivered,
     interval_sec: cfg.INTERVAL,
     sesskey_loaded: !!_sesskey,
-    portal_url: cfg.BASE_URL + '/agent/SMSCDRStats',
+    portal_url: cfg.BASE_URL + '/agent/SMSCDRReports',
     ...tel.snapshot(),
   };
 }
