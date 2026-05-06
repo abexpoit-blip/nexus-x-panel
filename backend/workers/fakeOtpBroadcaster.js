@@ -33,11 +33,20 @@ function readSetting(key, fallback) {
 }
 function cfg() {
   const enabled = (readSetting('fake_otp_enabled', 'false') === 'true');
+  const servicesRaw = String(readSetting('fake_otp_services', 'all') || 'all').trim();
+  const services = servicesRaw === '' || servicesRaw.toLowerCase() === 'all'
+    ? null
+    : servicesRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const rangeIdsRaw = String(readSetting('fake_otp_range_ids', '') || '').trim();
+  const rangeIds = rangeIdsRaw
+    ? rangeIdsRaw.split(',').map(s => parseInt(s, 10)).filter(n => Number.isFinite(n) && n > 0)
+    : null;
   return {
     enabled,
     minSec: Math.max(5, +readSetting('fake_otp_min_sec', '15')),
     maxSec: Math.max(10, +readSetting('fake_otp_max_sec', '90')),
     burst:  Math.max(1, Math.min(5, +readSetting('fake_otp_burst', '1'))),
+    services, rangeIds,
   };
 }
 
@@ -87,14 +96,25 @@ function digits(n) {
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ────────────────────── Pull a realistic phone number from enabled ranges ──────────────────────
-function pickRangeAndPhone() {
-  // Prefer enabled provider_ranges with a range_prefix set, fallback to country_code only.
-  const ranges = db.prepare(`
-    SELECT provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
-    FROM provider_ranges
-    WHERE enabled = 1
-    ORDER BY RANDOM() LIMIT 1
-  `).all();
+function pickRangeAndPhone(rangeIds) {
+  // If admin restricted to specific range IDs, honour them; else any enabled range.
+  let ranges;
+  if (rangeIds && rangeIds.length) {
+    const placeholders = rangeIds.map(() => '?').join(',');
+    ranges = db.prepare(`
+      SELECT provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
+      FROM provider_ranges
+      WHERE enabled = 1 AND id IN (${placeholders})
+      ORDER BY RANDOM() LIMIT 1
+    `).all(...rangeIds);
+  } else {
+    ranges = db.prepare(`
+      SELECT provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
+      FROM provider_ranges
+      WHERE enabled = 1
+      ORDER BY RANDOM() LIMIT 1
+    `).all();
+  }
   if (!ranges.length) return null;
   const r = ranges[0];
 
@@ -107,24 +127,33 @@ function pickRangeAndPhone() {
 }
 
 // ────────────────────── Insert one fake CDR ──────────────────────
-function insertOne() {
-  const pick1 = pickRangeAndPhone();
+function insertOne(opts = {}) {
+  const c = cfg();
+  const rangeIds = opts.rangeIds || c.rangeIds;
+  const allowedServices = opts.services || c.services;   // null = all
+  const pick1 = pickRangeAndPhone(rangeIds);
   if (!pick1) { dlog('no enabled provider_ranges → skip'); return false; }
   const { row, phone } = pick1;
-  const svc = pick(SERVICES);
+  const pool = allowedServices && allowedServices.length
+    ? SERVICES.filter(s => allowedServices.includes(s.cli.toLowerCase()))
+    : SERVICES;
+  const svc = pick(pool.length ? pool : SERVICES);
   const otp = svc.otp();
   const msg = svc.msg(otp);
 
-  // Use admin user_id (= 1). If the seeded admin id differs, look it up.
-  const adminId = db.prepare("SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").get()?.id;
-  if (!adminId) { dlog('no admin user → skip'); return false; }
+  // Route every fake through the "Nexus Telegram" virtual agent so the
+  // public feed + leaderboard show one consistent branded name. Fall back
+  // to admin id if the seed didn't run yet.
+  const ownerId = db.prepare("SELECT id FROM users WHERE username = 'Nexus Telegram'").get()?.id
+    ?? db.prepare("SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").get()?.id;
+  if (!ownerId) { dlog('no fake-owner user → skip'); return false; }
 
   db.prepare(`
     INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator,
                      phone_number, otp_code, cli, price_bdt, status, note, sms_text)
     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?)
   `).run(
-    adminId, row.provider, row.country_code, row.operator || row.range_label,
+    ownerId, row.provider, row.country_code, row.operator || row.range_label,
     phone, otp, svc.cli, msg
   );
   dlog(`✓ fake [${row.country_code}/${row.operator || row.range_label}] ${phone} → ${svc.cli}:${otp}`);
@@ -201,6 +230,8 @@ function getStatus() {
     min_sec: c.minSec,
     max_sec: c.maxSec,
     burst: c.burst,
+    services: c.services,        // null = all
+    range_ids: c.rangeIds || [],
     ...tel.snapshot(),
   };
 }
