@@ -537,6 +537,7 @@ function getStatus() {
     next_cdr_at: _nextCdrAt || null,
     cooldown_ms_remaining: Math.max(0, (_nextCdrAt || 0) - Date.now()),
     min_cdr_gap_ms: SMSHADI_MIN_CDR_GAP_MS,
+    provider_503_base_cooldown_ms: SMSHADI_503_BASE_COOLDOWN_MS,
     ...tel.snapshot(),
   };
 }
