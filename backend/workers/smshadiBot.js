@@ -174,13 +174,24 @@ async function fetchCdrRows() {
     fg: '0', sesskey: _sesskey,
     iDisplayLength: '300', iDisplayStart: '0', sEcho: String(Date.now() % 100000),
   });
-  const r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports`,
-    },
-  });
+  let r;
+  try {
+    r = await _client.get(`/agent/res/data_smscdr.php?${params.toString()}`, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Referer': `${_client.defaults.baseURL}/agent/SMSCDRReports`,
+      },
+    });
+  } catch (e) {
+    // axios threw despite validateStatus — surface a stable error code so
+    // the loop's cooldown branch can match it.
+    const st = e?.response?.status;
+    if (st === 503) { warn('CDR 503 (thrown) from panel'); throw new Error('cdr_503'); }
+    if (st && st >= 500) throw new Error('cdr_http_' + st);
+    if (st === 401 || st === 403) throw new Error('cdr_unauthorized');
+    throw e;
+  }
   const preview = (typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {})).slice(0, 300).replace(/\s+/g, ' ');
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 503) {
