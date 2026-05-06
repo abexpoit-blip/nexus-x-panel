@@ -332,7 +332,7 @@ router.get('/fake-otp', (req, res) => {
 });
 
 router.put('/fake-otp', (req, res) => {
-  const { enabled, min_sec, max_sec, burst } = req.body || {};
+  const { enabled, min_sec, max_sec, burst, services, range_ids } = req.body || {};
   const set = (key, val) => db.prepare(`
     INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
@@ -341,6 +341,20 @@ router.put('/fake-otp', (req, res) => {
   if (Number.isFinite(+min_sec))    set('fake_otp_min_sec', Math.max(5, +min_sec));
   if (Number.isFinite(+max_sec))    set('fake_otp_max_sec', Math.max(10, +max_sec));
   if (Number.isFinite(+burst))      set('fake_otp_burst',   Math.max(1, Math.min(5, +burst)));
+  if (services !== undefined) {
+    // Accept array, csv string, or 'all'
+    let v;
+    if (Array.isArray(services)) v = services.length ? services.map(s => String(s).toLowerCase()).join(',') : 'all';
+    else if (typeof services === 'string') v = services.trim() || 'all';
+    else v = 'all';
+    set('fake_otp_services', v);
+  }
+  if (range_ids !== undefined) {
+    const ids = Array.isArray(range_ids)
+      ? range_ids.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n > 0)
+      : String(range_ids || '').split(',').map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n > 0);
+    set('fake_otp_range_ids', ids.join(','));
+  }
   logFromReq(req, 'fake_otp_settings_updated', { meta: req.body });
   res.json({ ok: true });
 });
