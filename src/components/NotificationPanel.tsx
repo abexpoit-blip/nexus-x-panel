@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, BellOff, CheckCheck, Trash2, X, Inbox } from "lucide-react";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -43,7 +44,7 @@ const iconFor = (n: ApiNotification): string => {
   return "🔔";
 };
 
-export function NotificationPanel() {
+function NotificationPanelInner() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { panelOpen, closePanel, preferences, updatePreferences } = useNotifications();
@@ -250,3 +251,8 @@ export function NotificationPanel() {
     </>
   );
 }
+
+// AnimatePresence (and React in general) sometimes forwards refs to children.
+// Wrap the panel in forwardRef so the dev-mode warning goes away.
+export const NotificationPanel = forwardRef<HTMLDivElement>((_, _ref) => <NotificationPanelInner />);
+NotificationPanel.displayName = "NotificationPanel";

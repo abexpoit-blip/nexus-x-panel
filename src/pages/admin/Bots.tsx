@@ -234,7 +234,7 @@ const AdminBots = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-bots"],
     queryFn: () => api.admin.bots.list(),
-    refetchInterval: 5000,
+    refetchInterval: 10_000,
   });
 
   const { data: sysHealth } = useQuery({
