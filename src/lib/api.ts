@@ -579,6 +579,21 @@ export interface ProviderBotStatus {
   total_login_successes?: number;
   source?: string;
   portal_url?: string;
+  // IMS-specific (rate-limit / cooldown telemetry)
+  min_interval_sec?: number;
+  min_interval_floor?: number;
+  rl_penalty_base_sec?: number;
+  rl_penalty_max_sec?: number;
+  rl_penalty_steps?: number;
+  rl_streak?: number;
+  rl_relogin_threshold?: number;
+  rl_relogin_stale_sec?: number;
+  last_rate_limit_at?: number | null;
+  last_cdr_success_at?: number | null;
+  relogin_count?: number;
+  last_relogin_at?: number | null;
+  next_cdr_allowed_at?: number | null;
+  sesskey_loaded?: boolean;
 }
 
 export interface BotInfo {
