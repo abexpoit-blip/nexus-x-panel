@@ -348,6 +348,11 @@ async function loop() {
       if (/session_lost|unauthorized|login_failed/i.test(e.message)) {
         _loggedIn = false; _sesskey = null;
       }
+      // 503 often = stale session cookie or anti-bot from cached IP — drop session and re-login
+      if (/cdr_503|cdr_http_5\d\d/i.test(e.message)) {
+        _loggedIn = false; _sesskey = null;
+        try { writeSetting('smshadi_session_cookie', ''); } catch (_) {}
+      }
       const backoff = Math.min(60, 5 + _consecFail * 2);
       await new Promise(r => setTimeout(r, backoff * 1000));
     }
