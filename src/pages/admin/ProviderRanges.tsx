@@ -520,6 +520,27 @@ const AdminProviderRanges = () => {
                 </SelectContent>
               </Select>
             </div>
+            {form.provider === "iprn" && (
+              <div className="space-y-1.5 col-span-2">
+                <Label className="text-xs">Currency * (IPRN scrape filter)</Label>
+                <Select
+                  value={(form as any).currency || ""}
+                  onValueChange={(v) => setForm({ ...form, currency: v || null } as any)}
+                >
+                  <SelectTrigger className="bg-white/[0.04] border-white/[0.1]">
+                    <SelectValue placeholder="EUR / USD / GBP" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  Bot will hit /premium_number/stats/sms with this currency to scrape OTPs for this range.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
