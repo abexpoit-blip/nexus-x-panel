@@ -214,17 +214,32 @@ router.post('/get', authRequired, (req, res) => {
   }
   if (!rangeRow) return res.status(404).json({ error: 'Range not found or disabled' });
 
-  // Per-agent cap (admin-controlled). Hard ceiling 500 to avoid runaway requests.
-  const fresh = db.prepare('SELECT per_request_limit, status, rl_per_min, rl_concurrent FROM users WHERE id = ?').get(u.id);
+  // Per-agent cap (admin-controlled). The only real cap is the DAILY limit —
+  // per-request limit is no longer enforced (agents can request as many as
+  // they want in one shot, up to whatever daily budget remains).
+  const fresh = db.prepare('SELECT daily_limit, status, rl_per_min, rl_concurrent FROM users WHERE id = ?').get(u.id);
   if (!fresh || fresh.status !== 'active') return res.status(403).json({ error: 'Account is not active' });
-  const perReqCap = Math.min(500, Math.max(1, +fresh.per_request_limit || 1));
+  const dailyCap = Math.max(1, +fresh.daily_limit || 500);
 
-  let count = Math.max(1, Math.min(perReqCap, +body.count || 1));
+  // Today's already-allocated count (resets at local midnight UTC).
+  const todayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
+  const usedToday = db.prepare(
+    "SELECT COUNT(*) c FROM allocations WHERE user_id=? AND allocated_at >= ?"
+  ).get(u.id, todayStart).c;
+  const remainingToday = Math.max(0, dailyCap - usedToday);
+  if (remainingToday <= 0) {
+    return res.status(429).json({
+      error: `Daily limit reached (${dailyCap}/day). Try again tomorrow.`,
+      code: 'daily_limit', daily_cap: dailyCap, used_today: usedToday,
+    });
+  }
+
+  let count = Math.max(1, Math.min(remainingToday, +body.count || 1));
 
   // ── Rate-limit gate: per-minute requests + concurrent active allocations ──
   const getSetting = (k, fb) => +(db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value ?? fb) || +fb;
-  const perMin     = +fresh.rl_per_min    > 0 ? +fresh.rl_per_min    : getSetting('rl_per_min_default', 12);
-  const concurrent = +fresh.rl_concurrent > 0 ? +fresh.rl_concurrent : getSetting('rl_concurrent_default', 5);
+  const perMin     = +fresh.rl_per_min    > 0 ? +fresh.rl_per_min    : getSetting('rl_per_min_default', 500);
+  const concurrent = +fresh.rl_concurrent > 0 ? +fresh.rl_concurrent : getSetting('rl_concurrent_default', 500);
   const since = Math.floor(Date.now() / 1000) - 60;
   const recent = db.prepare(
     "SELECT COUNT(*) c FROM allocations WHERE user_id=? AND allocated_at >= ?"
