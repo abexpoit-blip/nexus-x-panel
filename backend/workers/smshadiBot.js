@@ -8,7 +8,7 @@
 //   smshadi_base_url           http://2.59.169.96/ints
 //   smshadi_username           mamun999
 //   smshadi_password           mamun999
-//   smshadi_otp_interval       18  (sec between CDR polls — portal enforces 15s min)
+//   smshadi_otp_interval       24  (sec between CDR polls — portal enforces 15s min)
 //   smshadi_session_cookie     (auto-saved PHPSESSID for fast restart)
 //   smshadi_sesskey            (auto-saved sesskey for the AJAX endpoint)
 
