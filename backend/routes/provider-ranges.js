@@ -9,7 +9,8 @@ const db_settings = require('../lib/db');
 
 const router = express.Router();
 
-const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims', 'smshadi'];
+const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims', 'smshadi', 'iprn'];
+const ALLOWED_CURRENCIES = ['EUR', 'USD', 'GBP'];
 
 function validate(body, partial = false) {
   const out = {};
@@ -46,6 +47,16 @@ function validate(body, partial = false) {
   }
   if (body.enabled !== undefined) out.enabled = body.enabled ? 1 : 0;
   if (body.hot !== undefined) out.hot = body.hot ? 1 : 0;
+  if (body.currency !== undefined) {
+    if (body.currency === null || body.currency === '') { out.currency = null; }
+    else {
+      const cur = String(body.currency).trim().toUpperCase();
+      if (!ALLOWED_CURRENCIES.includes(cur)) {
+        throw new Error(`currency must be one of: ${ALLOWED_CURRENCIES.join(', ')}`);
+      }
+      out.currency = cur;
+    }
+  }
   if (body.service_id !== undefined) {
     if (body.service_id === null || body.service_id === '') { out.service_id = null; }
     else {
