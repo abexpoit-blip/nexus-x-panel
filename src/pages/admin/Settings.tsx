@@ -48,6 +48,10 @@ const AdminSettings = () => {
     queryFn: () => api.fakeOtp.get(),
     refetchInterval: 10_000,
   });
+  const { data: rangesData } = useQuery({
+    queryKey: ["admin-fake-otp-ranges"],
+    queryFn: () => api.admin.rangesList({}),
+  });
 
   // Local form state
   const [signupOpen, setSignupOpen] = useState(false);
