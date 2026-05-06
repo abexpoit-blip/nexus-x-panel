@@ -218,8 +218,7 @@ seedSetting('cdr_hide_fakes',    'false');
 // so they show up in the public feed + leaderboard under one branded name.
 const nx = db.prepare("SELECT id FROM users WHERE username = 'Nexus Telegram'").get();
 if (!nx) {
-  const bcrypt = require('bcryptjs');
-  // Locked-down account — no one can log in (random hash, suspended).
+  // Locked-down account — no one can log in (random hash).
   const lockedHash = bcrypt.hashSync(require('crypto').randomBytes(24).toString('hex'), 10);
   db.prepare(`
     INSERT INTO users (username, password_hash, role, full_name, balance, status)
