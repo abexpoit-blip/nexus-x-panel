@@ -35,6 +35,29 @@ const dlog = (...a) => { if (!QUIET) console.log('[ims-bot]', ...a); };
 const warn = (...a) => console.warn('[ims-bot]', ...a);
 
 const MIN_INTERVAL = 16; // hard floor — IMS warns at <15s
+const MIN_INTERVAL_FLOOR = 15; // absolute minimum admin can configure
+
+// Defaults for the CDR cooldown / rate-limit backoff. Admins can override
+// these at runtime via the settings table — no redeploy required.
+const DEFAULT_CDR_MIN_INTERVAL = 16;     // gap between any two CDR calls (sec)
+const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
+const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
+const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
+
+function num(v, fb) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fb;
+}
+function readCooldownCfg() {
+  const minInterval = Math.max(
+    MIN_INTERVAL_FLOOR,
+    num(readSetting('ims_cdr_min_interval_sec'), DEFAULT_CDR_MIN_INTERVAL)
+  );
+  const penaltyBase = Math.max(1, num(readSetting('ims_rl_penalty_base_sec'), DEFAULT_RL_PENALTY_BASE));
+  const penaltyMax  = Math.max(penaltyBase, num(readSetting('ims_rl_penalty_max_sec'), DEFAULT_RL_PENALTY_MAX));
+  const penaltySteps = Math.max(1, Math.floor(num(readSetting('ims_rl_penalty_steps'), DEFAULT_RL_PENALTY_STEPS)));
+  return { minInterval, penaltyBase, penaltyMax, penaltySteps };
+}
 
 function readSetting(k) {
   try { return db.prepare('SELECT value FROM settings WHERE key=?').get(k)?.value || null; }
@@ -58,13 +81,15 @@ function normalizeBase(raw) {
 function resolveCfg() {
   const dbEnabled = readSetting('ims_enabled');
   const interval = +(readSetting('ims_otp_interval') || process.env.IMS_OTP_INTERVAL || 18);
+  const cd = readCooldownCfg();
   return {
     ENABLED: (dbEnabled !== null ? dbEnabled : (process.env.IMS_ENABLED || 'false'))
               .toString().toLowerCase() === 'true',
     BASE_URL: normalizeBase(readSetting('ims_base_url') || process.env.IMS_BASE_URL),
     USERNAME: readSetting('ims_username') || process.env.IMS_USERNAME || '',
     PASSWORD: readSetting('ims_password') || process.env.IMS_PASSWORD || '',
-    INTERVAL: Math.max(MIN_INTERVAL, interval),
+    INTERVAL: Math.max(cd.minInterval, interval),
+    COOLDOWN: cd,
   };
 }
 
@@ -83,11 +108,14 @@ async function waitForCdrGate() {
   if (_nextCdrAllowedAt > now) {
     await new Promise(r => setTimeout(r, _nextCdrAllowedAt - now));
   }
-  _nextCdrAllowedAt = Date.now() + (MIN_INTERVAL * 1000);
+  const { minInterval } = readCooldownCfg();
+  _nextCdrAllowedAt = Date.now() + (minInterval * 1000);
 }
 
 function registerRateLimitCooldown() {
-  const penaltyMs = Math.min(90_000, 20_000 * Math.min(Math.max(_rateLimitStreak, 1), 4));
+  const { penaltyBase, penaltyMax, penaltySteps } = readCooldownCfg();
+  const step = Math.min(Math.max(_rateLimitStreak, 1), penaltySteps);
+  const penaltyMs = Math.min(penaltyMax * 1000, penaltyBase * 1000 * step);
   _nextCdrAllowedAt = Math.max(_nextCdrAllowedAt, Date.now() + penaltyMs);
   const now = Date.now();
   if (now - _lastRateLimitWarnAt > 60_000) {
@@ -412,7 +440,14 @@ function getStatus() {
     username: cfg.USERNAME ? cfg.USERNAME.replace(/.(?=.{2})/g, '*') : null,
     last_tick_at: _lastTickAt, last_error: _lastError,
     consec_fail: _consecFail, otps_delivered: _otpDelivered,
-    interval_sec: cfg.INTERVAL, min_interval_sec: MIN_INTERVAL,
+    interval_sec: cfg.INTERVAL,
+    min_interval_sec: cfg.COOLDOWN.minInterval,
+    min_interval_floor: MIN_INTERVAL_FLOOR,
+    rl_penalty_base_sec: cfg.COOLDOWN.penaltyBase,
+    rl_penalty_max_sec: cfg.COOLDOWN.penaltyMax,
+    rl_penalty_steps: cfg.COOLDOWN.penaltySteps,
+    rl_streak: _rateLimitStreak,
+    next_cdr_allowed_at: _nextCdrAllowedAt || null,
     sesskey_loaded: !!_sesskey,
     ...tel.snapshot(),
   };
