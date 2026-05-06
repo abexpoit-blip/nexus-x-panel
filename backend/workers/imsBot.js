@@ -39,7 +39,7 @@ const MIN_INTERVAL_FLOOR = 15; // absolute minimum admin can configure
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
-const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — IMS 15s + safety
+const DEFAULT_CDR_MIN_INTERVAL = 18;     // gap between any two CDR calls (sec) — IMS 15s + 3s safety
 const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
@@ -408,6 +408,51 @@ function findActiveAllocation(phone) {
   `).get(`%${tail}`, now - GRACE_SEC, now - RESEND_SEC);
 }
 
+// Map IMS CLI text to a service slug. IMS puts the brand name in the CLI
+// column (e.g. "Facebook", "WhatsApp", "Telegram"). We use this to route
+// the OTP to the allocation that asked for the matching service, so a
+// Facebook OTP never gets delivered to a pending WhatsApp request and
+// vice-versa.
+function cliToServiceSlug(cli, msg) {
+  const hay = `${cli || ''} ${msg || ''}`.toLowerCase();
+  if (/whats\s*app|wa\b/.test(hay)) return 'whatsapp';
+  if (/facebook|fb\b|meta/.test(hay)) return 'facebook';
+  if (/telegram/.test(hay)) return 'telegram';
+  if (/instagram|insta\b/.test(hay)) return 'instagram';
+  if (/google|gmail|youtube/.test(hay)) return 'google';
+  if (/tiktok/.test(hay)) return 'tiktok';
+  if (/twitter|\bx\b/.test(hay)) return 'twitter';
+  return null;
+}
+
+// Service-aware allocation match: prefer allocation whose service_id maps
+// to the slug derived from CLI. Falls back to phone-only match.
+function findAllocationForCdr(phone, cliSlug) {
+  const tail = String(phone).slice(-9);
+  if (!tail) return null;
+  const GRACE_SEC = 300, RESEND_SEC = 600;
+  const now = Math.floor(Date.now() / 1000);
+  let serviceId = null;
+  if (cliSlug) {
+    try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
+    catch (_) { serviceId = null; }
+  }
+  if (serviceId) {
+    const matched = db.prepare(`
+      SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
+      FROM allocations
+      WHERE phone_number LIKE ?
+        AND service_id = ?
+        AND (status='active'
+          OR (status='expired'  AND allocated_at >= ?)
+          OR (status='received' AND allocated_at >= ?))
+      ORDER BY allocated_at DESC LIMIT 1
+    `).get(`%${tail}`, serviceId, now - GRACE_SEC, now - RESEND_SEC);
+    if (matched) return matched;
+  }
+  return findActiveAllocation(phone);
+}
+
 async function tickOnce() {
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
@@ -422,15 +467,16 @@ async function tickOnce() {
       const arr = Array.from(_seenIds);
       _seenIds = new Set(arr.slice(arr.length / 2));
     }
-    const alloc = findActiveAllocation(r.phone);
+    const cliSlug = cliToServiceSlug(r.cli, r.msg);
+    const alloc = findAllocationForCdr(r.phone, cliSlug);
     if (!alloc) {
-      dlog('no active alloc for', r.phone, '→ skip');
-      tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);
+      dlog('no active alloc for', r.phone, 'cli=', r.cli, '→ skip');
+      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no active allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''}`);
       logOtpAudit({
         source: 'ims', source_msg_id: r.dedup_key,
         phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
         outcome: 'mismatch',
-        miss_reason: 'no active allocation matched (suffix-9)',
+        miss_reason: `no active allocation matched (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
       });
       continue;
     }
