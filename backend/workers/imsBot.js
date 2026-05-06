@@ -235,7 +235,7 @@ async function refreshSesskey() {
   return _sesskey;
 }
 
-async function login() {
+async function login(forceCaptcha = false) {
   const { BASE_URL, USERNAME, PASSWORD } = resolveCfg();
   const manualCookie = String(readSetting('ims_cookie_header') || '').trim();
   if (!USERNAME && !PASSWORD && !manualCookie) {
@@ -246,7 +246,7 @@ async function login() {
 
   // Try saved/manual cookie first — covers both auto-resume after restart
   // and cookie-only login (admin pasted PHPSESSID, no credentials).
-  if (_jar) {
+  if (_jar && !forceCaptcha) {
     try {
       const probe = await _client.get('/client/SMSCDRStats');
       const html = String(probe.data || '');
@@ -291,7 +291,7 @@ async function login() {
   dlog('POST /signin →', r2.status, 'final', r2.request?.res?.responseUrl || '?');
 
   await refreshSesskey();
-  await persistSessionCookie();
+  await persistSessionCookie(forceCaptcha);
   _loggedIn = true;
   tel.recordLoginSuccess();
   log('✓ login OK as', USERNAME);
