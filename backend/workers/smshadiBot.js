@@ -18,6 +18,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { getOtpExpirySec } = require('../lib/settings');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -60,12 +61,15 @@ function resolveCfg() {
 let _client = null, _jar = null;
 let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
+let _lastCdrSuccessAt = null;
 let _seenIds = new Set();
 let _sesskey = null;
 let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
 const SEEN_MAX = 5000;
 const SMSHADI_MIN_CDR_GAP_MS = 22_000;
-const WORKER_VERSION = '2026-05-06-smshadi-serialized-22s-cdr-gate';
+const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
+const RESEND_SEC = 600;
+const WORKER_VERSION = '2026-05-06-smshadi-late-expired-match-v2';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function providerStatus(e) {
@@ -321,32 +325,67 @@ function parseRow(row) {
   const cli = row[3] ? String(row[3]) : null;
   const msg = row[5] ? String(row[5]) : null;
   if (!phone || !msg) return null;
-  const otpMatch = msg.match(/\b(\d{4,8})\b/);
+  const otpMatch = msg.match(/(?:^|\D)(\d{4,8})(?=\D|$)/);
   return {
     phone, cli, range, msg,
     otp: otpMatch ? otpMatch[1] : null,
+    cdr_at: parsePanelTimestamp(dateCol),
     dedup_key: `${phone}|${msg.slice(0, 60)}|${dateCol}`,
   };
 }
 
-function findActiveAllocation(phone) {
-  const GRACE_SEC = 300, RESEND_SEC = 600;
+function parsePanelTimestamp(dateCol) {
+  const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return Math.floor(new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`).getTime() / 1000);
+}
+
+function cliToServiceSlug(cli, msg) {
+  const hay = `${cli || ''} ${msg || ''}`.toLowerCase();
+  if (/whats\s*app|wa\b/.test(hay)) return 'whatsapp';
+  if (/facebook|fb\b|meta/.test(hay)) return 'facebook';
+  if (/instagram|insta\b/.test(hay)) return 'instagram';
+  if (/telegram/.test(hay)) return 'telegram';
+  if (/google|gmail|youtube/.test(hay)) return 'google';
+  if (/tiktok/.test(hay)) return 'tiktok';
+  if (/twitter|\bx\b/.test(hay)) return 'twitter';
+  return null;
+}
+
+function findActiveAllocation(phone, cdrAtSec = null, cliSlug = null) {
   const tail = phone.slice(-9);
+  if (!tail) return null;
   const nowSec = Math.floor(Date.now() / 1000);
-  return db.prepare(`
+  const expirySec = getOtpExpirySec();
+  const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
+  const oldestAllocatedAt = eventAt - expirySec - SMSHADI_LATE_GRACE_SEC;
+  const newestAllocatedAt = eventAt + 60;
+  let serviceId = null;
+  if (cliSlug) {
+    try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
+    catch (_) { serviceId = null; }
+  }
+  const runMatch = (extraSql = '', extraArgs = []) => db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
+      ${extraSql}
       AND ( status='active'
-         OR (status='expired'  AND allocated_at >= ?)
+         OR (status='expired'  AND allocated_at BETWEEN ? AND ?)
          OR (status='received' AND allocated_at >= ?) )
     ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, nowSec - GRACE_SEC, nowSec - RESEND_SEC);
+  `).get(`%${tail}`, ...extraArgs, oldestAllocatedAt, newestAllocatedAt, nowSec - RESEND_SEC);
+  if (serviceId) {
+    const matched = runMatch('AND service_id = ?', [serviceId]);
+    if (matched) return matched;
+  }
+  return runMatch();
 }
 
 async function tickOnce() {
   if (!_loggedIn) await login();
   const rows = await fetchCdrRows();
+  _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
   for (const raw of rows) {
     const r = parseRow(raw);
@@ -357,14 +396,15 @@ async function tickOnce() {
       const arr = Array.from(_seenIds);
       _seenIds = new Set(arr.slice(arr.length / 2));
     }
-    const alloc = findActiveAllocation(r.phone);
+    const cliSlug = cliToServiceSlug(r.cli, r.msg);
+    const alloc = findActiveAllocation(r.phone, r.cdr_at, cliSlug);
     if (!alloc) {
-      tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);
+      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''} within SMS Hadi late window`);
       logOtpAudit({
         source: 'smshadi', source_msg_id: r.dedup_key,
         phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
         outcome: 'mismatch',
-        miss_reason: 'no active allocation matched (suffix-9)',
+        miss_reason: `no allocation matched (suffix-9${cliSlug ? `, service=${cliSlug}` : ''}, late-window=24h)`,
       });
       continue;
     }
@@ -459,6 +499,7 @@ function getStatus() {
     sesskey_loaded: !!_sesskey,
     portal_url: cfg.BASE_URL + '/agent/SMSCDRReports',
     worker_version: WORKER_VERSION,
+    last_cdr_success_at: _lastCdrSuccessAt,
     last_cdr_request_at: _lastCdrRequestAt || null,
     next_cdr_at: _nextCdrAt || null,
     cooldown_ms_remaining: Math.max(0, (_nextCdrAt || 0) - Date.now()),
