@@ -66,7 +66,14 @@ const AdminSettings = () => {
   const [rlConcurrent, setRlConcurrent] = useState<number>(5);
   const [otpSound, setOtpSound] = useState<OtpSoundId>("faaaah");
 
-  const [fakeForm, setFakeForm] = useState({ enabled: false, min_sec: 30, max_sec: 90, burst: 1 });
+  const [fakeForm, setFakeForm] = useState<{
+    enabled: boolean; min_sec: number; max_sec: number; burst: number;
+    services: string[];     // empty = all services
+    range_ids: number[];    // empty = all enabled ranges
+  }>({
+    enabled: false, min_sec: 30, max_sec: 90, burst: 1,
+    services: [], range_ids: [],
+  });
 
   // ---- Bot credentials (mirror keys read by backend/workers/*.js) ----
   const [seven1Url, setSeven1Url] = useState("");
@@ -131,6 +138,8 @@ const AdminSettings = () => {
   useEffect(() => {
     if (fake) setFakeForm({
       enabled: !!fake.enabled, min_sec: fake.min_sec, max_sec: fake.max_sec, burst: fake.burst,
+      services: Array.isArray(fake.services) ? fake.services : [],
+      range_ids: Array.isArray(fake.range_ids) ? fake.range_ids : [],
     });
   }, [fake]);
 
