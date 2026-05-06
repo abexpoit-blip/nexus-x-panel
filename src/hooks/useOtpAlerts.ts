@@ -119,58 +119,6 @@ export function playOtpSound(id: OtpSoundId | string, volume: number) {
   return playFaaah(volume);
 }
 
-// Legacy synth body kept only as a no-op stub to avoid leaving dead code.
-function _legacyFaaah(_volume: number) { /* removed: replaced by real MP3 */ }
-if (false) _legacyFaaah(0);
-function __unused_synth_block(volume: number) {
-  try {
-    const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const t0 = ctx.currentTime;
-    const masterVol = Math.max(0, Math.min(1, volume / 100));
-
-    const tone = (
-      freq: number, start: number, dur: number,
-      type: OscillatorType = "sine", peak = 0.35
-    ) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, t0 + start);
-      gain.gain.linearRampToValueAtTime(peak * masterVol, t0 + start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t0 + start);
-      osc.stop(t0 + start + dur + 0.02);
-    };
-
-    // ── "Faaaah" — the viral horn-stab (TikTok / FB meme, late 2025).
-    // Two sharp brass stabs then a long brassy sustain that bends
-    // up a tone before fading. Fifth-stack (root + perfect 5 + octave)
-    // gives the bright, edgy timbre everyone is using in shorts.
-    // Stab 1 — short bark
-    tone(392.0,  0.00, 0.16, "sawtooth", 0.30); // G4
-    tone(587.33, 0.00, 0.16, "square",   0.20); // D5
-    tone(784.0,  0.00, 0.14, "triangle", 0.16); // G5
-    // Stab 2
-    tone(392.0,  0.18, 0.16, "sawtooth", 0.30);
-    tone(587.33, 0.18, 0.16, "square",   0.22);
-    tone(784.0,  0.18, 0.14, "triangle", 0.18);
-    // Long "faaaah" — sustain with subtle pitch bend simulated by
-    // overlapping tones a quarter-tone apart for chorus, then a higher
-    // 5th joining halfway through.
-    tone(440.0,  0.40, 0.65, "sawtooth", 0.34); // A4 lead
-    tone(442.0,  0.40, 0.65, "sawtooth", 0.20); // detune chorus
-    tone(659.25, 0.42, 0.62, "square",   0.20); // E5
-    tone(880.0,  0.55, 0.55, "triangle", 0.18); // A5 octave shimmer
-    tone(1318.5, 0.70, 0.45, "sine",     0.10); // E6 sparkle
-    const total = 1.1;
-    setTimeout(() => ctx.close(), Math.ceil(total * 1000) + 200);
-  } catch { /* noop */ }
-}
-
 export const requestPushPermission = async () => {
   if (typeof Notification === "undefined") return "unsupported";
   if (Notification.permission === "granted") return "granted";
