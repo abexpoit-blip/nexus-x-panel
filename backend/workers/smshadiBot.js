@@ -62,7 +62,21 @@ let _loggedIn = false, _running = false, _stopFlag = false;
 let _lastTickAt = null, _lastError = null, _consecFail = 0, _otpDelivered = 0;
 let _seenIds = new Set();
 let _sesskey = null;
+let _nextCdrAt = 0;
 const SEEN_MAX = 5000;
+const WORKER_VERSION = '2026-05-06-smshadi-503-backoff-v2';
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function providerStatus(e) {
+  const direct = Number(e?.response?.status || e?.status || 0);
+  if (direct) return direct;
+  const m = String(e?.message || '').match(/(?:status code|http_|provider_http_)(5\d\d)/i);
+  return m ? Number(m[1]) : 0;
+}
+function isProvider5xxError(e) {
+  const st = providerStatus(e);
+  return (st >= 500 && st < 600) || /cdr_503|cdr_http_5\d\d|provider_http_5\d\d|status code 5\d\d/i.test(String(e?.message || e || ''));
+}
 
 function buildClient(baseURL) {
   _jar = new tough.CookieJar();
@@ -98,6 +112,7 @@ async function login() {
   const r1 = await _client.get('/login');
   const html = String(r1.data || '');
   dlog('GET /login →', r1.status, 'len', html.length);
+  if (r1.status >= 500) throw new Error('provider_http_' + r1.status + '_login');
 
   // Math captcha: "What is 4 + 9 = ? :"
   const m = html.match(/What\s+is\s+(\d+)\s*([+\-*x\/])\s*(\d+)\s*=/i);
@@ -123,6 +138,7 @@ async function login() {
     },
   });
   dlog('POST /signin →', r2.status, 'final', r2.request?.res?.responseUrl || '?');
+  if (r2.status >= 500) throw new Error('provider_http_' + r2.status + '_signin');
 
   // Verify by hitting the Reports page (this is what the admin UI mirrors,
   // and on /ints panels each page issues its own sesskey).
@@ -135,6 +151,7 @@ async function login() {
     phtml = String(probe.data || '');
     isLogin = /<form[^>]+action=['"]?signin/i.test(phtml) || /placeholder=["']Username["']/i.test(phtml);
   }
+  if (probe.status >= 500) throw new Error('provider_http_' + probe.status + '_probe');
   if (probe.status !== 200 || isLogin) {
     log('login probe FAIL — status', probe.status, 'preview:', phtml.slice(0, 200).replace(/\s+/g, ' '));
     throw new Error('login_failed');
