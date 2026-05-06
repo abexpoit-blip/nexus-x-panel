@@ -43,6 +43,7 @@ const DEFAULT_CDR_MIN_INTERVAL = 16;     // gap between any two CDR calls (sec)
 const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
+const DEFAULT_RL_RELOGIN_THRESHOLD = 6;  // consecutive 503s → force fresh login
 
 function num(v, fb) {
   const n = Number(v);
@@ -56,7 +57,8 @@ function readCooldownCfg() {
   const penaltyBase = Math.max(1, num(readSetting('ims_rl_penalty_base_sec'), DEFAULT_RL_PENALTY_BASE));
   const penaltyMax  = Math.max(penaltyBase, num(readSetting('ims_rl_penalty_max_sec'), DEFAULT_RL_PENALTY_MAX));
   const penaltySteps = Math.max(1, Math.floor(num(readSetting('ims_rl_penalty_steps'), DEFAULT_RL_PENALTY_STEPS)));
-  return { minInterval, penaltyBase, penaltyMax, penaltySteps };
+  const reloginThreshold = Math.max(2, Math.floor(num(readSetting('ims_rl_relogin_threshold'), DEFAULT_RL_RELOGIN_THRESHOLD)));
+  return { minInterval, penaltyBase, penaltyMax, penaltySteps, reloginThreshold };
 }
 
 function readSetting(k) {
@@ -102,6 +104,46 @@ const SEEN_MAX = 5000;
 let _rateLimitStreak = 0;   // consecutive 503/15s errors → grow interval
 let _nextCdrAllowedAt = 0;   // IMS forbids CDR/stats refreshes inside the cooldown window
 let _lastRateLimitWarnAt = 0;
+let _reloginCount = 0;       // # of automatic re-logins triggered
+let _lastReloginAt = null;
+
+// Drop saved/stale cookies and force the next tick to do a fresh captcha login.
+// If a manual cookie header is set but credentials exist, we also clear the
+// manual header so it can't keep poisoning the session.
+async function forceRelogin(reason) {
+  const { USERNAME, PASSWORD } = resolveCfg();
+  const manualCookie = String(readSetting('ims_cookie_header') || '').trim();
+  const haveCreds = !!(USERNAME && PASSWORD);
+
+  warn(`auto-relogin triggered: ${reason}`);
+  writeSetting('ims_session_cookie', '');
+  if (manualCookie && haveCreds) {
+    writeSetting('ims_cookie_header', '');
+    log('cleared stale manual cookie header (credentials available — captcha login next)');
+  }
+  _client = null;
+  _jar = null;
+  _loggedIn = false;
+  _sesskey = null;
+  _rateLimitStreak = 0;
+  _nextCdrAllowedAt = Date.now() + 5_000;   // brief settle gap
+  _reloginCount++;
+  _lastReloginAt = Math.floor(Date.now() / 1000);
+
+  if (!haveCreds && !manualCookie) {
+    warn('cannot auto-relogin: no credentials AND no manual cookie configured');
+    return false;
+  }
+  try {
+    if (!_client) _client = buildClient(resolveCfg().BASE_URL);
+    await login();
+    log('✓ auto-relogin success — fresh PHPSESSID saved');
+    return true;
+  } catch (e) {
+    warn('auto-relogin failed:', e.message);
+    return false;
+  }
+}
 
 async function waitForCdrGate() {
   const now = Date.now();
@@ -411,6 +453,13 @@ async function loop() {
       if (/rate_limited/i.test(e.message)) {
         _rateLimitStreak++;
         penalty = registerRateLimitCooldown();
+        const { reloginThreshold } = readCooldownCfg();
+        if (_rateLimitStreak >= reloginThreshold) {
+          await forceRelogin(`rate_limited streak=${_rateLimitStreak} ≥ ${reloginThreshold}`);
+          // forceRelogin already reset the streak; skip the long backoff below
+          await new Promise(r => setTimeout(r, 2_000));
+          continue;
+        }
       } else {
         _rateLimitStreak = 0;
       }
@@ -447,6 +496,9 @@ function getStatus() {
     rl_penalty_max_sec: cfg.COOLDOWN.penaltyMax,
     rl_penalty_steps: cfg.COOLDOWN.penaltySteps,
     rl_streak: _rateLimitStreak,
+    rl_relogin_threshold: cfg.COOLDOWN.reloginThreshold,
+    relogin_count: _reloginCount,
+    last_relogin_at: _lastReloginAt,
     next_cdr_allowed_at: _nextCdrAllowedAt || null,
     sesskey_loaded: !!_sesskey,
     ...tel.snapshot(),
