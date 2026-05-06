@@ -34,6 +34,7 @@ export const Pages = {
   "/admin/notifications":     make(() => import("@/pages/admin/Notifications")),
   "/admin/settings":          make(() => import("@/pages/admin/Settings")),
   "/admin/bots":              make(() => import("@/pages/admin/Bots")),
+  "/admin/ims-health":        make(() => import("@/pages/admin/IMSHealth")),
 } as const;
 
 export type PagePath = keyof typeof Pages;

@@ -40,6 +40,7 @@ const AdminServices = Pages["/admin/services"].L;
 const AdminWithdrawals = Pages["/admin/withdrawals"].L;
 const AdminSettings = Pages["/admin/settings"].L;
 const AdminBots = Pages["/admin/bots"].L;
+const AdminIMSHealth = Pages["/admin/ims-health"].L;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -126,6 +127,7 @@ const AppRoutes = () => {
             <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/bots" element={<AdminBots />} />
+          <Route path="/admin/ims-health" element={<AdminIMSHealth />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
