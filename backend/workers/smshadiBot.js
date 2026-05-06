@@ -325,27 +325,61 @@ function parseRow(row) {
   const cli = row[3] ? String(row[3]) : null;
   const msg = row[5] ? String(row[5]) : null;
   if (!phone || !msg) return null;
-  const otpMatch = msg.match(/\b(\d{4,8})\b/);
+  const otpMatch = msg.match(/(?:^|\D)(\d{4,8})(?=\D|$)/);
   return {
     phone, cli, range, msg,
     otp: otpMatch ? otpMatch[1] : null,
+    cdr_at: parsePanelTimestamp(dateCol),
     dedup_key: `${phone}|${msg.slice(0, 60)}|${dateCol}`,
   };
 }
 
-function findActiveAllocation(phone) {
-  const GRACE_SEC = 300, RESEND_SEC = 600;
+function parsePanelTimestamp(dateCol) {
+  const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return Math.floor(new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`).getTime() / 1000);
+}
+
+function cliToServiceSlug(cli, msg) {
+  const hay = `${cli || ''} ${msg || ''}`.toLowerCase();
+  if (/whats\s*app|wa\b/.test(hay)) return 'whatsapp';
+  if (/facebook|fb\b|meta/.test(hay)) return 'facebook';
+  if (/instagram|insta\b/.test(hay)) return 'instagram';
+  if (/telegram/.test(hay)) return 'telegram';
+  if (/google|gmail|youtube/.test(hay)) return 'google';
+  if (/tiktok/.test(hay)) return 'tiktok';
+  if (/twitter|\bx\b/.test(hay)) return 'twitter';
+  return null;
+}
+
+function findActiveAllocation(phone, cdrAtSec = null, cliSlug = null) {
   const tail = phone.slice(-9);
+  if (!tail) return null;
   const nowSec = Math.floor(Date.now() / 1000);
-  return db.prepare(`
+  const expirySec = getOtpExpirySec();
+  const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
+  const oldestAllocatedAt = eventAt - expirySec - SMSHADI_LATE_GRACE_SEC;
+  const newestAllocatedAt = eventAt + 60;
+  let serviceId = null;
+  if (cliSlug) {
+    try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
+    catch (_) { serviceId = null; }
+  }
+  const runMatch = (extraSql = '', extraArgs = []) => db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
+      ${extraSql}
       AND ( status='active'
-         OR (status='expired'  AND allocated_at >= ?)
+         OR (status='expired'  AND allocated_at BETWEEN ? AND ?)
          OR (status='received' AND allocated_at >= ?) )
     ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, nowSec - GRACE_SEC, nowSec - RESEND_SEC);
+  `).get(`%${tail}`, ...extraArgs, oldestAllocatedAt, newestAllocatedAt, nowSec - RESEND_SEC);
+  if (serviceId) {
+    const matched = runMatch('AND service_id = ?', [serviceId]);
+    if (matched) return matched;
+  }
+  return runMatch();
 }
 
 async function tickOnce() {
