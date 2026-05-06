@@ -9,7 +9,7 @@ const db_settings = require('../lib/db');
 
 const router = express.Router();
 
-const ALLOWED_PROVIDERS = ['seven1tel', 'xisora'];
+const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims'];
 
 function validate(body, partial = false) {
   const out = {};
