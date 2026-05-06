@@ -39,7 +39,7 @@ const MIN_INTERVAL_FLOOR = 15; // absolute minimum admin can configure
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
-const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — IMS 15s + safety
+const DEFAULT_CDR_MIN_INTERVAL = 18;     // gap between any two CDR calls (sec) — IMS 15s + 3s safety
 const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
