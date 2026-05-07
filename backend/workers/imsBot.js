@@ -479,6 +479,9 @@ function findAllocationForCdr(phone, cliSlug) {
 
 async function tickOnce() {
   if (!_loggedIn) await login();
+  // One human-style page refresh per tick: gate once, then do page + AJAX
+  // back-to-back (just like a browser does on F5).
+  await waitForCdrGate();
   // Behave like a human refreshing the SMSCDRStats page in a browser:
   //   1) GET /client/SMSCDRStats     (the page itself, gives a fresh sesskey)
   //   2) GET /client/res/data_smscdr (the AJAX call the page makes for table rows)
