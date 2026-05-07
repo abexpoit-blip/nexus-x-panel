@@ -545,6 +545,36 @@ router.get('/bots/:bot/logs', (req, res) => {
   });
 });
 
+// GET /api/admin/bots/ims/cdr-debug?limit=50
+// Returns the rolling ring buffer of recent IMS CDR fetch attempts with
+// raw response metadata (HTTP status, content-type, body size, parsed
+// counts, error code, body preview). Use this to diagnose why the feed
+// is returning cdr_bad_response / cdr_rate_limited without tailing pm2.
+router.get('/bots/ims/cdr-debug', (req, res) => {
+  let mod;
+  try { mod = require('../workers/imsBot'); }
+  catch (e) { return res.status(500).json({ error: 'ims worker not loaded: ' + e.message }); }
+  if (typeof mod.getCdrDebug !== 'function') {
+    return res.status(500).json({ error: 'ims worker missing getCdrDebug (deploy newer build)' });
+  }
+  const limit = Math.min(50, Math.max(1, +req.query.limit || 50));
+  const entries = mod.getCdrDebug(limit) || [];
+  const status = (typeof mod.getStatus === 'function' ? mod.getStatus() : {}) || {};
+  res.json({
+    bot: 'ims',
+    entries,
+    summary: {
+      total: entries.length,
+      ok: entries.filter(e => e.ok).length,
+      errors: entries.filter(e => !e.ok).length,
+      last_error: status.last_error || null,
+      last_cdr_success_at: status.last_cdr_success_at || null,
+      consec_fail: status.consec_fail || 0,
+      rl_streak: status.rl_streak || 0,
+    },
+  });
+});
+
 // =============================================================
 // SMS Hadi — admin OTP history (SMSCDRReports proxy with paging)
 // No 15s rate-limit on this panel, so we can serve filtered pages live.
