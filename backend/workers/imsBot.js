@@ -389,6 +389,13 @@ async function fetchCdrRows() {
   // DataTables AJAX firing. NOT a full gate — that's already enforced by the
   // caller before refreshSesskey().
   await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 200)));
+  // Snapshot the exact parameters sent on this poll so any DATETIME / SQL
+  // error can be reproduced later. Sesskey is masked; everything else is
+  // captured verbatim.
+  const sentParams = {};
+  for (const [k, v] of params.entries()) {
+    sentParams[k] = (k === 'sesskey' && v) ? `${String(v).slice(0, 4)}…(${String(v).length})` : v;
+  }
   const r = await _client.get(`/client/res/data_smscdr.php?${params.toString()}`, {
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
@@ -404,6 +411,8 @@ async function fetchCdrRows() {
     body_bytes: bodyLen,
     fdate1: `${today} 00:00:00`,
     fdate2: `${today} 23:59:59`,
+    sent_params: sentParams,
+    request_url: `/client/res/data_smscdr.php`,
   };
   if (r.status === 401 || r.status === 403) {
     pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_unauthorized', preview: typeof r.data === 'string' ? r.data.slice(0, 240) : null });
@@ -431,8 +440,22 @@ async function fetchCdrRows() {
     try {
       data = JSON.parse(raw);
     } catch (_) {
-      log(`cdr raw: ${raw.replace(/\s+/g, ' ').slice(0, 300)}`);
-      pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_bad_response', preview: raw.replace(/\s+/g, ' ').slice(0, 500) });
+      const flat = raw.replace(/\s+/g, ' ').slice(0, 500);
+      const isDatetimeBug = /Incorrect\s+DATETIME\s+value|DATETIME\s+value:\s*''/i.test(raw);
+      // Loud, structured error so it's easy to grep in pm2 logs.
+      warn(
+        `[CDR_BAD_RESPONSE]${isDatetimeBug ? ' [DATETIME_BUG]' : ''} ` +
+        `http=${r.status} ctype="${ctype}" bytes=${bodyLen} ` +
+        `fdate1="${today} 00:00:00" fdate2="${today} 23:59:59" ` +
+        `params=${JSON.stringify(sentParams)} body="${flat}"`
+      );
+      pushCdrDebug({
+        ...debugBase,
+        ok: false,
+        error: isDatetimeBug ? 'cdr_datetime_bug' : 'cdr_bad_response',
+        datetime_bug: isDatetimeBug,
+        preview: flat,
+      });
       throw new Error('cdr_bad_response');
     }
   }
