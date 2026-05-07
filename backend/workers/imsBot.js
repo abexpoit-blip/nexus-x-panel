@@ -335,17 +335,6 @@ async function login(forceCaptcha = false) {
   return true;
 }
 
-function fmtDate(d) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ` +
-         `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-function fmtDay(d) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
-}
-
 function parsePanelTimestamp(dateCol) {
   const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
   if (!m) return null;
@@ -356,11 +345,10 @@ function parsePanelTimestamp(dateCol) {
 
 async function fetchCdrRows() {
   if (!_sesskey) await refreshSesskey();
-  // Per scrape rule: follow dates only, not times — always query today only.
-  const today = new Date();
-  const dayStr = fmtDay(today);
+  // IMS page already defaults to current-day CDR. Do not force/change date
+  // filters here; just refresh SMSCDRStats and let the portal default apply.
   const params = new URLSearchParams({
-    fdate1: dayStr, fdate2: dayStr,
+    fdate1: '', fdate2: '',
     frange: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
