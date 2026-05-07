@@ -382,6 +382,11 @@ async function fetchCdrRows() {
     if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(r.data)) throw new Error('cdr_rate_limited');
     throw new Error('cdr_bad_response');
   }
+  // TEMP DIAGNOSTIC: dump aaData shape so we can see what IMS returns
+  try {
+    const d = r.data || {};
+    log(`cdr resp: iTotalRecords=${d.iTotalRecords} iTotalDisplayRecords=${d.iTotalDisplayRecords} aaData.len=${(d.aaData||[]).length} firstRow=${JSON.stringify((d.aaData||[])[0])}`);
+  } catch(_){}
   return r.data?.aaData || [];
 }
 
