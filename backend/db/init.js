@@ -258,6 +258,12 @@ seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocat
 seedSetting('otp_expiry_sec',        process.env.OTP_EXPIRY_SEC || '600'); // 10-minute live number window
 seedSetting('recent_otp_hours',      process.env.RECENT_OTP_HOURS || '24');
 
+// One-time default shift: old installs seeded the live-number window as 30min.
+// Only change the old default value; admin-customized values stay untouched.
+try {
+  db.prepare("UPDATE settings SET value='600', updated_at=strftime('%s','now') WHERE key='otp_expiry_sec' AND value IN ('1800', '30')").run();
+} catch (_) {}
+
 // Default OTP-arrival sound profile (agents can override locally).
 // Options: 'chime' (default cyber) | 'fanfare' (Faaaah) | 'ding' | 'doublebeep' | 'pop'
 // Premium single-sound mode — every agent gets the viral "Faaaah" horn.
