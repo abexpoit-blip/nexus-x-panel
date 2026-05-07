@@ -18,7 +18,7 @@ const AgentDashboard = () => {
   const { data: summary } = useQuery({ queryKey: ["summary"], queryFn: () => api.numberSummary(), refetchInterval: 30000 });
   const { data: nums } = useQuery({ queryKey: ["my-numbers"], queryFn: () => api.myNumbers(), refetchInterval: 5000 });
 
-  // Tick every second for countdown timers within the 30-minute window
+  // Tick every second for countdown timers within the configured live-number window
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
@@ -29,8 +29,8 @@ const AgentDashboard = () => {
   const recent = (nums?.numbers || []).slice(0, 8);
   const allNums = nums?.numbers || [];
 
-  // Active window = allocations not yet expired and within 30-minute window
-  const WINDOW_SEC = 30 * 60;
+  // Active window = allocations not yet expired and within the server-configured window
+  const WINDOW_SEC = nums?.otp_expiry_sec || 10 * 60;
   const activeWindow = useMemo(() => {
     return allNums
       .filter((n: any) => {
@@ -180,7 +180,7 @@ const AgentDashboard = () => {
         </h3>
         {!activeWindow.length && (
           <p className="text-sm text-muted-foreground/60 text-center py-8">
-            No active numbers in the 30-minute window
+            No active numbers in the live window
           </p>
         )}
         <div className="space-y-2">

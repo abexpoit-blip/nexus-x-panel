@@ -2,6 +2,10 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../lib/db');
 const {
+  getOtpExpirySec, OTP_EXPIRY_KEY, OTP_EXPIRY_MIN, OTP_EXPIRY_MAX,
+  getRecentOtpHours, RECENT_OTP_HOURS_KEY, RECENT_OTP_HOURS_MIN, RECENT_OTP_HOURS_MAX,
+} = require('../lib/settings');
+const {
   authRequired, adminOnly,
   signImpersonationToken, recordSession, setAuthCookie,
 } = require('../middleware/auth');
@@ -301,6 +305,42 @@ router.get('/allocations', (req, res) => {
     ORDER BY a.allocated_at DESC LIMIT 500
   `).all();
   res.json({ allocations });
+});
+
+router.get('/otp-expiry', (_req, res) => {
+  res.json({
+    expiry_min: Math.round(getOtpExpirySec() / 60),
+    source: db.prepare('SELECT value FROM settings WHERE key = ?').get(OTP_EXPIRY_KEY) ? 'settings' : 'default',
+    options_min: [5, 8, 10, 15, 20, 30],
+  });
+});
+
+router.put('/otp-expiry', (req, res) => {
+  const min = Math.max(OTP_EXPIRY_MIN / 60, Math.min(OTP_EXPIRY_MAX / 60, Math.floor(+req.body?.expiry_min || 10)));
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+  `).run(OTP_EXPIRY_KEY, String(min * 60));
+  logFromReq(req, 'otp_expiry_updated', { meta: { expiry_min: min } });
+  res.json({ ok: true, expiry_min: min });
+});
+
+router.get('/recent-otp-window', (_req, res) => {
+  res.json({
+    hours: getRecentOtpHours(),
+    source: db.prepare('SELECT value FROM settings WHERE key = ?').get(RECENT_OTP_HOURS_KEY) ? 'settings' : 'default',
+    options_hours: [1, 6, 12, 24, 48, 72, 168],
+  });
+});
+
+router.put('/recent-otp-window', (req, res) => {
+  const hours = Math.max(RECENT_OTP_HOURS_MIN, Math.min(RECENT_OTP_HOURS_MAX, Math.floor(+req.body?.hours || 24)));
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=strftime('%s','now')
+  `).run(RECENT_OTP_HOURS_KEY, String(hours));
+  logFromReq(req, 'recent_otp_window_updated', { meta: { hours } });
+  res.json({ ok: true, hours });
 });
 
 router.get('/commission-trend', (req, res) => {

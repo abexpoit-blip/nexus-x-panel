@@ -343,13 +343,13 @@ const AgentRanges = () => {
     },
   });
 
-  // Tick every second so the 30-min countdown for active rows updates live.
+  // Tick every second so the server-configured countdown for active rows updates live.
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(id);
   }, []);
-  const WINDOW_SEC = 30 * 60;
+  const WINDOW_SEC = myData?.otp_expiry_sec || 10 * 60;
 
   const allRows = (myData?.numbers || []) as any[];
   const visibleRows = useMemo(() => {
