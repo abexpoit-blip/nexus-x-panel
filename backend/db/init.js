@@ -255,6 +255,8 @@ if (!nx) {
 // Per-agent rate-limit GLOBAL defaults — admin overrides via Settings UI.
 seedSetting('rl_per_min_default',    '12');   // max allocation requests / minute / agent
 seedSetting('rl_concurrent_default', '5');    // max simultaneous active allocations / agent
+seedSetting('otp_expiry_sec',        process.env.OTP_EXPIRY_SEC || '600'); // 10-minute live number window
+seedSetting('recent_otp_hours',      process.env.RECENT_OTP_HOURS || '24');
 
 // Default OTP-arrival sound profile (agents can override locally).
 // Options: 'chime' (default cyber) | 'fanfare' (Faaaah) | 'ding' | 'doublebeep' | 'pop'
