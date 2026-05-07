@@ -121,6 +121,19 @@ let _lastCdrSuccessAt = null;
 let _reloginCount = 0;       // # of automatic re-logins triggered
 let _lastReloginAt = null;
 
+// Rolling CDR debug ring — captures raw response metadata for the last N
+// /data_smscdr.php calls so admins can diagnose feed errors without tailing
+// pm2 logs. Exposed via GET /api/admin/bots/ims/cdr-debug.
+const CDR_DEBUG_MAX = 50;
+const _cdrDebug = [];
+function pushCdrDebug(entry) {
+  _cdrDebug.unshift({ at: Math.floor(Date.now() / 1000), ...entry });
+  if (_cdrDebug.length > CDR_DEBUG_MAX) _cdrDebug.length = CDR_DEBUG_MAX;
+}
+function getCdrDebug(limit = CDR_DEBUG_MAX) {
+  return _cdrDebug.slice(0, Math.max(1, Math.min(CDR_DEBUG_MAX, +limit || CDR_DEBUG_MAX)));
+}
+
 // Drop saved/stale cookies and force the next tick to do a fresh captcha login.
 // If a manual cookie header is set but credentials exist, we also clear the
 // manual header so it can't keep poisoning the session.
