@@ -710,4 +710,4 @@ function getStatus() {
   };
 }
 
-module.exports = { start, stop, login, tickOnce, getStatus };
+module.exports = { start, stop, login, tickOnce, getStatus, getCdrDebug };
