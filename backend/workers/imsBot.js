@@ -26,7 +26,6 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
-const { getOtpExpirySec } = require('../lib/settings');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -604,13 +603,13 @@ async function tickOnce() {
     const cliSlug = cliToServiceSlug(r.cli, r.msg);
     const alloc = findAllocationForCdr(r.phone, cliSlug, r.cdr_at);
     if (!alloc) {
-      log('no 30m alloc for', r.phone, 'otp=', r.otp, 'cli=', r.cli || '?', 'cdr_at=', r.cdr_at || 'now', '→ will retry');
-      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''} inside 30m window`);
+      log('no live alloc for', r.phone, 'tail=', String(r.phone).slice(-9), 'otp=', r.otp, 'cli=', r.cli || '?', 'service=', cliSlug || '-', 'cdr_at=', r.cdr_at || 'now', '→ will retry');
+      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no live allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''}`);
       logOtpAudit({
         source: 'ims', source_msg_id: r.dedup_key,
         phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
         outcome: 'mismatch',
-        miss_reason: `no allocation matched inside 30m window (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
+        miss_reason: `no live allocation matched (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
       });
       continue;
     }
