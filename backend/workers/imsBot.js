@@ -39,7 +39,7 @@ const MIN_INTERVAL_FLOOR = 16; // absolute minimum admin can configure (IMS rule
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
-const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — user-requested cadence
+const DEFAULT_CDR_MIN_INTERVAL = 18;     // gap between human-style page refreshes (sec)
 // IMS soft-blocks aggressive scrapers. Once they return 503 we MUST back off
 // hard or they keep returning 503 indefinitely. Exponential ramp up to 10min.
 const DEFAULT_RL_PENALTY_BASE  = 60;     // first 503 → wait 60s
@@ -92,7 +92,7 @@ function normalizeBase(raw) {
 }
 function resolveCfg() {
   const dbEnabled = readSetting('ims_enabled');
-  const interval = +(readSetting('ims_otp_interval') || process.env.IMS_OTP_INTERVAL || 20);
+  const interval = +(readSetting('ims_otp_interval') || process.env.IMS_OTP_INTERVAL || 18);
   const cd = readCooldownCfg();
   return {
     ENABLED: (dbEnabled !== null ? dbEnabled : (process.env.IMS_ENABLED || 'false'))
@@ -239,7 +239,11 @@ function solveCaptcha(html) {
 }
 
 async function refreshSesskey() {
-  await waitForCdrGate();
+  // NOTE: gate is held by the caller (tickOnce or login). The AJAX fetchCdrRows
+  // call right after this is part of the same "human page refresh" and runs
+  // immediately — exactly like a browser firing its DataTables AJAX after the
+  // page renders. Don't gate twice or we'd insert an 18s pause between the
+  // page load and the data load.
   const probe = await _client.get('/client/SMSCDRStats');
   if (probe.status === 429 || probe.status === 503) throw new Error('cdr_rate_limited');
   if (probe.status !== 200) throw new Error(`cdr_page_${probe.status}`);
@@ -359,7 +363,10 @@ async function fetchCdrRows() {
     params.set(`bSearchable_${i}`, 'true');
     params.set(`bSortable_${i}`, 'true');
   }
-  await waitForCdrGate();
+  // Mimic a real browser: small 400-600ms delay between page render and
+  // DataTables AJAX firing. NOT a full gate — that's already enforced by the
+  // caller before refreshSesskey().
+  await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 200)));
   const r = await _client.get(`/client/res/data_smscdr.php?${params.toString()}`, {
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
@@ -472,6 +479,16 @@ function findAllocationForCdr(phone, cliSlug) {
 
 async function tickOnce() {
   if (!_loggedIn) await login();
+  // One human-style page refresh per tick: gate once, then do page + AJAX
+  // back-to-back (just like a browser does on F5).
+  await waitForCdrGate();
+  // Behave like a human refreshing the SMSCDRStats page in a browser:
+  //   1) GET /client/SMSCDRStats     (the page itself, gives a fresh sesskey)
+  //   2) GET /client/res/data_smscdr (the AJAX call the page makes for table rows)
+  // This matches the exact request pattern a real browser produces when the
+  // user hits F5, so IMS sees us as a normal logged-in viewer instead of a
+  // bot hammering only the data endpoint.
+  await refreshSesskey();
   const rows = await fetchCdrRows();
   _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
