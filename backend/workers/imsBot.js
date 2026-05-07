@@ -345,10 +345,17 @@ function parsePanelTimestamp(dateCol) {
 
 async function fetchCdrRows() {
   if (!_sesskey) await refreshSesskey();
-  // IMS page already defaults to current-day CDR. Do not force/change date
-  // filters here; just refresh SMSCDRStats and let the portal default apply.
+  // IMS DataTables AJAX requires explicit fdate1/fdate2 (empty → SQL error
+  // "Incorrect DATETIME value: ''"). Use today 00:00:00 → 23:59:59 so we
+  // mirror what the page itself sends on first load (default = current day).
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const today = `${yyyy}-${mm}-${dd}`;
   const params = new URLSearchParams({
-    fdate1: '', fdate2: '',
+    fdate1: `${today} 00:00:00`,
+    fdate2: `${today} 23:59:59`,
     frange: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
