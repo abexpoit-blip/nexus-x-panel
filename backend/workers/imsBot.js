@@ -39,12 +39,17 @@ const MIN_INTERVAL_FLOOR = 16; // absolute minimum admin can configure (IMS rule
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
-const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — exactly matches user-requested cadence
-const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
-const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
-const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
-const DEFAULT_RL_RELOGIN_THRESHOLD = 6;  // consecutive 503s → force fresh login
-const DEFAULT_RL_RELOGIN_STALE_SEC = 300; // only relogin if no successful CDR scrape for 5m
+const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — user-requested cadence
+// IMS soft-blocks aggressive scrapers. Once they return 503 we MUST back off
+// hard or they keep returning 503 indefinitely. Exponential ramp up to 10min.
+const DEFAULT_RL_PENALTY_BASE  = 60;     // first 503 → wait 60s
+const DEFAULT_RL_PENALTY_MAX   = 600;    // cap at 10 minutes
+const DEFAULT_RL_PENALTY_STEPS = 6;      // 60 → 120 → 180 → 240 → 300 → 600
+// Re-login does NOT clear an IMS soft-block (the block is per-IP, not per-session).
+// We disable auto-relogin on rate-limit by default — set threshold huge so it only
+// triggers on genuine session loss paths (cdr_session_lost, unauthorized).
+const DEFAULT_RL_RELOGIN_THRESHOLD = 9999;
+const DEFAULT_RL_RELOGIN_STALE_SEC = 1800; // and only after 30min of no successful scrape
 
 function num(v, fb) {
   const n = Number(v);
