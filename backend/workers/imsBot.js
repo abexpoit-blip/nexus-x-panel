@@ -347,12 +347,11 @@ function fmtDay(d) {
 
 async function fetchCdrRows() {
   if (!_sesskey) await refreshSesskey();
-  // Date-only window covering today (00:00:00 → 23:59:59). Per scrape rule:
-  // follow dates only, not times — always fetch today's full day.
+  // Per scrape rule: follow dates only, not times — always query today only.
   const today = new Date();
   const dayStr = fmtDay(today);
   const params = new URLSearchParams({
-    fdate1: `${dayStr} 00:00:00`, fdate2: `${dayStr} 23:59:59`,
+    fdate1: dayStr, fdate2: dayStr,
     frange: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
@@ -383,17 +382,24 @@ async function fetchCdrRows() {
   if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
   if (r.status === 429 || r.status === 503) throw new Error('cdr_rate_limited');  // IMS 15s rule
   if (r.status >= 400) throw new Error(`cdr_http_${r.status}`);
-  if (typeof r.data === 'string') {
-    if (/<form[^>]+action=['"]?signin/i.test(r.data)) throw new Error('cdr_session_lost');
-    if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(r.data)) throw new Error('cdr_rate_limited');
-    throw new Error('cdr_bad_response');
+  let data = r.data;
+  if (typeof data === 'string') {
+    const raw = data.trim();
+    if (/<form[^>]+action=['"]?signin/i.test(raw)) throw new Error('cdr_session_lost');
+    if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(raw)) throw new Error('cdr_rate_limited');
+    try {
+      data = JSON.parse(raw);
+    } catch (_) {
+      log(`cdr raw: ${raw.replace(/\s+/g, ' ').slice(0, 300)}`);
+      throw new Error('cdr_bad_response');
+    }
   }
   // TEMP DIAGNOSTIC: dump aaData shape so we can see what IMS returns
   try {
-    const d = r.data || {};
+    const d = data || {};
     log(`cdr resp: iTotalRecords=${d.iTotalRecords} iTotalDisplayRecords=${d.iTotalDisplayRecords} aaData.len=${(d.aaData||[]).length} firstRow=${JSON.stringify((d.aaData||[])[0])}`);
   } catch(_){}
-  return r.data?.aaData || [];
+  return data?.aaData || [];
 }
 
 // IMS row layout: [datetime, range, number, cli, message, currency, payout]
