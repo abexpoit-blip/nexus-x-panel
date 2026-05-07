@@ -396,18 +396,43 @@ async function fetchCdrRows() {
       'Accept': 'application/json, text/javascript, */*; q=0.01',
     },
   });
-  if (r.status === 401 || r.status === 403) throw new Error('cdr_unauthorized');
-  if (r.status === 429 || r.status === 503) throw new Error('cdr_rate_limited');  // IMS 15s rule
-  if (r.status >= 400) throw new Error(`cdr_http_${r.status}`);
+  const ctype = String(r.headers?.['content-type'] || '');
+  const bodyLen = (typeof r.data === 'string' ? r.data.length : JSON.stringify(r.data || '').length);
+  const debugBase = {
+    http_status: r.status,
+    content_type: ctype,
+    body_bytes: bodyLen,
+    fdate1: `${today} 00:00:00`,
+    fdate2: `${today} 23:59:59`,
+  };
+  if (r.status === 401 || r.status === 403) {
+    pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_unauthorized', preview: typeof r.data === 'string' ? r.data.slice(0, 240) : null });
+    throw new Error('cdr_unauthorized');
+  }
+  if (r.status === 429 || r.status === 503) {
+    pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_rate_limited', preview: typeof r.data === 'string' ? r.data.slice(0, 240) : null });
+    throw new Error('cdr_rate_limited');
+  }
+  if (r.status >= 400) {
+    pushCdrDebug({ ...debugBase, ok: false, error: `cdr_http_${r.status}`, preview: typeof r.data === 'string' ? r.data.slice(0, 240) : null });
+    throw new Error(`cdr_http_${r.status}`);
+  }
   let data = r.data;
   if (typeof data === 'string') {
     const raw = data.trim();
-    if (/<form[^>]+action=['"]?signin/i.test(raw)) throw new Error('cdr_session_lost');
-    if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(raw)) throw new Error('cdr_rate_limited');
+    if (/<form[^>]+action=['"]?signin/i.test(raw)) {
+      pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_session_lost', preview: raw.slice(0, 240) });
+      throw new Error('cdr_session_lost');
+    }
+    if (/15\s*second|within\s+\d+\s*sec|refresh\s+.*frequent|too\s+many/i.test(raw)) {
+      pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_rate_limited', preview: raw.slice(0, 240) });
+      throw new Error('cdr_rate_limited');
+    }
     try {
       data = JSON.parse(raw);
     } catch (_) {
       log(`cdr raw: ${raw.replace(/\s+/g, ' ').slice(0, 300)}`);
+      pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_bad_response', preview: raw.replace(/\s+/g, ' ').slice(0, 500) });
       throw new Error('cdr_bad_response');
     }
   }
@@ -415,6 +440,14 @@ async function fetchCdrRows() {
   try {
     const d = data || {};
     log(`cdr resp: iTotalRecords=${d.iTotalRecords} iTotalDisplayRecords=${d.iTotalDisplayRecords} aaData.len=${(d.aaData||[]).length} firstRow=${JSON.stringify((d.aaData||[])[0])}`);
+    pushCdrDebug({
+      ...debugBase,
+      ok: true,
+      iTotalRecords: d.iTotalRecords ?? null,
+      iTotalDisplayRecords: d.iTotalDisplayRecords ?? null,
+      rows: (d.aaData || []).length,
+      first_row: (d.aaData || [])[0] || null,
+    });
   } catch(_){}
   return data?.aaData || [];
 }
