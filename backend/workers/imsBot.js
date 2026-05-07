@@ -37,6 +37,8 @@ const warn = (...a) => console.warn('[ims-bot]', ...a);
 
 const MIN_INTERVAL = 16; // hard floor — IMS warns at <15s
 const MIN_INTERVAL_FLOOR = 16; // absolute minimum admin can configure (IMS rule = 15s, +1s safety)
+const IMS_EXPIRED_GRACE_SEC = 300; // late OTPs after expiry still credit original holder
+const IMS_RESEND_SEC = 600;        // additional OTPs shortly after delivery stay on same allocation
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
@@ -521,18 +523,19 @@ function findActiveAllocation(phone, cdrAtSec = null) {
   const nowSec = Math.floor(Date.now() / 1000);
   const expirySec = getOtpExpirySec();
   const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
-  const oldestAllocatedAt = eventAt - expirySec;
-  const newestAllocatedAt = eventAt + 60;
+  const oldestEventAllocation = eventAt - expirySec - IMS_EXPIRED_GRACE_SEC;
+  const newestEventAllocation = eventAt + 60;
   return db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
-      AND allocated_at BETWEEN ? AND ?
-      AND status IN ('active', 'expired', 'received')
+      AND ( status = 'active'
+         OR (status = 'expired'  AND (allocated_at >= ? OR allocated_at BETWEEN ? AND ?))
+         OR (status = 'received' AND allocated_at >= ?) )
     ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
              allocated_at DESC
     LIMIT 1
-  `).get(`%${tail}`, oldestAllocatedAt, newestAllocatedAt);
+  `).get(`%${tail}`, nowSec - IMS_EXPIRED_GRACE_SEC, oldestEventAllocation, newestEventAllocation, nowSec - IMS_RESEND_SEC);
 }
 
 // Map IMS CLI text to a service slug. IMS puts the brand name in the CLI
@@ -560,8 +563,8 @@ function findAllocationForCdr(phone, cliSlug, cdrAtSec = null) {
   const nowSec = Math.floor(Date.now() / 1000);
   const expirySec = getOtpExpirySec();
   const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
-  const oldestAllocatedAt = eventAt - expirySec;
-  const newestAllocatedAt = eventAt + 60;
+  const oldestEventAllocation = eventAt - expirySec - IMS_EXPIRED_GRACE_SEC;
+  const newestEventAllocation = eventAt + 60;
   let serviceId = null;
   if (cliSlug) {
     try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
@@ -573,12 +576,13 @@ function findAllocationForCdr(phone, cliSlug, cdrAtSec = null) {
       FROM allocations
       WHERE phone_number LIKE ?
         AND service_id = ?
-        AND allocated_at BETWEEN ? AND ?
-        AND status IN ('active', 'expired', 'received')
+        AND ( status = 'active'
+           OR (status = 'expired'  AND (allocated_at >= ? OR allocated_at BETWEEN ? AND ?))
+           OR (status = 'received' AND allocated_at >= ?) )
       ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
                allocated_at DESC
       LIMIT 1
-    `).get(`%${tail}`, serviceId, oldestAllocatedAt, newestAllocatedAt);
+    `).get(`%${tail}`, serviceId, nowSec - IMS_EXPIRED_GRACE_SEC, oldestEventAllocation, newestEventAllocation, nowSec - IMS_RESEND_SEC);
     if (matched) return matched;
   }
   return findActiveAllocation(phone, cdrAtSec);
