@@ -7,6 +7,7 @@ import { GradientMesh, PageHeader, PremiumKpiCard, PremiumChartCard } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { SystemHealthWidget } from "@/components/SystemHealthWidget";
 import { SmsHadiHealthWidget } from "@/components/SmsHadiHealthWidget";
+import { ImsScrapeWidget } from "@/components/ImsScrapeWidget";
 
 const sparkData = (n = 14, base = 100) =>
   Array.from({ length: n }, () => base + Math.random() * base * 0.6);
@@ -91,6 +92,9 @@ const AdminDashboard = () => {
 
       {/* SMS Hadi bot live health — cooldown, last CDR, worker version */}
       <SmsHadiHealthWidget />
+
+      {/* IMS scrape schedule — next scrape countdown + last successful scrape */}
+      <ImsScrapeWidget />
 
       {/* KPI Row 1 — primary metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
