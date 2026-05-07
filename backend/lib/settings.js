@@ -3,7 +3,7 @@ const db = require('./db');
 
 // ---- OTP expiry (how long an allocation stays "active") ----
 const OTP_EXPIRY_KEY = 'otp_expiry_sec';
-const OTP_EXPIRY_DEFAULT = 1800;  // 30 minutes
+const OTP_EXPIRY_DEFAULT = 600;   // 10 minutes
 const OTP_EXPIRY_MIN = 300;       // 5 minutes
 const OTP_EXPIRY_MAX = 1800;      // 30 minutes
 
