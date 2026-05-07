@@ -492,6 +492,8 @@ async function tickOnce() {
   const rows = await fetchCdrRows();
   _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
+  // TEMP DIAGNOSTIC: log first row + count so we can see what IMS returns
+  log(`tick rows=${rows.length}${rows.length ? ` first=[${String(rows[0][0]||'').slice(0,19)} | ${rows[0][2]||''} | ${String(rows[0][4]||'').slice(0,40)}]` : ''}`);
   for (const raw of rows) {
     const r = parseRow(raw);
     if (!r || !r.otp) continue;
