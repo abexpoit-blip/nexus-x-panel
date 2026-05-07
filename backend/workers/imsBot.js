@@ -472,6 +472,13 @@ function findAllocationForCdr(phone, cliSlug) {
 
 async function tickOnce() {
   if (!_loggedIn) await login();
+  // Behave like a human refreshing the SMSCDRStats page in a browser:
+  //   1) GET /client/SMSCDRStats     (the page itself, gives a fresh sesskey)
+  //   2) GET /client/res/data_smscdr (the AJAX call the page makes for table rows)
+  // This matches the exact request pattern a real browser produces when the
+  // user hits F5, so IMS sees us as a normal logged-in viewer instead of a
+  // bot hammering only the data endpoint.
+  await refreshSesskey();
   const rows = await fetchCdrRows();
   _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
