@@ -345,6 +345,18 @@ function fmtDay(d) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 
+function startOfTodaySec() {
+  const d = new Date();
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000);
+}
+
+function parsePanelTimestamp(dateCol) {
+  const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+  if (!m) return null;
+  const hh = m[4] || '00', mm = m[5] || '00', ss = m[6] || '00';
+  return Math.floor(new Date(`${m[1]}-${m[2]}-${m[3]}T${hh}:${mm}:${ss}`).getTime() / 1000);
+}
+
 async function fetchCdrRows() {
   if (!_sesskey) await refreshSesskey();
   // Per scrape rule: follow dates only, not times — always query today only.
@@ -427,6 +439,7 @@ function parseRow(row) {
   return {
     phone, otp: otpMatch ? otpMatch[1] : null,
     msg, cli, range, datetime,
+    cdr_at: parsePanelTimestamp(datetime),
     dedup_key: `${datetime}|${phone}|${msg.slice(0, 60)}`,
   };
 }
