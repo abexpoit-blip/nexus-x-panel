@@ -26,6 +26,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { getOtpExpirySec } = require('../lib/settings');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -353,6 +354,7 @@ function startOfTodaySec() {
 function parsePanelTimestamp(dateCol) {
   const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
   if (!m) return null;
+  if (!m[4]) return null;
   const hh = m[4] || '00', mm = m[5] || '00', ss = m[6] || '00';
   return Math.floor(new Date(`${m[1]}-${m[2]}-${m[3]}T${hh}:${mm}:${ss}`).getTime() / 1000);
 }
