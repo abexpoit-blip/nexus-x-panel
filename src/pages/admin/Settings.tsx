@@ -68,7 +68,7 @@ const AdminSettings = () => {
   const [tgGroupChat, setTgGroupChat] = useState("");
   const [tgOtpGroup, setTgOtpGroup] = useState("");
   const [tgOtpGroupChat, setTgOtpGroupChat] = useState("");
-  const [otpMin, setOtpMin] = useState<number>(8);
+  const [otpMin, setOtpMin] = useState<number>(10);
   const [recentHrs, setRecentHrs] = useState<number>(24);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
