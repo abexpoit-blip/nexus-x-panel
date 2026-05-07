@@ -447,19 +447,17 @@ function parseRow(row) {
 function findActiveAllocation(phone) {
   const tail = String(phone).slice(-9);
   if (!tail) return null;
-  const GRACE_SEC = 300, RESEND_SEC = 600;
-  const now = Math.floor(Date.now() / 1000);
+  const todayStart = startOfTodaySec();
   return db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
-      AND (
-            status = 'active'
-         OR (status = 'expired'  AND allocated_at >= ?)
-         OR (status = 'received' AND allocated_at >= ?)
-      )
-    ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, now - GRACE_SEC, now - RESEND_SEC);
+      AND allocated_at >= ?
+      AND status IN ('active', 'expired', 'received')
+    ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
+             allocated_at DESC
+    LIMIT 1
+  `).get(`%${tail}`, todayStart);
 }
 
 // Map IMS CLI text to a service slug. IMS puts the brand name in the CLI
@@ -484,8 +482,7 @@ function cliToServiceSlug(cli, msg) {
 function findAllocationForCdr(phone, cliSlug) {
   const tail = String(phone).slice(-9);
   if (!tail) return null;
-  const GRACE_SEC = 300, RESEND_SEC = 600;
-  const now = Math.floor(Date.now() / 1000);
+  const todayStart = startOfTodaySec();
   let serviceId = null;
   if (cliSlug) {
     try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
@@ -497,11 +494,12 @@ function findAllocationForCdr(phone, cliSlug) {
       FROM allocations
       WHERE phone_number LIKE ?
         AND service_id = ?
-        AND (status='active'
-          OR (status='expired'  AND allocated_at >= ?)
-          OR (status='received' AND allocated_at >= ?))
-      ORDER BY allocated_at DESC LIMIT 1
-    `).get(`%${tail}`, serviceId, now - GRACE_SEC, now - RESEND_SEC);
+        AND allocated_at >= ?
+        AND status IN ('active', 'expired', 'received')
+      ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
+               allocated_at DESC
+      LIMIT 1
+    `).get(`%${tail}`, serviceId, todayStart);
     if (matched) return matched;
   }
   return findActiveAllocation(phone);
