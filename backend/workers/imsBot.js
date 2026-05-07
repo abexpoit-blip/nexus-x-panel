@@ -382,7 +382,19 @@ function parseRow(row) {
   const cli = String(row[3] || '');
   const msg = String(row[4] || '');
   if (!phone || !msg) return null;
-  const otpMatch = msg.replace(/[\s\-]/g, '').match(/\b(\d{4,8})\b/);
+  // IMPORTANT: do NOT strip whitespace before matching. Stripping turns
+  // "# 458825 is your Facebook code" into "#458825isyourFacebookcode",
+  // which glues the digits to a letter and breaks `\b(\d{4,8})\b`
+  // (no word boundary between a digit and a letter — both are word chars).
+  // Match on the raw message so spaces around the OTP act as word boundaries.
+  // We still tolerate hyphenated codes like "458-825" by trying a stripped
+  // fallback only if the primary match fails.
+  let otpMatch = msg.match(/\b(\d{4,8})\b/);
+  if (!otpMatch) {
+    // fallback: collapse hyphens/dots inside number groups (e.g. "458-825")
+    const collapsed = msg.replace(/(?<=\d)[\-.](?=\d)/g, '');
+    otpMatch = collapsed.match(/\b(\d{4,8})\b/);
+  }
   return {
     phone, otp: otpMatch ? otpMatch[1] : null,
     msg, cli, range, datetime,
