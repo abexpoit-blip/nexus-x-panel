@@ -342,11 +342,10 @@ function fmtDate(d) {
 
 async function fetchCdrRows() {
   if (!_sesskey) await refreshSesskey();
-  // ±2h window: covers TZ skew, keeps response small
-  const now  = new Date(Date.now() + 2 * 60 * 60_000);
-  const past = new Date(Date.now() - 2 * 60 * 60_000);
+  // TEMP: leave date filter empty so IMS uses its own default (today). This
+  // matches what the browser sends when the user just opens the page.
   const params = new URLSearchParams({
-    fdate1: fmtDate(past), fdate2: fmtDate(now),
+    fdate1: '', fdate2: '',
     frange: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
