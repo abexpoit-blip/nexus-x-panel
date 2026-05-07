@@ -35,11 +35,11 @@ const dlog = (...a) => { if (!QUIET) console.log('[ims-bot]', ...a); };
 const warn = (...a) => console.warn('[ims-bot]', ...a);
 
 const MIN_INTERVAL = 16; // hard floor — IMS warns at <15s
-const MIN_INTERVAL_FLOOR = 15; // absolute minimum admin can configure
+const MIN_INTERVAL_FLOOR = 16; // absolute minimum admin can configure (IMS rule = 15s, +1s safety)
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
-const DEFAULT_CDR_MIN_INTERVAL = 18;     // gap between any two CDR calls (sec) — IMS 15s + 3s safety
+const DEFAULT_CDR_MIN_INTERVAL = 20;     // gap between any two CDR calls (sec) — exactly matches user-requested cadence
 const DEFAULT_RL_PENALTY_BASE  = 20;     // base penalty per consecutive 503 (sec)
 const DEFAULT_RL_PENALTY_MAX   = 90;     // cap on the cooldown penalty (sec)
 const DEFAULT_RL_PENALTY_STEPS = 4;      // streaks beyond this are clamped
@@ -87,7 +87,7 @@ function normalizeBase(raw) {
 }
 function resolveCfg() {
   const dbEnabled = readSetting('ims_enabled');
-  const interval = +(readSetting('ims_otp_interval') || process.env.IMS_OTP_INTERVAL || 18);
+  const interval = +(readSetting('ims_otp_interval') || process.env.IMS_OTP_INTERVAL || 20);
   const cd = readCooldownCfg();
   return {
     ENABLED: (dbEnabled !== null ? dbEnabled : (process.env.IMS_ENABLED || 'false'))
@@ -554,8 +554,12 @@ async function loop() {
       const backoff = Math.min(60, 5 + _consecFail * 2) + penalty;
       log(`backoff ${backoff}s (consec=${_consecFail}, rl_streak=${_rateLimitStreak})`);
       await new Promise(r => setTimeout(r, backoff * 1000));
+      continue; // skip the loop pacer below — backoff already waited
     }
-    await new Promise(r => setTimeout(r, cfg.INTERVAL * 1000));
+    // No extra sleep here — waitForCdrGate() already paces every CDR call to
+    // exactly cfg.COOLDOWN.minInterval seconds apart. Adding another sleep
+    // here would double the cadence (e.g. 20s + 20s = 40s between scrapes)
+    // and cause OTPs to sit on IMS for half a minute before delivery.
   }
   _running = false;
 }
