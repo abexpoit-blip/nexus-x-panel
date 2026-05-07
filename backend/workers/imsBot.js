@@ -537,15 +537,15 @@ async function tickOnce() {
     if (!r || !r.otp) continue;
     if (_seenIds.has(r.dedup_key)) continue;
     const cliSlug = cliToServiceSlug(r.cli, r.msg);
-    const alloc = findAllocationForCdr(r.phone, cliSlug);
+    const alloc = findAllocationForCdr(r.phone, cliSlug, r.cdr_at);
     if (!alloc) {
-      log('no today alloc for', r.phone, 'otp=', r.otp, 'cli=', r.cli || '?', '→ will retry');
-      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no today allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''}`);
+      log('no 30m alloc for', r.phone, 'otp=', r.otp, 'cli=', r.cli || '?', 'cdr_at=', r.cdr_at || 'now', '→ will retry');
+      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''} inside 30m window`);
       logOtpAudit({
         source: 'ims', source_msg_id: r.dedup_key,
         phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
         outcome: 'mismatch',
-        miss_reason: `no today allocation matched (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
+        miss_reason: `no allocation matched inside 30m window (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
       });
       continue;
     }
