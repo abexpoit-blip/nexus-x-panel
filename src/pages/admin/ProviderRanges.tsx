@@ -102,7 +102,7 @@ const AdminProviderRanges = () => {
 
   const restartBot = async (provider: string) => {
     try {
-      await api.admin.bots.action(`${provider}Bot`, "restart");
+      await api.admin.bots.action(provider, "restart");
       toast({ title: "Restart sent", description: `${provider}Bot` });
     } catch (e) {
       toast({ title: "Restart failed", description: (e as Error).message, variant: "destructive" });
