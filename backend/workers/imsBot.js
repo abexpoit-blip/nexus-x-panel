@@ -340,12 +340,19 @@ function fmtDate(d) {
          `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+function fmtDay(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+
 async function fetchCdrRows() {
   if (!_sesskey) await refreshSesskey();
-  // TEMP: leave date filter empty so IMS uses its own default (today). This
-  // matches what the browser sends when the user just opens the page.
+  // Date-only window covering today (00:00:00 → 23:59:59). Per scrape rule:
+  // follow dates only, not times — always fetch today's full day.
+  const today = new Date();
+  const dayStr = fmtDay(today);
   const params = new URLSearchParams({
-    fdate1: '', fdate2: '',
+    fdate1: `${dayStr} 00:00:00`, fdate2: `${dayStr} 23:59:59`,
     frange: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
