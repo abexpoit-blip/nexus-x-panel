@@ -26,6 +26,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { getOtpExpirySec } = require('../lib/settings');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -345,14 +346,10 @@ function fmtDay(d) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 
-function startOfTodaySec() {
-  const d = new Date();
-  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000);
-}
-
 function parsePanelTimestamp(dateCol) {
   const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
   if (!m) return null;
+  if (!m[4]) return null;
   const hh = m[4] || '00', mm = m[5] || '00', ss = m[6] || '00';
   return Math.floor(new Date(`${m[1]}-${m[2]}-${m[3]}T${hh}:${mm}:${ss}`).getTime() / 1000);
 }
@@ -444,20 +441,24 @@ function parseRow(row) {
   };
 }
 
-function findActiveAllocation(phone) {
+function findActiveAllocation(phone, cdrAtSec = null) {
   const tail = String(phone).slice(-9);
   if (!tail) return null;
-  const todayStart = startOfTodaySec();
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expirySec = getOtpExpirySec();
+  const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
+  const oldestAllocatedAt = eventAt - expirySec;
+  const newestAllocatedAt = eventAt + 60;
   return db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
     FROM allocations
     WHERE phone_number LIKE ?
-      AND allocated_at >= ?
+      AND allocated_at BETWEEN ? AND ?
       AND status IN ('active', 'expired', 'received')
     ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
              allocated_at DESC
     LIMIT 1
-  `).get(`%${tail}`, todayStart);
+  `).get(`%${tail}`, oldestAllocatedAt, newestAllocatedAt);
 }
 
 // Map IMS CLI text to a service slug. IMS puts the brand name in the CLI
@@ -479,10 +480,14 @@ function cliToServiceSlug(cli, msg) {
 
 // Service-aware allocation match: prefer allocation whose service_id maps
 // to the slug derived from CLI. Falls back to phone-only match.
-function findAllocationForCdr(phone, cliSlug) {
+function findAllocationForCdr(phone, cliSlug, cdrAtSec = null) {
   const tail = String(phone).slice(-9);
   if (!tail) return null;
-  const todayStart = startOfTodaySec();
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expirySec = getOtpExpirySec();
+  const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
+  const oldestAllocatedAt = eventAt - expirySec;
+  const newestAllocatedAt = eventAt + 60;
   let serviceId = null;
   if (cliSlug) {
     try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
@@ -494,15 +499,15 @@ function findAllocationForCdr(phone, cliSlug) {
       FROM allocations
       WHERE phone_number LIKE ?
         AND service_id = ?
-        AND allocated_at >= ?
+        AND allocated_at BETWEEN ? AND ?
         AND status IN ('active', 'expired', 'received')
       ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
                allocated_at DESC
       LIMIT 1
-    `).get(`%${tail}`, serviceId, todayStart);
+    `).get(`%${tail}`, serviceId, oldestAllocatedAt, newestAllocatedAt);
     if (matched) return matched;
   }
-  return findActiveAllocation(phone);
+  return findActiveAllocation(phone, cdrAtSec);
 }
 
 async function tickOnce() {
@@ -527,15 +532,15 @@ async function tickOnce() {
     if (!r || !r.otp) continue;
     if (_seenIds.has(r.dedup_key)) continue;
     const cliSlug = cliToServiceSlug(r.cli, r.msg);
-    const alloc = findAllocationForCdr(r.phone, cliSlug);
+    const alloc = findAllocationForCdr(r.phone, cliSlug, r.cdr_at);
     if (!alloc) {
-      log('no today alloc for', r.phone, 'otp=', r.otp, 'cli=', r.cli || '?', '→ will retry');
-      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no today allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''}`);
+      log('no 30m alloc for', r.phone, 'otp=', r.otp, 'cli=', r.cli || '?', 'cdr_at=', r.cdr_at || 'now', '→ will retry');
+      tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''} inside 30m window`);
       logOtpAudit({
         source: 'ims', source_msg_id: r.dedup_key,
         phone_number: r.phone, cli: r.cli, otp_code: r.otp, sms_text: r.msg,
         outcome: 'mismatch',
-        miss_reason: `no today allocation matched (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
+        miss_reason: `no allocation matched inside 30m window (suffix-9${cliSlug ? `, service=${cliSlug}` : ''})`,
       });
       continue;
     }
