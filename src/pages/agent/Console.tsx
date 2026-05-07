@@ -160,13 +160,9 @@ const AgentConsole = () => {
                   {fullDetail && (
                     <p className="mt-1 text-xs text-muted-foreground truncate">{fullDetail}</p>
                   )}
-                  {c.sms_text ? (
-                    <p className="mt-2 text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
-                      {c.sms_text}
-                    </p>
-                  ) : c.otp_code ? (
-                    <p className="mt-2 text-base text-foreground leading-relaxed font-mono tracking-wider">
-                      OTP: <span className="font-bold text-neon-green">{c.otp_code}</span>
+                  {c.otp_code ? (
+                    <p className="mt-2 text-2xl text-foreground leading-none font-mono font-bold tracking-widest">
+                      <span className="text-neon-green">{c.otp_code}</span>
                     </p>
                   ) : null}
                 </div>
