@@ -361,14 +361,24 @@ async function fetchCdrRows() {
   // IMS DataTables AJAX requires explicit fdate1/fdate2 (empty → SQL error
   // "Incorrect DATETIME value: ''"). Use today 00:00:00 → 23:59:59 so we
   // mirror what the page itself sends on first load (default = current day).
+  // IMS server runs on its own timezone (observed ~6h behind UTC server time).
+  // To avoid missing rows when our VPS day rolls over before IMS does, query
+  // a 2-day window: yesterday 00:00 → tomorrow 23:59 (covers any TZ skew up to ±24h).
+  const fmt = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
   const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const today = `${yyyy}-${mm}-${dd}`;
+  const yesterday = new Date(now.getTime() - 24 * 3600 * 1000);
+  const tomorrow  = new Date(now.getTime() + 24 * 3600 * 1000);
+  const fdate1Str = `${fmt(yesterday)} 00:00:00`;
+  const fdate2Str = `${fmt(tomorrow)} 23:59:59`;
+  const today = fmt(now); // kept for log/debug fields below
   const params = new URLSearchParams({
-    fdate1: `${today} 00:00:00`,
-    fdate2: `${today} 23:59:59`,
+    fdate1: fdate1Str,
+    fdate2: fdate2Str,
     frange: '', fnum: '', fcli: '',
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
@@ -409,8 +419,8 @@ async function fetchCdrRows() {
     http_status: r.status,
     content_type: ctype,
     body_bytes: bodyLen,
-    fdate1: `${today} 00:00:00`,
-    fdate2: `${today} 23:59:59`,
+    fdate1: fdate1Str,
+    fdate2: fdate2Str,
     sent_params: sentParams,
     request_url: `/client/res/data_smscdr.php`,
   };
@@ -446,7 +456,7 @@ async function fetchCdrRows() {
       warn(
         `[CDR_BAD_RESPONSE]${isDatetimeBug ? ' [DATETIME_BUG]' : ''} ` +
         `http=${r.status} ctype="${ctype}" bytes=${bodyLen} ` +
-        `fdate1="${today} 00:00:00" fdate2="${today} 23:59:59" ` +
+        `fdate1="${fdate1Str}" fdate2="${fdate2Str}" ` +
         `params=${JSON.stringify(sentParams)} body="${flat}"`
       );
       pushCdrDebug({
