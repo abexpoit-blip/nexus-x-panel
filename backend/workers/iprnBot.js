@@ -27,6 +27,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { findMatchingAllocation, hasSeenSourceMessage } = require('../lib/allocationMatcher');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -219,21 +220,7 @@ async function fetchCdrRows(currencyId) {
 }
 
 function findActiveAllocation(phone) {
-  const tail = String(phone).replace(/\D/g, '').slice(-9);
-  if (!tail) return null;
-  const GRACE_SEC = 300, RESEND_SEC = 600;
-  const now = Math.floor(Date.now() / 1000);
-  return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
-    FROM allocations
-    WHERE phone_number LIKE ?
-      AND (
-            status='active'
-         OR (status='expired'  AND allocated_at >= ?)
-         OR (status='received' AND allocated_at >= ?)
-      )
-    ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, now - GRACE_SEC, now - RESEND_SEC);
+  return findMatchingAllocation({ provider: 'iprn', phone, lateGraceSec: 300, resendSec: 600 });
 }
 
 function extractOtp(msg) {
@@ -257,7 +244,7 @@ async function tickOnce() {
       const msg   = String(row.message || '');
       if (!phone || !msg) continue;
       const dedup = `${row.created || ''}|${phone}|${msg.slice(0, 60)}`;
-      if (_seenIds.has(dedup)) continue;
+      if (_seenIds.has(dedup) || hasSeenSourceMessage('iprn', dedup)) continue;
       _seenIds.add(dedup);
       if (_seenIds.size > SEEN_MAX) {
         const arr = Array.from(_seenIds);

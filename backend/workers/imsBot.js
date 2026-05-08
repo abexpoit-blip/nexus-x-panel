@@ -26,6 +26,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { findMatchingAllocation, hasSeenSourceMessage } = require('../lib/allocationMatcher');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -517,20 +518,13 @@ function parseRow(row) {
 }
 
 function findActiveAllocation(phone) {
-  const tail = String(phone).slice(-9);
-  if (!tail) return null;
-  const nowSec = Math.floor(Date.now() / 1000);
-  return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
-    FROM allocations
-    WHERE phone_number LIKE ?
-      AND ( status = 'active'
-         OR (status = 'expired'  AND allocated_at >= ?)
-         OR (status = 'received' AND allocated_at >= ?) )
-    ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
-             allocated_at DESC
-    LIMIT 1
-  `).get(`%${tail}`, nowSec - IMS_EXPIRED_GRACE_SEC, nowSec - IMS_RESEND_SEC);
+  return findMatchingAllocation({
+    provider: 'ims',
+    phone,
+    eventAtSec: arguments[1] || null,
+    lateGraceSec: IMS_EXPIRED_GRACE_SEC,
+    resendSec: IMS_RESEND_SEC,
+  });
 }
 
 // Map IMS CLI text to a service slug. IMS puts the brand name in the CLI
@@ -552,31 +546,15 @@ function cliToServiceSlug(cli, msg) {
 
 // Service-aware allocation match: prefer allocation whose service_id maps
 // to the slug derived from CLI. Falls back to phone-only match.
-function findAllocationForCdr(phone, cliSlug) {
-  const tail = String(phone).slice(-9);
-  if (!tail) return null;
-  const nowSec = Math.floor(Date.now() / 1000);
-  let serviceId = null;
-  if (cliSlug) {
-    try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
-    catch (_) { serviceId = null; }
-  }
-  if (serviceId) {
-    const matched = db.prepare(`
-      SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
-      FROM allocations
-      WHERE phone_number LIKE ?
-        AND service_id = ?
-        AND ( status = 'active'
-           OR (status = 'expired'  AND allocated_at >= ?)
-           OR (status = 'received' AND allocated_at >= ?) )
-      ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'expired' THEN 1 ELSE 2 END,
-               allocated_at DESC
-      LIMIT 1
-    `).get(`%${tail}`, serviceId, nowSec - IMS_EXPIRED_GRACE_SEC, nowSec - IMS_RESEND_SEC);
-    if (matched) return matched;
-  }
-  return findActiveAllocation(phone);
+function findAllocationForCdr(phone, cliSlug, cdrAtSec = null) {
+  return findMatchingAllocation({
+    provider: 'ims',
+    phone,
+    cliSlug,
+    eventAtSec: cdrAtSec,
+    lateGraceSec: IMS_EXPIRED_GRACE_SEC,
+    resendSec: IMS_RESEND_SEC,
+  });
 }
 
 async function tickOnce() {
@@ -599,7 +577,7 @@ async function tickOnce() {
   for (const raw of rows) {
     const r = parseRow(raw);
     if (!r || !r.otp) continue;
-    if (_seenIds.has(r.dedup_key)) continue;
+    if (_seenIds.has(r.dedup_key) || hasSeenSourceMessage('ims', r.dedup_key)) continue;
     const cliSlug = cliToServiceSlug(r.cli, r.msg);
     const alloc = findAllocationForCdr(r.phone, cliSlug, r.cdr_at);
     if (!alloc) {
