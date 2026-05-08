@@ -35,7 +35,10 @@ function _ensureCol(table, col, ddl) {
 }
 _ensureCol('cdr', 'note', 'TEXT');
 _ensureCol('cdr', 'cli', 'TEXT');
+_ensureCol('cdr', 'sms_text', 'TEXT');
+_ensureCol('cdr', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
 _ensureCol('allocations', 'cli', 'TEXT');
+_ensureCol('allocations', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
 
 // --- Self-healing: ensure pool tables exist (idempotent) ---
 // Prevents "no such table: provider_ranges / pool_numbers" when the runtime
