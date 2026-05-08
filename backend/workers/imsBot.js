@@ -211,6 +211,22 @@ function registerRateLimitCooldown() {
   return Math.ceil(penaltyMs / 1000);
 }
 
+function rememberDegradedFetch(reason, meta = {}) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  _cdrBlankStreak++;
+  _lastFetchDegraded = { at: nowSec, reason, streak: _cdrBlankStreak };
+  if (_lastCdrSuccessAt && (nowSec - _lastCdrSuccessAt) <= EMPTY_CDR_GRACE_SEC) {
+    log(`CDR ${reason}; keeping bot healthy because last good scrape was ${nowSec - _lastCdrSuccessAt}s ago`);
+    return [];
+  }
+  if (_cdrBlankStreak >= EMPTY_CDR_STREAK_RELOGIN) {
+    _loggedIn = false;
+    _sesskey = null;
+  }
+  const suffix = meta.bodyLen != null ? ` bytes=${meta.bodyLen}` : '';
+  throw new Error(`${reason}${suffix}`);
+}
+
 function buildClient(baseURL) {
   _jar = new tough.CookieJar();
   const manual = String(readSetting('ims_cookie_header') || '').trim();
