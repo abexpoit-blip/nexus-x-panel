@@ -752,6 +752,8 @@ function getStatus() {
     rl_relogin_stale_sec: cfg.COOLDOWN.reloginStaleSec,
     last_rate_limit_at: _lastRateLimitAt,
     last_cdr_success_at: _lastCdrSuccessAt,
+    cdr_blank_streak: _cdrBlankStreak,
+    last_fetch_degraded: _lastFetchDegraded,
     relogin_count: _reloginCount,
     last_relogin_at: _lastReloginAt,
     next_cdr_allowed_at: _nextCdrAllowedAt || null,
