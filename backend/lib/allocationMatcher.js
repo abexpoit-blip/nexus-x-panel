@@ -19,11 +19,11 @@ function samePhone(a, b) {
 
 function sameRange(panelRange, allocation) {
   const panel = String(panelRange || '').trim().toLowerCase();
-  if (!panel) return true;
+  if (!panel) return true; // no panel info → caller must disambiguate by phone
   const values = [allocation.range_label, allocation.operator]
     .map((v) => String(v || '').trim().toLowerCase())
     .filter(Boolean);
-  if (!values.length) return true;
+  if (!values.length) return false; // panel says X, allocation has nothing → not a match
   return values.some((v) => v === panel || v.includes(panel) || panel.includes(v));
 }
 
@@ -97,8 +97,21 @@ function findMatchingAllocation({
   );
 
   const pick = (rows) => {
-    const exact = rows.filter((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row));
-    if (exact.length) return exact[0];
+    // 1) Best: full phone match AND range match (when panel exposes range).
+    const exactBoth = rows.filter((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row));
+    if (exactBoth.length === 1) return exactBoth[0];
+    if (exactBoth.length > 1) return exactBoth[0]; // already narrowed by phone+range; newest wins
+
+    // 2) Phone matches exactly, no range info from panel — only deliver if
+    //    there's exactly ONE such allocation. Multiple = ambiguous → drop
+    //    rather than risk delivering an OTP to the wrong agent.
+    const exactPhone = rows.filter((row) => samePhone(row.phone_number, phone));
+    if (exactPhone.length === 1) return exactPhone[0];
+    if (exactPhone.length > 1 && !panelRange) return null;
+
+    // 3) Phone tail-only match (e.g. panel reports "0971234567" but allocation
+    //    stored "260971234567"). Only accept when exactly one candidate AND
+    //    range matches (or panel has no range info and only one candidate exists).
     const ranged = rows.filter((row) => sameRange(panelRange, row));
     return ranged.length === 1 ? ranged[0] : null;
   };

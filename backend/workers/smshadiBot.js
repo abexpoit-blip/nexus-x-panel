@@ -436,12 +436,13 @@ function cliToServiceSlug(cli, msg) {
   return null;
 }
 
-function findActiveAllocation(phone, cdrAtSec = null, cliSlug = null) {
+function findActiveAllocation(phone, cdrAtSec = null, cliSlug = null, panelRange = null) {
   return findMatchingAllocation({
     provider: 'smshadi',
     phone,
     cliSlug,
     eventAtSec: cdrAtSec,
+    panelRange,
     lateGraceSec: SMSHADI_LATE_GRACE_SEC,
     resendSec: RESEND_SEC,
   });
@@ -462,7 +463,7 @@ async function tickOnce() {
       _seenIds = new Set(arr.slice(arr.length / 2));
     }
     const cliSlug = cliToServiceSlug(r.cli, r.msg);
-    const alloc = findActiveAllocation(r.phone, r.cdr_at, cliSlug);
+    const alloc = findActiveAllocation(r.phone, r.cdr_at, cliSlug, r.range);
     if (!alloc) {
       tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''} within SMS Hadi late window`);
       logOtpAudit({
