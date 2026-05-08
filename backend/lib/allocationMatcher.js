@@ -96,7 +96,12 @@ function findMatchingAllocation({
     newestRelevantAt,
   );
 
-  const pick = (rows) => rows.find((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row)) || null;
+  const pick = (rows) => {
+    const exact = rows.filter((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row));
+    if (exact.length) return exact[0];
+    const ranged = rows.filter((row) => sameRange(panelRange, row));
+    return ranged.length === 1 ? ranged[0] : null;
+  };
 
   if (serviceId) {
     const matched = pick(loadCandidates('AND service_id = ?', [serviceId]));
