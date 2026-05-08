@@ -138,7 +138,10 @@ function hasSeenSourceMessage(source, sourceMsgId) {
   if (!source || !sourceMsgId) return false;
   try {
     return !!db.prepare(
-      'SELECT 1 FROM otp_audit_log WHERE source = ? AND source_msg_id = ? LIMIT 1'
+      `SELECT 1 FROM otp_audit_log
+       WHERE source = ? AND source_msg_id = ?
+         AND outcome IN ('billed', 'duplicate', 'resend')
+       LIMIT 1`
     ).get(String(source), String(sourceMsgId));
   } catch (_) {
     return false;
