@@ -200,14 +200,26 @@ function insertOne(opts = {}) {
   const rangeIds = opts.rangeIds || c.rangeIds;
   const allowedServices = opts.services || c.services;   // null = all
   const pick1 = pickRangeAndPhone(rangeIds);
-  if (!pick1) { dlog('no enabled provider_ranges → skip'); return false; }
+  if (!pick1) {
+    _lastError = null;
+    _lastSkipReason = rangeIds && rangeIds.length
+      ? 'no enabled selected ranges'
+      : 'no enabled provider ranges';
+    dlog(`${_lastSkipReason} → skip`);
+    return false;
+  }
   const { row, phone } = pick1;
   const pool = allowedServices && allowedServices.length
     ? SERVICES.filter(s => allowedServices.includes(s.cli.toLowerCase()))
     : SERVICES;
   // If admin restricted services but none match the SERVICES list, skip —
   // don't silently fall back to all services.
-  if (!pool.length) { dlog('no services match filter → skip'); return false; }
+  if (!pool.length) {
+    _lastError = null;
+    _lastSkipReason = 'no services match filter';
+    dlog(`${_lastSkipReason} → skip`);
+    return false;
+  }
   const svc = pick(pool);
   const otp = svc.otp();
   const variants = svc.msgs(otp);
@@ -218,16 +230,30 @@ function insertOne(opts = {}) {
   // to admin id if the seed didn't run yet.
   const ownerId = db.prepare("SELECT id FROM users WHERE username = 'Nexus Telegram'").get()?.id
     ?? db.prepare("SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").get()?.id;
-  if (!ownerId) { dlog('no fake-owner user → skip'); return false; }
+  if (!ownerId) {
+    _lastError = null;
+    _lastSkipReason = 'no fake-owner user';
+    dlog(`${_lastSkipReason} → skip`);
+    return false;
+  }
 
-  db.prepare(`
-    INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator,
-                     phone_number, otp_code, cli, price_bdt, status, note, sms_text)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?)
-  `).run(
-    ownerId, row.provider, row.country_code, row.operator || row.range_label,
-    phone, otp, svc.cli, msg
-  );
+  try {
+    db.prepare(`
+      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator,
+                       phone_number, otp_code, cli, price_bdt, status, note, sms_text)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?)
+    `).run(
+      ownerId, row.provider, row.country_code, row.operator || row.range_label,
+      phone, otp, svc.cli, msg
+    );
+  } catch (e) {
+    _lastError = e.message;
+    _lastSkipReason = null;
+    warn('insertOne db error:', e.message);
+    return false;
+  }
+  _lastError = null;
+  _lastSkipReason = null;
   dlog(`✓ fake [${row.country_code}/${row.operator || row.range_label}] ${phone} → ${svc.cli}:${otp}`);
   return true;
 }
@@ -237,6 +263,8 @@ let _running = false;
 let _stopFlag = false;
 let _lastFireAt = null;
 let _totalFired = 0;
+let _lastError = null;
+let _lastSkipReason = null;
 let _wakeResolve = null;   // lets start() interrupt the idle/sleep wait
 
 function sleepInterruptible(ms) {
@@ -299,6 +327,8 @@ function getStatus() {
     running: _running,
     last_fire_at: _lastFireAt,
     total_fired: _totalFired,
+    last_error: _lastError,
+    last_skip_reason: _lastSkipReason,
     min_sec: c.minSec,
     max_sec: c.maxSec,
     burst: c.burst,
