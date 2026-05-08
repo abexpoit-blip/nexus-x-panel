@@ -956,7 +956,7 @@ const AgentRanges = () => {
                         size={12}
                       />
                     )}
-                    {r.country_code && <CountryFlag code={r.country_code} size="sm" />}
+                    {r.country_code && <CountryFlag code={r.country_code} size="sm" interactive operations={[r.operator || "Number rental", "OTP delivery"]} />}
                     <span className="truncate">{r.operator || "—"}</span>
                   </div>
 
@@ -1071,7 +1071,7 @@ const AgentRanges = () => {
                               size={16}
                             />
                           )}
-                          {r.country_code && <CountryFlag code={r.country_code} size="sm" />}
+                          {r.country_code && <CountryFlag code={r.country_code} size="sm" interactive operations={[r.operator || "Number rental", "OTP delivery"]} />}
                           <span className="text-foreground truncate">{r.operator || "—"}</span>
                         </div>
                       </td>
