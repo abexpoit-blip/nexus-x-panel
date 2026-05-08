@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -71,11 +71,9 @@ const AuthPage = ({ children }: { children: React.ReactNode }) => (
 );
 
 const AppRoutes = () => {
-  const location = useLocation();
-
   return (
     <Suspense fallback={<PageFallback />}>
-      <Routes location={location}>
+      <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<AuthPage><Login /></AuthPage>} />
           <Route path="/register" element={<AuthPage><Register /></AuthPage>} />
