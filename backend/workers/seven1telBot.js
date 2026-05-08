@@ -278,7 +278,7 @@ function parseRow(row) {
   };
 }
 
-function findActiveAllocation(phone) {
+function findActiveAllocation(phone, cdrAtSec = null) {
   // Match the most recent allocation for this MSISDN (suffix-9, handles +44 vs 44),
   // accepting any of:
   //   • status='active'                           — normal in-window delivery
@@ -288,7 +288,7 @@ function findActiveAllocation(phone) {
   return findMatchingAllocation({
     provider: 'seven1tel',
     phone,
-    eventAtSec: arguments[1] || null,
+    eventAtSec: cdrAtSec,
     lateGraceSec: 300,
     resendSec: 600,
   });
