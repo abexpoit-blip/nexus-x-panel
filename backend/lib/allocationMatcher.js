@@ -6,6 +6,27 @@ function normalizeTail(phone) {
   return digits ? digits.slice(-9) : null;
 }
 
+function normalizeDigits(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+function samePhone(a, b) {
+  const left = normalizeDigits(a);
+  const right = normalizeDigits(b);
+  if (!left || !right) return false;
+  return left === right || left.endsWith(right) || right.endsWith(left);
+}
+
+function sameRange(panelRange, allocation) {
+  const panel = String(panelRange || '').trim().toLowerCase();
+  if (!panel) return true;
+  const values = [allocation.range_label, allocation.operator]
+    .map((v) => String(v || '').trim().toLowerCase())
+    .filter(Boolean);
+  if (!values.length) return true;
+  return values.some((v) => v === panel || v.includes(panel) || panel.includes(v));
+}
+
 function resolveServiceId(cliSlug) {
   if (!cliSlug) return null;
   try {
@@ -31,6 +52,7 @@ function findMatchingAllocation({
   provider,
   phone,
   cliSlug = null,
+  panelRange = null,
   eventAtSec = null,
   lateGraceSec = 300,
   resendSec = 600,
@@ -47,9 +69,9 @@ function findMatchingAllocation({
   const resendSince = eventAt - Math.max(0, +resendSec || 0);
   const serviceId = resolveServiceId(cliSlug);
 
-  const runMatch = (extraSql = '', extraArgs = []) => db.prepare(`
+  const loadCandidates = (extraSql = '', extraArgs = []) => db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator,
-           service_id, status, allocated_at, otp_received_at
+           service_id, range_id, range_label, status, allocated_at, otp_received_at
     FROM allocations
     WHERE provider = ?
       AND phone_number LIKE ?
@@ -61,8 +83,8 @@ function findMatchingAllocation({
       )
     ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'received' THEN 1 WHEN 'expired' THEN 2 ELSE 3 END,
              allocated_at DESC
-    LIMIT 1
-  `).get(
+    LIMIT 20
+  `).all(
     provider,
     `%${tail}`,
     ...extraArgs,
@@ -74,12 +96,14 @@ function findMatchingAllocation({
     newestRelevantAt,
   );
 
+  const pick = (rows) => rows.find((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row)) || null;
+
   if (serviceId) {
-    const matched = runMatch('AND service_id = ?', [serviceId]);
+    const matched = pick(loadCandidates('AND service_id = ?', [serviceId]));
     if (matched) return matched;
   }
 
-  return runMatch();
+  return pick(loadCandidates());
 }
 
 function hasSeenSourceMessage(source, sourceMsgId) {
@@ -97,5 +121,6 @@ module.exports = {
   findMatchingAllocation,
   hasSeenSourceMessage,
   inferServiceSlug,
+  normalizeDigits,
   resolveServiceId,
 };
