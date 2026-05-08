@@ -51,6 +51,7 @@ const AdminAllocation = () => {
         </div>
         <DataTable
           className="border-0 rounded-none"
+          pageParam="agentsPage"
           columns={[
             { key: "username", header: "Agent", render: (r) => <span className="font-semibold">{r.username}</span> },
             { key: "daily_limit", header: "Daily limit", render: (r) => <span className="font-mono">{r.daily_limit}</span> },
@@ -76,6 +77,7 @@ const AdminAllocation = () => {
         </div>
         <DataTable
           className="border-0 rounded-none"
+          pageParam="allocPage"
           columns={[
             { key: "username", header: "Agent", render: (r) => r.username || `#${r.user_id}` },
             { key: "phone_number", header: "Number", render: (r) => <span className="font-mono">{r.phone_number}</span> },
