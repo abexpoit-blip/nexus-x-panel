@@ -64,9 +64,19 @@ function findMatchingAllocation({
   const nowSec = Math.floor(Date.now() / 1000);
   const eventAt = Number.isFinite(+eventAtSec) && +eventAtSec > 0 ? +eventAtSec : nowSec;
   const expirySec = Math.max(1, +getOtpExpirySec() || 600);
-  const oldestAllocatedAt = eventAt - expirySec - Math.max(0, +lateGraceSec || 0);
-  const newestRelevantAt = eventAt + Math.max(0, +futureSkewSec || 0);
-  const resendSince = eventAt - Math.max(0, +resendSec || 0);
+  // Panels often report timestamps in their own timezone (IMS is ~6h behind
+  // our VPS UTC clock). If we trust eventAt blindly, a freshly-claimed
+  // allocation can look "in the future" relative to the panel's reported
+  // event time and get excluded. Anchor the window to the EARLIER of
+  // eventAt and now for the lower bound, and the LATER of eventAt and now
+  // for the upper bound — this absorbs any panel↔server clock skew while
+  // still keeping the window narrow enough to reject genuinely stale rows.
+  const skew = Math.max(0, +futureSkewSec || 0);
+  const anchorOld = Math.min(eventAt, nowSec);
+  const anchorNew = Math.max(eventAt, nowSec);
+  const oldestAllocatedAt = anchorOld - expirySec - Math.max(0, +lateGraceSec || 0);
+  const newestRelevantAt = anchorNew + skew;
+  const resendSince = anchorOld - Math.max(0, +resendSec || 0);
   const serviceId = resolveServiceId(cliSlug);
 
   const loadCandidates = (extraSql = '', extraArgs = []) => db.prepare(`
