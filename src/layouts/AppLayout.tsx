@@ -1,6 +1,5 @@
 import { Suspense, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import { AnimatedOutlet } from "@/components/AnimatedOutlet";
+import { Navigate, useNavigate, Outlet } from "react-router-dom";
 import { useAuth, type UserRole } from "@/contexts/AuthContext";
 import { AppSidebar } from "./Sidebar";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -34,10 +33,6 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-luxe-mesh relative">
-      {/* Ambient page glow */}
-      <div className="pointer-events-none fixed -top-40 -right-40 w-[640px] h-[640px] rounded-full bg-neon-violet/[0.05] blur-[140px]" />
-      <div className="pointer-events-none fixed -bottom-40 -left-40 w-[640px] h-[640px] rounded-full bg-neon-cyan/[0.04] blur-[140px]" />
-
       <CommandPalette />
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -59,7 +54,7 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
           </div>
         )}
         {/* Header */}
-        <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-white/[0.06] bg-background/40 backdrop-blur-2xl shrink-0 relative">
+        <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-white/[0.06] bg-background/70 backdrop-blur-md shrink-0 relative">
           <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <button
             onClick={() => setSidebarOpen(true)}
@@ -132,7 +127,7 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
               </div>
             }
           >
-            <AnimatedOutlet />
+            <Outlet />
           </Suspense>
         </main>
       </div>

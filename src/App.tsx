@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -67,31 +66,14 @@ const PageFallback = () => (
   </div>
 );
 
-const AuthPage = ({ children }: { children: React.ReactNode }) => {
-  const location = useLocation();
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ type: "tween", ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number], duration: 0.3 }}
-        className="min-h-screen"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
-};
+const AuthPage = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen animate-in fade-in duration-200">{children}</div>
+);
 
 const AppRoutes = () => {
-  const location = useLocation();
-
   return (
     <Suspense fallback={<PageFallback />}>
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
+      <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<AuthPage><Login /></AuthPage>} />
           <Route path="/register" element={<AuthPage><Register /></AuthPage>} />
@@ -134,7 +116,6 @@ const AppRoutes = () => {
 
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </AnimatePresence>
     </Suspense>
   );
 };
