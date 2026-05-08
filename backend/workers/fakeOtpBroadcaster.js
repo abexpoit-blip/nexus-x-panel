@@ -139,19 +139,21 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ────────────────────── Pull a realistic phone number from enabled ranges ──────────────────────
 function pickRangeAndPhone(rangeIds) {
-  // If admin restricted to specific range IDs, honour them; else any enabled range.
+  // Strict mode: if admin selected specific range_ids, use ONLY those (and
+  // skip if none of them are currently enabled). If empty, fall back to any
+  // enabled range. We never silently widen scope when targets are set.
   let ranges;
   if (rangeIds && rangeIds.length) {
     const placeholders = rangeIds.map(() => '?').join(',');
     ranges = db.prepare(`
-      SELECT provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
+      SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
       FROM provider_ranges
       WHERE enabled = 1 AND id IN (${placeholders})
       ORDER BY RANDOM() LIMIT 1
     `).all(...rangeIds);
   } else {
     ranges = db.prepare(`
-      SELECT provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
+      SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
       FROM provider_ranges
       WHERE enabled = 1
       ORDER BY RANDOM() LIMIT 1
@@ -160,11 +162,35 @@ function pickRangeAndPhone(rangeIds) {
   if (!ranges.length) return null;
   const r = ranges[0];
 
-  // Build a phone: range_prefix (digits only) + random tail to total ~10-13 digits.
-  const prefix = String(r.range_prefix || '').replace(/\D/g, '');
-  const target = 11 + Math.floor(Math.random() * 3);   // 11..13 digit total
-  const tailLen = Math.max(4, target - prefix.length);
-  const phone = prefix + digits(tailLen);
+  // Prefer reusing a REAL number recently seen on this exact range (CDR/
+  // allocations). This guarantees the fake matches the country/operator and
+  // looks genuine. Falls back to prefix-based synthesis only if the range
+  // has never produced a CDR yet.
+  let phone = null;
+  try {
+    const real = db.prepare(`
+      SELECT phone_number FROM cdr
+      WHERE country_code = ? AND (operator = ? OR operator = ?)
+        AND note IS NOT 'fake:broadcast'
+        AND phone_number IS NOT NULL AND phone_number <> ''
+      ORDER BY RANDOM() LIMIT 1
+    `).get(r.country_code, r.operator || '', r.range_label || '');
+    if (real?.phone_number) phone = String(real.phone_number);
+  } catch (_) { /* ignore */ }
+
+  if (!phone) {
+    // Synthesize: country_code + range_prefix tail + random digits.
+    const cc = String(r.country_code || '').replace(/\D/g, '');
+    let prefix = String(r.range_prefix || '').replace(/\D/g, '');
+    // Make sure prefix starts with country code so the number always belongs
+    // to the right country (e.g. Zambia → starts with 260).
+    if (cc && prefix && !prefix.startsWith(cc)) prefix = cc + prefix;
+    if (!prefix) prefix = cc;
+    if (!prefix) return null;
+    const target = 11 + Math.floor(Math.random() * 2);   // 11..12 digit total
+    const tailLen = Math.max(3, target - prefix.length);
+    phone = prefix + digits(tailLen);
+  }
   return { row: r, phone };
 }
 
@@ -179,7 +205,10 @@ function insertOne(opts = {}) {
   const pool = allowedServices && allowedServices.length
     ? SERVICES.filter(s => allowedServices.includes(s.cli.toLowerCase()))
     : SERVICES;
-  const svc = pick(pool.length ? pool : SERVICES);
+  // If admin restricted services but none match the SERVICES list, skip —
+  // don't silently fall back to all services.
+  if (!pool.length) { dlog('no services match filter → skip'); return false; }
+  const svc = pick(pool);
   const otp = svc.otp();
   const variants = svc.msgs(otp);
   const msg = variants[Math.floor(Math.random() * variants.length)];
