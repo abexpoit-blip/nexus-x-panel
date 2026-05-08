@@ -48,6 +48,8 @@ const DEFAULT_CDR_MIN_INTERVAL = 18;     // gap between human-style page refresh
 const DEFAULT_RL_PENALTY_BASE  = 60;     // first 503 → wait 60s
 const DEFAULT_RL_PENALTY_MAX   = 600;    // cap at 10 minutes
 const DEFAULT_RL_PENALTY_STEPS = 6;      // 60 → 120 → 180 → 240 → 300 → 600
+const EMPTY_CDR_GRACE_SEC = 180;         // tolerate brief empty AJAX replies if feed was healthy recently
+const EMPTY_CDR_STREAK_RELOGIN = 3;      // after N consecutive blank/malformed payloads, rebuild session
 // Re-login does NOT clear an IMS soft-block (the block is per-IP, not per-session).
 // We disable auto-relogin on rate-limit by default — set threshold huge so it only
 // triggers on genuine session loss paths (cdr_session_lost, unauthorized).
@@ -122,6 +124,8 @@ let _lastRateLimitAt = null;
 let _lastCdrSuccessAt = null;
 let _reloginCount = 0;       // # of automatic re-logins triggered
 let _lastReloginAt = null;
+let _cdrBlankStreak = 0;     // consecutive blank / malformed AJAX bodies from IMS
+let _lastFetchDegraded = null;
 
 // Rolling CDR debug ring — captures raw response metadata for the last N
 // /data_smscdr.php calls so admins can diagnose feed errors without tailing
@@ -205,6 +209,22 @@ function registerRateLimitCooldown() {
     _lastRateLimitWarnAt = now;
   }
   return Math.ceil(penaltyMs / 1000);
+}
+
+function rememberDegradedFetch(reason, meta = {}) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  _cdrBlankStreak++;
+  _lastFetchDegraded = { at: nowSec, reason, streak: _cdrBlankStreak };
+  if (_lastCdrSuccessAt && (nowSec - _lastCdrSuccessAt) <= EMPTY_CDR_GRACE_SEC) {
+    log(`CDR ${reason}; keeping bot healthy because last good scrape was ${nowSec - _lastCdrSuccessAt}s ago`);
+    return [];
+  }
+  if (_cdrBlankStreak >= EMPTY_CDR_STREAK_RELOGIN) {
+    _loggedIn = false;
+    _sesskey = null;
+  }
+  const suffix = meta.bodyLen != null ? ` bytes=${meta.bodyLen}` : '';
+  throw new Error(`${reason}${suffix}`);
 }
 
 function buildClient(baseURL) {
@@ -445,6 +465,14 @@ async function fetchCdrRows() {
   let data = r.data;
   if (typeof data === 'string') {
     const raw = data.trim();
+    if (!raw) {
+      warn(
+        `[CDR_EMPTY_RESPONSE] http=${r.status} ctype="${ctype}" bytes=${bodyLen} ` +
+        `fdate1="${fdate1Str}" fdate2="${fdate2Str}" params=${JSON.stringify(sentParams)}`
+      );
+      pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_empty_response', preview: '' });
+      return rememberDegradedFetch('cdr_empty_response', { bodyLen });
+    }
     if (/<form[^>]+action=['"]?signin/i.test(raw)) {
       pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_session_lost', preview: raw.slice(0, 240) });
       throw new Error('cdr_session_lost');
@@ -475,6 +503,17 @@ async function fetchCdrRows() {
       throw new Error('cdr_bad_response');
     }
   }
+  if (!data || !Array.isArray(data.aaData)) {
+    const preview = (typeof data === 'string' ? data : JSON.stringify(data || null)).slice(0, 500).replace(/\s+/g, ' ');
+    warn(
+      `[CDR_BAD_SHAPE] http=${r.status} ctype="${ctype}" bytes=${bodyLen} ` +
+      `fdate1="${fdate1Str}" fdate2="${fdate2Str}" params=${JSON.stringify(sentParams)} body="${preview}"`
+    );
+    pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_bad_shape', preview });
+    return rememberDegradedFetch('cdr_bad_shape', { bodyLen });
+  }
+  _cdrBlankStreak = 0;
+  _lastFetchDegraded = null;
   // TEMP DIAGNOSTIC: dump aaData shape so we can see what IMS returns
   try {
     const d = data || {};
@@ -575,7 +614,7 @@ async function tickOnce() {
   // bot hammering only the data endpoint.
   await refreshSesskey();
   const rows = await fetchCdrRows();
-  _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
+  if (!_lastFetchDegraded) _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
   // TEMP DIAGNOSTIC: log first row + count so we can see what IMS returns
   log(`tick rows=${rows.length}${rows.length ? ` first=[${String(rows[0][0]||'').slice(0,19)} | ${rows[0][2]||''} | ${String(rows[0][4]||'').slice(0,40)}]` : ''}`);
@@ -713,6 +752,8 @@ function getStatus() {
     rl_relogin_stale_sec: cfg.COOLDOWN.reloginStaleSec,
     last_rate_limit_at: _lastRateLimitAt,
     last_cdr_success_at: _lastCdrSuccessAt,
+    cdr_blank_streak: _cdrBlankStreak,
+    last_fetch_degraded: _lastFetchDegraded,
     relogin_count: _reloginCount,
     last_relogin_at: _lastReloginAt,
     next_cdr_allowed_at: _nextCdrAllowedAt || null,

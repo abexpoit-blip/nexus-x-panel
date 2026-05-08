@@ -4,10 +4,22 @@
 const db = require('./db');
 
 const stmt = db.prepare(`
-  INSERT OR IGNORE INTO otp_audit_log
+  INSERT INTO otp_audit_log
     (source, source_msg_id, phone_number, cli, otp_code, sms_text,
      allocation_id, user_id, outcome, miss_reason, amount_bdt)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(source, source_msg_id) DO UPDATE SET
+    phone_number = COALESCE(excluded.phone_number, otp_audit_log.phone_number),
+    cli = COALESCE(excluded.cli, otp_audit_log.cli),
+    otp_code = COALESCE(excluded.otp_code, otp_audit_log.otp_code),
+    sms_text = COALESCE(excluded.sms_text, otp_audit_log.sms_text),
+    allocation_id = COALESCE(excluded.allocation_id, otp_audit_log.allocation_id),
+    user_id = COALESCE(excluded.user_id, otp_audit_log.user_id),
+    outcome = excluded.outcome,
+    miss_reason = excluded.miss_reason,
+    amount_bdt = COALESCE(excluded.amount_bdt, otp_audit_log.amount_bdt)
+  WHERE otp_audit_log.outcome IN ('mismatch', 'error')
+    AND excluded.outcome IN ('billed', 'duplicate', 'resend')
 `);
 
 /**
