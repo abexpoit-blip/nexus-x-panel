@@ -160,11 +160,6 @@ const AgentConsole = () => {
                   {fullDetail && (
                     <p className="mt-1 text-xs text-muted-foreground truncate">{fullDetail}</p>
                   )}
-                  {c.otp_code ? (
-                    <p className="mt-2 text-2xl text-foreground leading-none font-mono font-bold tracking-widest">
-                      <span className="text-neon-green">{c.otp_code}</span>
-                    </p>
-                  ) : null}
                   {c.sms_text && (
                     <p className="mt-2 text-[12px] text-muted-foreground/90 leading-snug whitespace-pre-wrap break-words font-mono bg-white/[0.02] border border-white/[0.05] rounded-md px-2.5 py-1.5">
                       {c.sms_text.replace(/\d/g, "•")}
