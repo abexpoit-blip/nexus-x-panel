@@ -17,8 +17,8 @@ interface PlexusBackgroundProps {
  * Honors prefers-reduced-motion (renders a static frame instead).
  */
 export const PlexusBackground = ({
-  density = 80,
-  linkDistance = 140,
+  density = 50,
+  linkDistance = 130,
   hue = 188, // matches --primary (neon cyan)
   className,
 }: PlexusBackgroundProps) => {
@@ -31,14 +31,15 @@ export const PlexusBackground = ({
     if (!ctx) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Cap DPR to 1.5 — the canvas is decorative; full DPR doubles GPU cost.
+    let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     let W = 0, H = 0;
 
     type P = { x: number; y: number; vx: number; vy: number; r: number; pulse: number };
     let pts: P[] = [];
 
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       W = canvas.clientWidth;
       H = canvas.clientHeight;
       canvas.width = Math.floor(W * dpr);
@@ -47,7 +48,7 @@ export const PlexusBackground = ({
 
       // Density scales gently with viewport area
       const area = W * H;
-      const target = Math.round(density * Math.min(1.4, Math.max(0.5, area / (1280 * 720))));
+      const target = Math.round(density * Math.min(1.1, Math.max(0.4, area / (1280 * 720))));
       pts = Array.from({ length: target }, () => ({
         x: Math.random() * W,
         y: Math.random() * H,
