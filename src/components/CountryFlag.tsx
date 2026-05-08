@@ -100,7 +100,8 @@ export function CountryFlag({
   // Cache-bust on retry only — successful URLs hit the browser HTTP cache.
   const bust = attempt > 0 ? `?r=${attempt}` : "";
   const src   = `https://flagcdn.com/${cfg.cdn}/${lower}.png${bust}`;
-  const src2x = `https://flagcdn.com/${cfg.cdn === "w20" ? "w40" : cfg.cdn === "w40" ? "w80" : "w160"}/${lower}.png${bust} 2x`;
+  const hi = cfg.cdn === "w40" ? "w80" : "w160";
+  const src2x = `https://flagcdn.com/${hi}/${lower}.png${bust} 2x`;
 
   return (
     <img
