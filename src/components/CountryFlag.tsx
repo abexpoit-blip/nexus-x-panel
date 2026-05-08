@@ -17,11 +17,12 @@ const ISO3_TO_2: Record<string, string> = {
 };
 
 const SIZE_MAP = {
-  xs: { px: 16, w: 20, h: "h-3.5", cdn: "w20" },
-  sm: { px: 20, w: 24, h: "h-4",   cdn: "w20" },
-  md: { px: 28, w: 40, h: "h-5",   cdn: "w40" },
-  lg: { px: 40, w: 60, h: "h-7",   cdn: "w80" },
-  xl: { px: 56, w: 80, h: "h-9",   cdn: "w80" },
+  // Circular flags — width === height for a perfect round badge.
+  xs: { px: 14, w: 14, h: "h-[14px]", cdn: "w40" },
+  sm: { px: 18, w: 18, h: "h-[18px]", cdn: "w40" },
+  md: { px: 22, w: 22, h: "h-[22px]", cdn: "w80" },
+  lg: { px: 30, w: 30, h: "h-[30px]", cdn: "w80" },
+  xl: { px: 40, w: 40, h: "h-[40px]", cdn: "w160" },
 } as const;
 
 type FlagSize = keyof typeof SIZE_MAP;
@@ -85,7 +86,7 @@ export function CountryFlag({
       <span
         title={title || code}
         className={cn(
-          "inline-flex items-center justify-center rounded bg-white/[0.06] border border-white/[0.08] text-[10px] font-bold uppercase tracking-tight text-muted-foreground shrink-0",
+          "inline-flex items-center justify-center rounded-full bg-white/[0.06] border border-white/[0.08] text-[9px] font-bold uppercase tracking-tight text-muted-foreground shrink-0",
           cfg.h, className,
         )}
         style={{ width: cfg.w, minWidth: cfg.w }}
@@ -120,7 +121,7 @@ export function CountryFlag({
         }
       }}
       className={cn(
-        "inline-block rounded-[3px] object-cover shrink-0 ring-1 ring-white/[0.06] shadow-sm",
+        "inline-block rounded-full object-cover shrink-0 ring-1 ring-white/15 shadow-[0_1px_3px_rgba(0,0,0,0.4)]",
         // Smooth fade-in only on first paint — cached flags render instantly.
         loaded ? "opacity-100" : "opacity-0 transition-opacity duration-200",
         cfg.h, className,
