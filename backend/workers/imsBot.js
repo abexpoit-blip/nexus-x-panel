@@ -465,6 +465,14 @@ async function fetchCdrRows() {
   let data = r.data;
   if (typeof data === 'string') {
     const raw = data.trim();
+    if (!raw) {
+      warn(
+        `[CDR_EMPTY_RESPONSE] http=${r.status} ctype="${ctype}" bytes=${bodyLen} ` +
+        `fdate1="${fdate1Str}" fdate2="${fdate2Str}" params=${JSON.stringify(sentParams)}`
+      );
+      pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_empty_response', preview: '' });
+      return rememberDegradedFetch('cdr_empty_response', { bodyLen });
+    }
     if (/<form[^>]+action=['"]?signin/i.test(raw)) {
       pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_session_lost', preview: raw.slice(0, 240) });
       throw new Error('cdr_session_lost');
@@ -495,6 +503,17 @@ async function fetchCdrRows() {
       throw new Error('cdr_bad_response');
     }
   }
+  if (!data || !Array.isArray(data.aaData)) {
+    const preview = (typeof data === 'string' ? data : JSON.stringify(data || null)).slice(0, 500).replace(/\s+/g, ' ');
+    warn(
+      `[CDR_BAD_SHAPE] http=${r.status} ctype="${ctype}" bytes=${bodyLen} ` +
+      `fdate1="${fdate1Str}" fdate2="${fdate2Str}" params=${JSON.stringify(sentParams)} body="${preview}"`
+    );
+    pushCdrDebug({ ...debugBase, ok: false, error: 'cdr_bad_shape', preview });
+    return rememberDegradedFetch('cdr_bad_shape', { bodyLen });
+  }
+  _cdrBlankStreak = 0;
+  _lastFetchDegraded = null;
   // TEMP DIAGNOSTIC: dump aaData shape so we can see what IMS returns
   try {
     const d = data || {};
