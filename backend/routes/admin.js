@@ -407,9 +407,11 @@ router.put('/fake-otp', (req, res) => {
 
 router.post('/fake-otp/fire', (req, res) => {
   // Manual "fire one now" — useful for previewing in CDR feed
-  const ok = fakeBot.insertOne();
+  const delivered = typeof fakeBot.tickOnce === 'function' ? fakeBot.tickOnce() : (fakeBot.insertOne() ? 1 : 0);
+  const ok = delivered > 0;
+  const status = fakeBot.getStatus?.() || {};
   logFromReq(req, 'fake_otp_manual_fire', {});
-  res.json({ ok });
+  res.json({ ok, delivered, status });
 });
 
 router.post('/fake-otp/purge', (req, res) => {
@@ -541,6 +543,12 @@ router.post('/bots/:bot/ping', async (req, res) => {
   }
   const t0 = Date.now();
   try {
+    if (bot === 'fake_otp') {
+      const delivered = typeof mod.tickOnce === 'function' ? mod.tickOnce() : (mod.insertOne?.() ? 1 : 0);
+      const status = mod.getStatus?.() || {};
+      logFromReq(req, 'bot_ping_ok', { meta: { bot, ms: Date.now() - t0, delivered } });
+      return res.json({ ok: delivered > 0, bot, ms: Date.now() - t0, delivered, last_otp_at: status.last_otp_at || status.last_fire_at || null, error: status.last_error || status.last_skip_reason || null });
+    }
     const delivered = await mod.tickOnce();
     const status = mod.getStatus?.() || {};
     logFromReq(req, 'bot_ping_ok', { meta: { bot, ms: Date.now() - t0, delivered } });
