@@ -4,11 +4,9 @@
 const db = require('../lib/db');
 const { getOtpExpirySec } = require('../lib/settings');
 
-// Late-OTP grace window (must match findActiveAllocation GRACE_SEC in bots).
-// During this window: allocation is 'expired' (UI hides timer) but the pool
-// number stays 'allocated' so the bot can still credit a late SMS to the
-// original agent before the MSISDN is recycled.
-const GRACE_SEC = 300;
+// Recycle immediately after the configured expiry. Bots must not credit OTPs
+// to expired allocations; this avoids old/recycled numbers delivering later.
+const GRACE_SEC = 0;
 
 function sweep() {
   try {
