@@ -230,7 +230,12 @@ function insertOne(opts = {}) {
   // to admin id if the seed didn't run yet.
   const ownerId = db.prepare("SELECT id FROM users WHERE username = 'Nexus Telegram'").get()?.id
     ?? db.prepare("SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").get()?.id;
-  if (!ownerId) { dlog('no fake-owner user → skip'); return false; }
+  if (!ownerId) {
+    _lastError = null;
+    _lastSkipReason = 'no fake-owner user';
+    dlog(`${_lastSkipReason} → skip`);
+    return false;
+  }
 
   try {
     db.prepare(`
@@ -258,6 +263,8 @@ let _running = false;
 let _stopFlag = false;
 let _lastFireAt = null;
 let _totalFired = 0;
+let _lastError = null;
+let _lastSkipReason = null;
 let _wakeResolve = null;   // lets start() interrupt the idle/sleep wait
 
 function sleepInterruptible(ms) {
@@ -320,6 +327,8 @@ function getStatus() {
     running: _running,
     last_fire_at: _lastFireAt,
     total_fired: _totalFired,
+    last_error: _lastError,
+    last_skip_reason: _lastSkipReason,
     min_sec: c.minSec,
     max_sec: c.maxSec,
     burst: c.burst,
