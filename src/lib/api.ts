@@ -543,7 +543,7 @@ export const api = {
       request<{ ok: boolean }>("/admin/fake-otp", {
         method: "PUT", body: JSON.stringify(body),
       }),
-    fireNow: () => request<{ ok: boolean }>("/admin/fake-otp/fire", { method: "POST" }),
+    fireNow: () => request<{ ok: boolean; delivered: number; status?: { last_error?: string | null; last_skip_reason?: string | null; last_otp_at?: number | null; last_fire_at?: number | null } }>("/admin/fake-otp/fire", { method: "POST" }),
     purge: () => request<{ ok: boolean; removed: number }>("/admin/fake-otp/purge", { method: "POST" }),
   },
 };
@@ -648,6 +648,7 @@ export interface BotInfo {
   status: (ProviderBotStatus & {
     total_fired?: number;
     last_fire_at?: number | null;
+      last_skip_reason?: string | null;
     min_sec?: number;
     max_sec?: number;
     burst?: number;

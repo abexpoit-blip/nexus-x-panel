@@ -144,14 +144,14 @@ const BotCard = ({ info, onAction, onHealth, onPing, busy, healthResult, pingRes
         </div>
       )}
 
-      {/* Last error */}
-      {s.last_error || s.error ? (
+      {/* Last error / skip reason */}
+      {s.last_error || s.error || s.last_skip_reason ? (
         <div className="mb-4 p-3 rounded-lg bg-destructive/[0.06] border border-destructive/30 relative">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-destructive/80 font-semibold">Last error</div>
-              <div className="text-xs text-foreground/90 mt-0.5 break-words font-mono">{s.last_error || s.error}</div>
+              <div className="text-[10px] uppercase tracking-wider text-destructive/80 font-semibold">{s.last_skip_reason && !s.last_error && !s.error ? "Last skip" : "Last error"}</div>
+              <div className="text-xs text-foreground/90 mt-0.5 break-words font-mono">{s.last_error || s.error || s.last_skip_reason}</div>
               {typeof s.consec_fail === "number" && s.consec_fail > 0 && (
                 <div className="text-[10px] text-muted-foreground mt-1">Consecutive failures: {s.consec_fail}</div>
               )}
@@ -228,18 +228,16 @@ const BotCard = ({ info, onAction, onHealth, onPing, busy, healthResult, pingRes
             Test
           </Button>
         )}
-        {info.key !== "fake_otp" && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onPing}
-            disabled={busy !== null}
-            className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
-          >
-            {busy === "ping" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Radar className="w-3.5 h-3.5 mr-1.5" />}
-            Ping scrape
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onPing}
+          disabled={busy !== null}
+          className="border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
+        >
+          {busy === "ping" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Radar className="w-3.5 h-3.5 mr-1.5" />}
+          {info.key === "fake_otp" ? "Fire one" : "Ping scrape"}
+        </Button>
         {s.base_url && (
           <span className="ml-auto text-[10px] font-mono text-muted-foreground/60 self-center truncate max-w-[200px]">
             {s.base_url}

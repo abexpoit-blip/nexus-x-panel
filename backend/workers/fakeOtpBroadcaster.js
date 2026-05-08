@@ -258,6 +258,17 @@ function insertOne(opts = {}) {
   return true;
 }
 
+function tickOnce(opts = {}) {
+  const ok = insertOne(opts);
+  tel.recordTick();
+  if (ok) {
+    _totalFired++;
+    _lastFireAt = Math.floor(Date.now() / 1000);
+    tel.recordOtpDelivered();
+  }
+  return ok ? 1 : 0;
+}
+
 // ────────────────────── Loop ──────────────────────
 let _running = false;
 let _stopFlag = false;
@@ -288,14 +299,9 @@ async function loop() {
     try {
       const burst = 1 + Math.floor(Math.random() * c.burst);
       for (let i = 0; i < burst; i++) {
-        if (insertOne()) {
-          _totalFired++;
-          _lastFireAt = Math.floor(Date.now() / 1000);
-          tel.recordOtpDelivered();
-        }
+        tickOnce();
         if (i < burst - 1) await new Promise(r => setTimeout(r, 600 + Math.random() * 1400));
       }
-      tel.recordTick();
     } catch (e) {
       warn('insertOne error:', e.message);
       tel.recordError(e.message);
@@ -344,4 +350,4 @@ function purgeAll() {
   return r.changes || 0;
 }
 
-module.exports = { start, stop, getStatus, insertOne, purgeAll };
+module.exports = { start, stop, getStatus, insertOne, tickOnce, purgeAll };
