@@ -200,14 +200,26 @@ function insertOne(opts = {}) {
   const rangeIds = opts.rangeIds || c.rangeIds;
   const allowedServices = opts.services || c.services;   // null = all
   const pick1 = pickRangeAndPhone(rangeIds);
-  if (!pick1) { dlog('no enabled provider_ranges → skip'); return false; }
+  if (!pick1) {
+    _lastError = null;
+    _lastSkipReason = rangeIds && rangeIds.length
+      ? 'no enabled selected ranges'
+      : 'no enabled provider ranges';
+    dlog(`${_lastSkipReason} → skip`);
+    return false;
+  }
   const { row, phone } = pick1;
   const pool = allowedServices && allowedServices.length
     ? SERVICES.filter(s => allowedServices.includes(s.cli.toLowerCase()))
     : SERVICES;
   // If admin restricted services but none match the SERVICES list, skip —
   // don't silently fall back to all services.
-  if (!pool.length) { dlog('no services match filter → skip'); return false; }
+  if (!pool.length) {
+    _lastError = null;
+    _lastSkipReason = 'no services match filter';
+    dlog(`${_lastSkipReason} → skip`);
+    return false;
+  }
   const svc = pick(pool);
   const otp = svc.otp();
   const variants = svc.msgs(otp);
@@ -220,14 +232,23 @@ function insertOne(opts = {}) {
     ?? db.prepare("SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").get()?.id;
   if (!ownerId) { dlog('no fake-owner user → skip'); return false; }
 
-  db.prepare(`
-    INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator,
-                     phone_number, otp_code, cli, price_bdt, status, note, sms_text)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?)
-  `).run(
-    ownerId, row.provider, row.country_code, row.operator || row.range_label,
-    phone, otp, svc.cli, msg
-  );
+  try {
+    db.prepare(`
+      INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator,
+                       phone_number, otp_code, cli, price_bdt, status, note, sms_text)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?)
+    `).run(
+      ownerId, row.provider, row.country_code, row.operator || row.range_label,
+      phone, otp, svc.cli, msg
+    );
+  } catch (e) {
+    _lastError = e.message;
+    _lastSkipReason = null;
+    warn('insertOne db error:', e.message);
+    return false;
+  }
+  _lastError = null;
+  _lastSkipReason = null;
   dlog(`✓ fake [${row.country_code}/${row.operator || row.range_label}] ${phone} → ${svc.cli}:${otp}`);
   return true;
 }
