@@ -57,6 +57,8 @@ function findMatchingAllocation({
   lateGraceSec = 300,
   resendSec = 600,
   futureSkewSec = 60,
+  allowExpired = true,
+  eventClockSkewSec = null,
 }) {
   const tail = normalizeTail(phone);
   if (!provider || !tail) return null;
@@ -78,6 +80,9 @@ function findMatchingAllocation({
   const newestRelevantAt = anchorNew + skew;
   const resendSince = anchorOld - Math.max(0, +resendSec || 0);
   const serviceId = resolveServiceId(cliSlug);
+  const eventClockSkew = Number.isFinite(+eventClockSkewSec) && +eventClockSkewSec >= 0
+    ? +eventClockSkewSec
+    : null;
 
   const loadCandidates = (extraSql = '', extraArgs = []) => db.prepare(`
     SELECT id, user_id, phone_number, provider, country_code, operator,
@@ -107,22 +112,40 @@ function findMatchingAllocation({
   );
 
   const pick = (rows) => {
+    const filtered = rows.filter((row) => {
+      if (!row) return false;
+
+      if (row.status === 'expired' && !allowExpired) return false;
+
+      if (eventClockSkew === null || !Number.isFinite(eventAt) || eventAt <= 0) {
+        return true;
+      }
+
+      const referenceAt = row.status === 'received'
+        ? (row.otp_received_at || row.allocated_at)
+        : row.allocated_at;
+
+      if (!Number.isFinite(+referenceAt) || +referenceAt <= 0) return true;
+
+      return +referenceAt <= (eventAt + eventClockSkew + skew);
+    });
+
     // 1) Best: full phone match AND range match (when panel exposes range).
-    const exactBoth = rows.filter((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row));
+    const exactBoth = filtered.filter((row) => samePhone(row.phone_number, phone) && sameRange(panelRange, row));
     if (exactBoth.length === 1) return exactBoth[0];
     if (exactBoth.length > 1) return exactBoth[0]; // already narrowed by phone+range; newest wins
 
     // 2) Phone matches exactly, no range info from panel — only deliver if
     //    there's exactly ONE such allocation. Multiple = ambiguous → drop
     //    rather than risk delivering an OTP to the wrong agent.
-    const exactPhone = rows.filter((row) => samePhone(row.phone_number, phone));
+    const exactPhone = filtered.filter((row) => samePhone(row.phone_number, phone));
     if (exactPhone.length === 1) return exactPhone[0];
     if (exactPhone.length > 1 && !panelRange) return null;
 
     // 3) Phone tail-only match (e.g. panel reports "0971234567" but allocation
     //    stored "260971234567"). Only accept when exactly one candidate AND
     //    range matches (or panel has no range info and only one candidate exists).
-    const ranged = rows.filter((row) => sameRange(panelRange, row));
+    const ranged = filtered.filter((row) => sameRange(panelRange, row));
     return ranged.length === 1 ? ranged[0] : null;
   };
 
