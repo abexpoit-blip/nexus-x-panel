@@ -495,7 +495,7 @@ const AgentRanges = () => {
                   <div className="flex items-center gap-2 min-w-0">
                     {selectedCountry ? (
                       <>
-                        <CountryFlag code={selectedCountry.country_code} size="lg" />
+                        <CountryFlag code={selectedCountry.country_code} size="lg" premium />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <div className="font-display text-sm font-semibold text-foreground truncate leading-tight">{selectedCountry.country_name}</div>
