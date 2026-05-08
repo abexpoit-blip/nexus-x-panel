@@ -614,7 +614,7 @@ async function tickOnce() {
   // bot hammering only the data endpoint.
   await refreshSesskey();
   const rows = await fetchCdrRows();
-  _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
+  if (!_lastFetchDegraded) _lastCdrSuccessAt = Math.floor(Date.now() / 1000);
   let delivered = 0;
   // TEMP DIAGNOSTIC: log first row + count so we can see what IMS returns
   log(`tick rows=${rows.length}${rows.length ? ` first=[${String(rows[0][0]||'').slice(0,19)} | ${rows[0][2]||''} | ${String(rows[0][4]||'').slice(0,40)}]` : ''}`);
