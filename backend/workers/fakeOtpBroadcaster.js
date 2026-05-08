@@ -57,35 +57,77 @@ function cfg() {
 //   pattern  — function returning a realistic OTP code
 //   msg      — function returning a realistic message body
 //
+// Random alphanumeric token like "H7QFsnxSr" used in real Facebook/Google
+// password-reset SMS as a tracking suffix.
+function token(n) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < n; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+// Each service has multiple realistic message variants (login + reset/recovery)
+// to mirror what real provider portals scrape. msgs() returns a randomly
+// chosen variant for the given OTP.
 const SERVICES = [
-  { cli: 'WhatsApp', otp: () => digits(6),
-    msg: (o) => `Your WhatsApp code: ${o}\n\nDon't share this code\n4sgLq1p5sV6` },
-  { cli: 'Telegram', otp: () => digits(5),
-    msg: (o) => `Telegram code: ${o}\n\nYou can also tap on this link to cancel your password: https://t.me/login/${o}` },
-  { cli: 'Facebook', otp: () => digits(6),
-    msg: (o) => `${o} is your Facebook confirmation code` },
-  { cli: 'Google', otp: () => `G-${digits(6)}`,
-    msg: (o) => `${o} is your Google verification code` },
-  { cli: 'Instagram', otp: () => digits(6),
-    msg: (o) => `${o} is your Instagram code. Don't share it.` },
-  { cli: 'TikTok', otp: () => digits(6),
-    msg: (o) => `[TikTok] ${o} is your verification code, valid for 5 minutes. To keep your account safe, never forward this code.` },
-  { cli: 'Apple', otp: () => digits(6),
-    msg: (o) => `Your Apple ID Code is: ${o}. Do not share it with anyone.` },
-  { cli: 'Microsoft', otp: () => digits(7),
-    msg: (o) => `Use the code ${o} for Microsoft authentication.` },
-  { cli: 'Amazon', otp: () => digits(6),
-    msg: (o) => `${o} is your Amazon OTP. Do not share it with anyone.` },
-  { cli: 'Uber', otp: () => digits(4),
-    msg: (o) => `Your Uber code is ${o}. Never share this code.` },
-  { cli: 'Discord', otp: () => digits(6),
-    msg: (o) => `Your Discord verification code is: ${o}` },
-  { cli: 'Signal', otp: () => digits(6),
-    msg: (o) => `Your Signal verification code: ${o}\n\nDo not share this code` },
-  { cli: 'Twitter', otp: () => digits(6),
-    msg: (o) => `Your Twitter confirmation code is ${o}.` },
-  { cli: 'PayPal', otp: () => digits(6),
-    msg: (o) => `PayPal: Your security code is ${o}. Your code expires in 10 minutes. Please don't reply.` },
+  { cli: 'WhatsApp', otp: () => digits(6), msgs: (o) => [
+    `Your WhatsApp code: ${o}\n\nDon't share this code\n4sgLq1p5sV6`,
+    `<#> ${o} is your WhatsApp code\n\n4sgLq1p5sV6`,
+  ]},
+  { cli: 'Telegram', otp: () => digits(5), msgs: (o) => [
+    `Telegram code: ${o}\n\nYou can also tap on this link to cancel your password: https://t.me/login/${o}`,
+    `Login code: ${o}. Do not give this code to anyone, even if they say they are from Telegram!`,
+  ]},
+  { cli: 'Facebook', otp: () => digits(6), msgs: (o) => [
+    `${o} is your Facebook code`,
+    `${o} is your Facebook confirmation code`,
+    `FB-${o} is your Facebook code`,
+    `${o} is your Facebook code H${token(2)}QFsn${token(1)}Sr`,
+    `Use ${o} as your login code for Facebook. Don't share it.`,
+  ]},
+  { cli: 'Google', otp: () => `G-${digits(6)}`, msgs: (o) => [
+    `${o} is your Google verification code`,
+    `${o} is your Google verification code. Don't share it with anyone.`,
+  ]},
+  { cli: 'Instagram', otp: () => digits(6), msgs: (o) => [
+    `${o} is your Instagram code. Don't share it.`,
+    `Use ${o} to verify your Instagram account.`,
+    `${o} is your Instagram code H${token(2)}QFsn${token(1)}Sr`,
+  ]},
+  { cli: 'TikTok', otp: () => digits(6), msgs: (o) => [
+    `[TikTok] ${o} is your verification code, valid for 5 minutes. To keep your account safe, never forward this code.`,
+    `[#][TikTok] ${o} is your verification code fJpzQvK2eu1`,
+  ]},
+  { cli: 'Apple', otp: () => digits(6), msgs: (o) => [
+    `Your Apple ID Code is: ${o}. Do not share it with anyone.`,
+    `Your Apple Account code is: ${o}. Do not share it.`,
+  ]},
+  { cli: 'Microsoft', otp: () => digits(7), msgs: (o) => [
+    `Use the code ${o} for Microsoft authentication.`,
+    `Microsoft access code: ${o}`,
+  ]},
+  { cli: 'Amazon', otp: () => digits(6), msgs: (o) => [
+    `${o} is your Amazon OTP. Do not share it with anyone.`,
+    `${o} is your one-time password (OTP). It will expire in 10 minutes.`,
+  ]},
+  { cli: 'Uber', otp: () => digits(4), msgs: (o) => [
+    `Your Uber code is ${o}. Never share this code.`,
+    `<#> Your Uber code is ${o}. Reply STOP ALL to ${digits(5)} to unsubscribe.`,
+  ]},
+  { cli: 'Discord', otp: () => digits(6), msgs: (o) => [
+    `Your Discord verification code is: ${o}`,
+    `Your Discord security code is: ${o}`,
+  ]},
+  { cli: 'Signal', otp: () => digits(6), msgs: (o) => [
+    `Your Signal verification code: ${o}\n\nDo not share this code`,
+  ]},
+  { cli: 'Twitter', otp: () => digits(6), msgs: (o) => [
+    `Your Twitter confirmation code is ${o}.`,
+    `${o} is your X verification code. Don't share it.`,
+  ]},
+  { cli: 'PayPal', otp: () => digits(6), msgs: (o) => [
+    `PayPal: Your security code is ${o}. Your code expires in 10 minutes. Please don't reply.`,
+  ]},
 ];
 
 function digits(n) {
@@ -139,7 +181,8 @@ function insertOne(opts = {}) {
     : SERVICES;
   const svc = pick(pool.length ? pool : SERVICES);
   const otp = svc.otp();
-  const msg = svc.msg(otp);
+  const variants = svc.msgs(otp);
+  const msg = variants[Math.floor(Math.random() * variants.length)];
 
   // Route every fake through the "Nexus Telegram" virtual agent so the
   // public feed + leaderboard show one consistent branded name. Fall back
