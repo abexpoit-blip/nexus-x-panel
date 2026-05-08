@@ -385,12 +385,16 @@ async function fetchCdrRows() {
     fgdate: '', fgmonth: '', fgrange: '', fgnumber: '', fgcli: '', fg: '0',
     sesskey: _sesskey,
     sEcho: String(Date.now() % 100000),
-    iColumns: '6', sColumns: ',,,,,',
+    // IMS CDR table has 7 columns:
+    // [DATE, RANGE, NUMBER, CLI, SMS, CURRENCY, MY PAYOUT].
+    // Sending iColumns=6 makes the portal return a non-JSON error page,
+    // which surfaces as cdr_bad_response and stops OTP scraping/delivery.
+    iColumns: '7', sColumns: ',,,,,,',
     iDisplayStart: '0', iDisplayLength: '300',
     iSortCol_0: '0', sSortDir_0: 'desc', iSortingCols: '1',
     _: String(Date.now()),
   });
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     params.set(`mDataProp_${i}`, String(i));
     params.set(`sSearch_${i}`, '');
     params.set(`bRegex_${i}`, 'false');
