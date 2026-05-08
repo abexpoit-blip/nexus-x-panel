@@ -162,34 +162,40 @@ function pickRangeAndPhone(rangeIds) {
   if (!ranges.length) return null;
   const r = ranges[0];
 
-  // Prefer reusing a REAL number recently seen on this exact range (CDR/
-  // allocations). This guarantees the fake matches the country/operator and
-  // looks genuine. Falls back to prefix-based synthesis only if the range
-  // has never produced a CDR yet.
-  let phone = null;
-  try {
-    const real = db.prepare(`
-      SELECT phone_number FROM cdr
-      WHERE country_code = ? AND (operator = ? OR operator = ?)
-        AND note IS NOT 'fake:broadcast'
-        AND phone_number IS NOT NULL AND phone_number <> ''
-      ORDER BY RANDOM() LIMIT 1
-    `).get(r.country_code, r.operator || '', r.range_label || '');
-    if (real?.phone_number) phone = String(real.phone_number);
-  } catch (_) { /* ignore */ }
+  // CRITICAL: Fake numbers must NEVER overlap with real agent allocations.
+  // Otherwise agents see fakes drop on their currently-held numbers and
+  // think the bot is feeding them garbage OTPs. So:
+  //   1. Always SYNTHESIZE a new phone using country_code + range_prefix.
+  //   2. Reject if it collides with any active (non-expired, non-released)
+  //      allocation, or with any allocation owned by a real (non-admin)
+  //      agent — try a few times before giving up.
+  const cc = String(r.country_code || '').replace(/\D/g, '');
+  let prefix = String(r.range_prefix || '').replace(/\D/g, '');
+  if (cc && prefix && !prefix.startsWith(cc)) prefix = cc + prefix;
+  if (!prefix) prefix = cc;
+  if (!prefix) return null;
 
-  if (!phone) {
-    // Synthesize: country_code + range_prefix tail + random digits.
-    const cc = String(r.country_code || '').replace(/\D/g, '');
-    let prefix = String(r.range_prefix || '').replace(/\D/g, '');
-    // Make sure prefix starts with country code so the number always belongs
-    // to the right country (e.g. Zambia → starts with 260).
-    if (cc && prefix && !prefix.startsWith(cc)) prefix = cc + prefix;
-    if (!prefix) prefix = cc;
-    if (!prefix) return null;
+  let phone = null;
+  for (let attempt = 0; attempt < 8; attempt++) {
     const target = 11 + Math.floor(Math.random() * 2);   // 11..12 digit total
     const tailLen = Math.max(3, target - prefix.length);
-    phone = prefix + digits(tailLen);
+    const candidate = prefix + digits(tailLen);
+    let collision = false;
+    try {
+      const hit = db.prepare(`
+        SELECT 1 FROM allocations a
+        JOIN users u ON u.id = a.user_id
+        WHERE a.phone_number = ?
+          AND u.role <> 'admin'
+        LIMIT 1
+      `).get(candidate);
+      if (hit) collision = true;
+    } catch (_) { /* table shape may differ — skip check */ }
+    if (!collision) { phone = candidate; break; }
+  }
+  if (!phone) {
+    _lastSkipReason = 'phone collision with real allocation';
+    return null;
   }
   return { row: r, phone };
 }
