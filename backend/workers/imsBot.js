@@ -37,8 +37,9 @@ const warn = (...a) => console.warn('[ims-bot]', ...a);
 
 const MIN_INTERVAL = 16; // hard floor — IMS warns at <15s
 const MIN_INTERVAL_FLOOR = 16; // absolute minimum admin can configure (IMS rule = 15s, +1s safety)
-const IMS_EXPIRED_GRACE_SEC = 300; // late OTPs after expiry still credit original holder
+const IMS_EXPIRED_GRACE_SEC = 0;   // hard stop: expired numbers must not receive OTP
 const IMS_RESEND_SEC = 600;        // additional OTPs shortly after delivery stay on same allocation
+const IMS_PANEL_CLOCK_SKEW_SEC = 8 * 3600; // IMS timestamps can be hours behind VPS UTC
 
 // Defaults for the CDR cooldown / rate-limit backoff. Admins can override
 // these at runtime via the settings table — no redeploy required.
@@ -567,6 +568,8 @@ function findActiveAllocation(phone) {
     eventAtSec: arguments[1] || null,
     lateGraceSec: IMS_EXPIRED_GRACE_SEC,
     resendSec: IMS_RESEND_SEC,
+    allowExpired: false,
+    eventClockSkewSec: IMS_PANEL_CLOCK_SKEW_SEC,
   });
 }
 
@@ -598,6 +601,8 @@ function findAllocationForCdr(phone, cliSlug, cdrAtSec = null, panelRange = null
     eventAtSec: cdrAtSec,
     lateGraceSec: IMS_EXPIRED_GRACE_SEC,
     resendSec: IMS_RESEND_SEC,
+    allowExpired: false,
+    eventClockSkewSec: IMS_PANEL_CLOCK_SKEW_SEC,
   });
 }
 
