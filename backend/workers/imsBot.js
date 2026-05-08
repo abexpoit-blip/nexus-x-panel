@@ -546,11 +546,12 @@ function cliToServiceSlug(cli, msg) {
 
 // Service-aware allocation match: prefer allocation whose service_id maps
 // to the slug derived from CLI. Falls back to phone-only match.
-function findAllocationForCdr(phone, cliSlug, cdrAtSec = null) {
+function findAllocationForCdr(phone, cliSlug, cdrAtSec = null, panelRange = null) {
   return findMatchingAllocation({
     provider: 'ims',
     phone,
     cliSlug,
+    panelRange,
     eventAtSec: cdrAtSec,
     lateGraceSec: IMS_EXPIRED_GRACE_SEC,
     resendSec: IMS_RESEND_SEC,
@@ -579,7 +580,7 @@ async function tickOnce() {
     if (!r || !r.otp) continue;
     if (_seenIds.has(r.dedup_key) || hasSeenSourceMessage('ims', r.dedup_key)) continue;
     const cliSlug = cliToServiceSlug(r.cli, r.msg);
-    const alloc = findAllocationForCdr(r.phone, cliSlug, r.cdr_at);
+    const alloc = findAllocationForCdr(r.phone, cliSlug, r.cdr_at, r.range);
     if (!alloc) {
       log('no live alloc for', r.phone, 'tail=', String(r.phone).slice(-9), 'otp=', r.otp, 'cli=', r.cli || '?', 'service=', cliSlug || '-', 'cdr_at=', r.cdr_at || 'now', '→ will retry');
       tel.recordMiss(r.phone, `OTP "${r.otp}" (${r.cli || '?'}) arrived but no live allocation matched suffix-9${cliSlug ? `+service=${cliSlug}` : ''}`);

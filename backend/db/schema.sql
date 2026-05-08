@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS allocations (
   provider_ref TEXT,                          -- upstream provider reference, if any
   country_code TEXT,
   operator TEXT,
+  range_id INTEGER REFERENCES provider_ranges(id) ON DELETE SET NULL,
+  range_label TEXT,
   phone_number TEXT NOT NULL,
   otp TEXT,
   cli TEXT,                                   -- service/CLI tag (Facebook, WhatsApp, Telegram, etc.)

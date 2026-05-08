@@ -39,6 +39,8 @@ _ensureCol('cdr', 'sms_text', 'TEXT');
 _ensureCol('cdr', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
 _ensureCol('allocations', 'cli', 'TEXT');
 _ensureCol('allocations', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
+_ensureCol('allocations', 'range_id', 'INTEGER REFERENCES provider_ranges(id) ON DELETE SET NULL');
+_ensureCol('allocations', 'range_label', 'TEXT');
 
 // --- Self-healing: ensure pool tables exist (idempotent) ---
 // Prevents "no such table: provider_ranges / pool_numbers" when the runtime

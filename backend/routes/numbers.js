@@ -258,8 +258,8 @@ router.post('/get', authRequired, (req, res) => {
 
   const result = { allocated: [], errors: [] };
   const insAlloc = db.prepare(`
-    INSERT INTO allocations (user_id, provider, country_code, operator, phone_number, status, price_bdt, service_id)
-    VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+    INSERT INTO allocations (user_id, provider, country_code, operator, phone_number, status, price_bdt, service_id, range_id, range_label)
+    VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
   `);
   const claimFree = db.prepare(`
     UPDATE pool_numbers
@@ -278,7 +278,7 @@ router.post('/get', authRequired, (req, res) => {
       const allocRes = insAlloc.run(
         u.id, rangeRow.provider, rangeRow.country_code,
         rangeRow.operator || null, claimed.msisdn, rangeRow.price_bdt || 0,
-        rangeRow.service_id || null
+        rangeRow.service_id || null, rangeRow.id, rangeRow.range_label || null
       );
       result.allocated.push({
         id: allocRes.lastInsertRowid,
