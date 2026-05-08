@@ -366,8 +366,11 @@ async function markOtpReceived(allocation, otpCode, cli = null, smsTextArg = nul
   //   • If it's 'received' with a DIFFERENT otp (site sent a 2nd code) → log it
   //     as a fresh notification but do NOT bill again. Stores latest OTP on row.
   const fresh = db.prepare(
-    `SELECT id, status, otp FROM allocations WHERE id = ?`
+    `SELECT id, status, otp, allocated_at, otp_received_at FROM allocations WHERE id = ?`
   ).get(allocation.id);
+  if (!fresh) {
+    throw new Error('allocation_not_found');
+  }
   if (fresh && fresh.status === 'received') {
     if (fresh.otp === otpCode) {
       logOtpAudit({ ...auditBase, outcome: 'duplicate',
@@ -383,6 +386,19 @@ async function markOtpReceived(allocation, otpCode, cli = null, smsTextArg = nul
     logOtpAudit({ ...auditBase, outcome: 'resend',
       miss_reason: '2nd OTP after allocation already billed (no re-bill)' });
     return;
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expirySec = Math.max(1, +getOtpExpirySec() || 600);
+  if (fresh.status !== 'active') {
+    logOtpAudit({ ...auditBase, outcome: 'mismatch',
+      miss_reason: `allocation status is ${fresh.status}; expired/released numbers cannot receive OTP` });
+    throw new Error(`allocation_not_active:${fresh.status}`);
+  }
+  if ((+fresh.allocated_at || 0) + expirySec < nowSec) {
+    logOtpAudit({ ...auditBase, outcome: 'mismatch',
+      miss_reason: `allocation older than expiry window (${expirySec}s); OTP rejected` });
+    throw new Error('allocation_expired_by_time');
   }
 
   const { agent_amount } = agentPayout({
