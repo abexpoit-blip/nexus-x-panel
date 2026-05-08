@@ -34,6 +34,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { findMatchingAllocation, hasSeenSourceMessage } = require('../lib/allocationMatcher');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -125,22 +126,7 @@ function buildUrl(BASE_URL, TOKEN) {
 //   • expired within GRACE_SEC            — late SMS still credits original agent
 //   • received within RESEND_SEC          — site sent a 2nd / re-confirm OTP
 function findActiveAllocation(phone) {
-  const tail = String(phone).replace(/\D/g, '').slice(-9);
-  if (!tail) return null;
-  const GRACE_SEC  = 300;
-  const RESEND_SEC = 600;
-  const now = Math.floor(Date.now() / 1000);
-  return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
-    FROM allocations
-    WHERE phone_number LIKE ?
-      AND (
-            status = 'active'
-         OR (status = 'expired'  AND allocated_at >= ?)
-         OR (status = 'received' AND allocated_at >= ?)
-      )
-    ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, now - GRACE_SEC, now - RESEND_SEC);
+  return findMatchingAllocation({ provider: 'xisora', phone, lateGraceSec: 300, resendSec: 600 });
 }
 
 function extractOtp(message) {
@@ -297,7 +283,7 @@ async function tickOnce() {
   for (const row of rows) {
     if (!row || !row.number || !row.message) continue;
     const dedupKey = `${row.datetime}|${row.number}|${String(row.message).slice(0, 60)}`;
-    if (_seenIds.has(dedupKey)) continue;
+    if (_seenIds.has(dedupKey) || hasSeenSourceMessage('xisora', dedupKey)) continue;
     _seenIds.add(dedupKey);
     if (_seenIds.size > SEEN_MAX) {
       const arr = Array.from(_seenIds);

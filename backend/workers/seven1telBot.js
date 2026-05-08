@@ -27,6 +27,7 @@ const { wrapper } = require('axios-cookiejar-support');
 const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
+const { findMatchingAllocation, hasSeenSourceMessage } = require('../lib/allocationMatcher');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -206,6 +207,12 @@ function fmtDate(d) {
          `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+function parsePanelTimestamp(dateCol) {
+  const m = String(dateCol || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return Math.floor(new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`).getTime() / 1000);
+}
+
 async function fetchCdrRows() {
   // Window: -2h … +2h around the VPS clock. This covers any TZ skew up to
   // ±2 hours (Seven1Tel server is in BD/UTC+6, our VPS is UTC) while keeping
@@ -266,6 +273,7 @@ function parseRow(row) {
     msg,
     cli,
     range,
+    cdr_at: parsePanelTimestamp(dateCol),
     dedup_key: `${phone}|${(msg || '').slice(0, 60)}`,
   };
 }
@@ -277,23 +285,13 @@ function findActiveAllocation(phone) {
   //   • status='expired' within GRACE_SEC         — SMS arrived seconds late
   //   • status='received' within RESEND_SEC       — site sent a 2nd OTP
   // The agent who originally held the number still gets credited.
-  const GRACE_SEC  = 300;  // 5 min late tolerance
-  const RESEND_SEC = 600;  // 10 min re-confirm window
-  const tail = phone.slice(-9);
-  const cutoffActive   = Math.floor(Date.now() / 1000);  // anything still 'active' is fine
-  const cutoffExpired  = cutoffActive - GRACE_SEC;
-  const cutoffReceived = cutoffActive - RESEND_SEC;
-  return db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
-    FROM allocations
-    WHERE phone_number LIKE ?
-      AND (
-            status = 'active'
-         OR (status = 'expired'  AND allocated_at >= ?)
-         OR (status = 'received' AND allocated_at >= ?)
-      )
-    ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, cutoffExpired, cutoffReceived);
+  return findMatchingAllocation({
+    provider: 'seven1tel',
+    phone,
+    eventAtSec: arguments[1] || null,
+    lateGraceSec: 300,
+    resendSec: 600,
+  });
 }
 
 async function tickOnce() {
@@ -303,14 +301,14 @@ async function tickOnce() {
   for (const raw of rows) {
     const r = parseRow(raw);
     if (!r || !r.otp) continue;
-    if (_seenIds.has(r.dedup_key)) continue;
+    if (_seenIds.has(r.dedup_key) || hasSeenSourceMessage('seven1tel', r.dedup_key)) continue;
     _seenIds.add(r.dedup_key);
     if (_seenIds.size > SEEN_MAX) {
       // reset oldest half
       const arr = Array.from(_seenIds);
       _seenIds = new Set(arr.slice(arr.length / 2));
     }
-    const alloc = findActiveAllocation(r.phone);
+    const alloc = findActiveAllocation(r.phone, r.cdr_at);
     if (!alloc) {
       dlog('no active alloc for', r.phone, '→ skip');
       tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);

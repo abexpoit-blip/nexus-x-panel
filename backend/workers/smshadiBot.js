@@ -19,6 +19,7 @@ const db = require('../lib/db');
 const { markOtpReceived } = require('../routes/numbers');
 const { logOtpAudit } = require('../lib/otpAudit');
 const { getOtpExpirySec } = require('../lib/settings');
+const { findMatchingAllocation, hasSeenSourceMessage } = require('../lib/allocationMatcher');
 const { Telemetry } = require('./_botTelemetry');
 const tel = new Telemetry();
 
@@ -436,33 +437,14 @@ function cliToServiceSlug(cli, msg) {
 }
 
 function findActiveAllocation(phone, cdrAtSec = null, cliSlug = null) {
-  const tail = phone.slice(-9);
-  if (!tail) return null;
-  const nowSec = Math.floor(Date.now() / 1000);
-  const expirySec = getOtpExpirySec();
-  const eventAt = Number.isFinite(+cdrAtSec) && +cdrAtSec > 0 ? +cdrAtSec : nowSec;
-  const oldestAllocatedAt = eventAt - expirySec - SMSHADI_LATE_GRACE_SEC;
-  const newestAllocatedAt = eventAt + 60;
-  let serviceId = null;
-  if (cliSlug) {
-    try { serviceId = db.prepare('SELECT id FROM services WHERE slug = ?').get(cliSlug)?.id || null; }
-    catch (_) { serviceId = null; }
-  }
-  const runMatch = (extraSql = '', extraArgs = []) => db.prepare(`
-    SELECT id, user_id, phone_number, provider, country_code, operator, service_id, status, allocated_at
-    FROM allocations
-    WHERE phone_number LIKE ?
-      ${extraSql}
-      AND ( status='active'
-         OR (status='expired'  AND allocated_at BETWEEN ? AND ?)
-         OR (status='received' AND allocated_at >= ?) )
-    ORDER BY allocated_at DESC LIMIT 1
-  `).get(`%${tail}`, ...extraArgs, oldestAllocatedAt, newestAllocatedAt, nowSec - RESEND_SEC);
-  if (serviceId) {
-    const matched = runMatch('AND service_id = ?', [serviceId]);
-    if (matched) return matched;
-  }
-  return runMatch();
+  return findMatchingAllocation({
+    provider: 'smshadi',
+    phone,
+    cliSlug,
+    eventAtSec: cdrAtSec,
+    lateGraceSec: SMSHADI_LATE_GRACE_SEC,
+    resendSec: RESEND_SEC,
+  });
 }
 
 async function tickOnce() {
@@ -473,7 +455,7 @@ async function tickOnce() {
   for (const raw of rows) {
     const r = parseRow(raw);
     if (!r || !r.otp) continue;
-    if (_seenIds.has(r.dedup_key)) continue;
+    if (_seenIds.has(r.dedup_key) || hasSeenSourceMessage('smshadi', r.dedup_key)) continue;
     _seenIds.add(r.dedup_key);
     if (_seenIds.size > SEEN_MAX) {
       const arr = Array.from(_seenIds);
