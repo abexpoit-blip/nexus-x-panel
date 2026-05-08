@@ -278,7 +278,7 @@ function parseRow(row) {
   };
 }
 
-function findActiveAllocation(phone, cdrAtSec = null) {
+function findActiveAllocation(phone, cdrAtSec = null, panelRange = null) {
   // Match the most recent allocation for this MSISDN (suffix-9, handles +44 vs 44),
   // accepting any of:
   //   • status='active'                           — normal in-window delivery
@@ -289,6 +289,7 @@ function findActiveAllocation(phone, cdrAtSec = null) {
     provider: 'seven1tel',
     phone,
     eventAtSec: cdrAtSec,
+    panelRange,
     lateGraceSec: 300,
     resendSec: 600,
   });
@@ -308,7 +309,7 @@ async function tickOnce() {
       const arr = Array.from(_seenIds);
       _seenIds = new Set(arr.slice(arr.length / 2));
     }
-    const alloc = findActiveAllocation(r.phone, r.cdr_at);
+    const alloc = findActiveAllocation(r.phone, r.cdr_at, r.range);
     if (!alloc) {
       dlog('no active alloc for', r.phone, '→ skip');
       tel.recordMiss(r.phone, `OTP "${r.otp}" arrived but no active allocation matched suffix-9`);
