@@ -947,7 +947,15 @@ const AgentRanges = () => {
                   </div>
 
                   {/* Country / operator */}
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    {(r as any).service_slug && (
+                      <BrandIcon
+                        slug={(r as any).service_slug}
+                        fallback={(r as any).service_icon}
+                        color={(r as any).service_color}
+                        size={12}
+                      />
+                    )}
                     {r.country_code && <CountryFlag code={r.country_code} size="sm" />}
                     <span className="truncate">{r.operator || "—"}</span>
                   </div>
@@ -1054,11 +1062,17 @@ const AgentRanges = () => {
                         </button>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex items-center gap-2 text-[12px]">
-                          {r.country_code && <CountryFlag code={r.country_code} size="md" />}
-                          <div className="min-w-0">
-                            <div className="text-foreground truncate">{r.operator || "—"}</div>
-                          </div>
+                        <div className="flex items-center gap-2 text-[12px] leading-tight">
+                          {(r as any).service_slug && (
+                            <BrandIcon
+                              slug={(r as any).service_slug}
+                              fallback={(r as any).service_icon}
+                              color={(r as any).service_color}
+                              size={16}
+                            />
+                          )}
+                          {r.country_code && <CountryFlag code={r.country_code} size="sm" />}
+                          <span className="text-foreground truncate">{r.operator || "—"}</span>
                         </div>
                       </td>
                       <td className="px-3 py-3">

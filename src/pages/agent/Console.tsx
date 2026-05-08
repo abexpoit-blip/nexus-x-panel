@@ -165,6 +165,11 @@ const AgentConsole = () => {
                       <span className="text-neon-green">{c.otp_code}</span>
                     </p>
                   ) : null}
+                  {c.sms_text && (
+                    <p className="mt-2 text-[12px] text-muted-foreground/90 leading-snug whitespace-pre-wrap break-words font-mono bg-white/[0.02] border border-white/[0.05] rounded-md px-2.5 py-1.5">
+                      {c.sms_text.replace(/\d/g, "•")}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-muted-foreground">{new Date(c.created_at * 1000).toLocaleTimeString()}</p>
