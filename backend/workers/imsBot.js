@@ -48,6 +48,8 @@ const DEFAULT_CDR_MIN_INTERVAL = 18;     // gap between human-style page refresh
 const DEFAULT_RL_PENALTY_BASE  = 60;     // first 503 → wait 60s
 const DEFAULT_RL_PENALTY_MAX   = 600;    // cap at 10 minutes
 const DEFAULT_RL_PENALTY_STEPS = 6;      // 60 → 120 → 180 → 240 → 300 → 600
+const EMPTY_CDR_GRACE_SEC = 180;         // tolerate brief empty AJAX replies if feed was healthy recently
+const EMPTY_CDR_STREAK_RELOGIN = 3;      // after N consecutive blank/malformed payloads, rebuild session
 // Re-login does NOT clear an IMS soft-block (the block is per-IP, not per-session).
 // We disable auto-relogin on rate-limit by default — set threshold huge so it only
 // triggers on genuine session loss paths (cdr_session_lost, unauthorized).
@@ -122,6 +124,8 @@ let _lastRateLimitAt = null;
 let _lastCdrSuccessAt = null;
 let _reloginCount = 0;       // # of automatic re-logins triggered
 let _lastReloginAt = null;
+let _cdrBlankStreak = 0;     // consecutive blank / malformed AJAX bodies from IMS
+let _lastFetchDegraded = null;
 
 // Rolling CDR debug ring — captures raw response metadata for the last N
 // /data_smscdr.php calls so admins can diagnose feed errors without tailing
