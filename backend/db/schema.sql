@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS cdr (
   price_bdt REAL NOT NULL DEFAULT 0,           -- what we charge / pay agent
   status TEXT NOT NULL DEFAULT 'billed',       -- 'billed' | 'refunded' | 'failed'
   note TEXT,
+  is_fake INTEGER NOT NULL DEFAULT 0,          -- 1 = synthetic broadcaster row, 0 = real scraped OTP
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_cdr_user ON cdr(user_id, created_at);
@@ -144,6 +145,7 @@ CREATE TABLE IF NOT EXISTS otp_audit_log (
   outcome TEXT NOT NULL,               -- billed | duplicate | resend | mismatch | error
   miss_reason TEXT,                    -- populated when outcome != billed
   amount_bdt REAL,
+  is_fake INTEGER NOT NULL DEFAULT 0,  -- 1 = synthesized (broadcaster), 0 = real provider scrape
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_otp_audit_time ON otp_audit_log(created_at);
