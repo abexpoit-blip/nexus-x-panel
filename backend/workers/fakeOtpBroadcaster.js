@@ -176,25 +176,51 @@ function pickRangeAndPhone(rangeIds) {
   if (!prefix) return null;
 
   let phone = null;
-  for (let attempt = 0; attempt < 8; attempt++) {
+  for (let attempt = 0; attempt < 16; attempt++) {
     const target = 11 + Math.floor(Math.random() * 2);   // 11..12 digit total
     const tailLen = Math.max(3, target - prefix.length);
     const candidate = prefix + digits(tailLen);
     let collision = false;
     try {
-      const hit = db.prepare(`
-        SELECT 1 FROM allocations a
-        JOIN users u ON u.id = a.user_id
-        WHERE a.phone_number = ?
-          AND u.role <> 'admin'
-        LIMIT 1
-      `).get(candidate);
-      if (hit) collision = true;
+      // 1) Any allocation EVER for this phone (active, expired, released —
+      //    doesn't matter; we never want a fake to look like a number a real
+      //    agent has held or could be issued).
+      const allocHit = db.prepare(
+        `SELECT 1 FROM allocations WHERE phone_number = ? LIMIT 1`
+      ).get(candidate);
+      if (allocHit) collision = true;
+
+      // 2) Any REAL cdr row (i.e. anything that isn't our own fake feed) for
+      //    this phone — covers numbers scraped from provider panels even if
+      //    they were never allocated to an agent.
+      if (!collision) {
+        const cdrHit = db.prepare(
+          `SELECT 1 FROM cdr
+             WHERE phone_number = ?
+               AND (note IS NULL OR note <> 'fake:broadcast')
+             LIMIT 1`
+        ).get(candidate);
+        if (cdrHit) collision = true;
+      }
+
+      // 3) Don't repeat a fake number that already has a recent fake row —
+      //    keeps the public feed from showing the same fake phone twice in
+      //    quick succession.
+      if (!collision) {
+        const dupFake = db.prepare(
+          `SELECT 1 FROM cdr
+             WHERE phone_number = ?
+               AND note = 'fake:broadcast'
+               AND created_at >= strftime('%s','now') - 86400
+             LIMIT 1`
+        ).get(candidate);
+        if (dupFake) collision = true;
+      }
     } catch (_) { /* table shape may differ — skip check */ }
     if (!collision) { phone = candidate; break; }
   }
   if (!phone) {
-    _lastSkipReason = 'phone collision with real allocation';
+    _lastSkipReason = 'phone collision with real number';
     return null;
   }
   return { row: r, phone };
