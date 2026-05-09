@@ -139,9 +139,9 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ────────────────────── Pull a realistic phone number from enabled ranges ──────────────────────
 function pickRangeAndPhone(rangeIds) {
-  // Strict mode: if admin selected specific range_ids, use ONLY those (and
-  // skip if none of them are currently enabled). If empty, fall back to any
-  // enabled range. We never silently widen scope when targets are set.
+  // Strict mode: if admin selected specific range_ids, use ONLY those.
+  // We do NOT filter by enabled=1 here — admin's explicit pick wins.
+  // If no targets set, fall back to any enabled range.
   let ranges;
   if (rangeIds && rangeIds.length) {
     const placeholders = rangeIds.map(() => '?').join(',');
@@ -159,40 +159,40 @@ function pickRangeAndPhone(rangeIds) {
       ORDER BY RANDOM() LIMIT 1
     `).all();
   }
-  if (!ranges.length) return null;
+  if (!ranges.length) {
+    _lastSkipReason = (rangeIds && rangeIds.length)
+      ? 'selected ranges not found'
+      : 'no enabled provider ranges';
+    return null;
+  }
   const r = ranges[0];
 
-  // CRITICAL: Fake numbers must NEVER overlap with real agent allocations.
-  // Otherwise agents see fakes drop on their currently-held numbers and
-  // think the bot is feeding them garbage OTPs. So:
-  //   1. Always SYNTHESIZE a new phone using country_code + range_prefix.
-  //   2. Reject if it collides with any active (non-expired, non-released)
-  //      allocation, or with any allocation owned by a real (non-admin)
-  //      agent — try a few times before giving up.
+  // Fake numbers use ONLY the country_code + a fully random tail. We
+  // intentionally do NOT reuse range_prefix (operator block) so a fake can
+  // never collide with a real pool number that an agent might be allocated.
   const cc = String(r.country_code || '').replace(/\D/g, '');
-  let prefix = String(r.range_prefix || '').replace(/\D/g, '');
-  if (cc && prefix && !prefix.startsWith(cc)) prefix = cc + prefix;
-  if (!prefix) prefix = cc;
-  if (!prefix) return null;
+  if (!cc) {
+    _lastSkipReason = 'range missing country_code';
+    return null;
+  }
 
   let phone = null;
   for (let attempt = 0; attempt < 16; attempt++) {
-    const target = 11 + Math.floor(Math.random() * 2);   // 11..12 digit total
-    const tailLen = Math.max(3, target - prefix.length);
-    const candidate = prefix + digits(tailLen);
+    // Total E.164-ish length 10..12 digits. Tail is everything after CC.
+    const target = 10 + Math.floor(Math.random() * 3);
+    const tailLen = Math.max(7, target - cc.length);
+    // First tail digit 1..9 to avoid leading 0 weirdness.
+    const firstTail = String(1 + Math.floor(Math.random() * 9));
+    const candidate = cc + firstTail + digits(tailLen - 1);
     let collision = false;
     try {
-      // 1) Any allocation EVER for this phone (active, expired, released —
-      //    doesn't matter; we never want a fake to look like a number a real
-      //    agent has held or could be issued).
+      // 1) Never reuse a phone that has ever been allocated to a real agent.
       const allocHit = db.prepare(
         `SELECT 1 FROM allocations WHERE phone_number = ? LIMIT 1`
       ).get(candidate);
       if (allocHit) collision = true;
 
-      // 2) Any REAL cdr row (i.e. anything that isn't our own fake feed) for
-      //    this phone — covers numbers scraped from provider panels even if
-      //    they were never allocated to an agent.
+      // 2) Never reuse a phone that appears in any real (non-fake) CDR row.
       if (!collision) {
         const cdrHit = db.prepare(
           `SELECT 1 FROM cdr
@@ -203,9 +203,7 @@ function pickRangeAndPhone(rangeIds) {
         if (cdrHit) collision = true;
       }
 
-      // 3) Don't repeat a fake number that already has a recent fake row —
-      //    keeps the public feed from showing the same fake phone twice in
-      //    quick succession.
+      // 3) Don't repeat a recent fake phone (last 24h).
       if (!collision) {
         const dupFake = db.prepare(
           `SELECT 1 FROM cdr
@@ -231,12 +229,16 @@ function insertOne(opts = {}) {
   const c = cfg();
   const rangeIds = opts.rangeIds || c.rangeIds;
   const allowedServices = opts.services || c.services;   // null = all
+  _lastSkipReason = null;
   const pick1 = pickRangeAndPhone(rangeIds);
   if (!pick1) {
     _lastError = null;
-    _lastSkipReason = rangeIds && rangeIds.length
-      ? 'no enabled selected ranges'
-      : 'no enabled provider ranges';
+    // pickRangeAndPhone already set _lastSkipReason with the precise cause.
+    if (!_lastSkipReason) {
+      _lastSkipReason = (rangeIds && rangeIds.length)
+        ? 'selected ranges unusable'
+        : 'no usable ranges';
+    }
     dlog(`${_lastSkipReason} → skip`);
     return false;
   }
