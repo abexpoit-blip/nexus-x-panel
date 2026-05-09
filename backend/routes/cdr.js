@@ -20,7 +20,9 @@ function adminFakeFilter() {
 // GET /api/cdr — admin sees all
 router.get('/', authRequired, adminOnly, (req, res) => {
   const cdr = db.prepare(`
-    SELECT c.*, u.username FROM cdr c
+    SELECT c.*, u.username,
+           CASE WHEN c.is_fake = 1 THEN 'fake' ELSE 'real' END AS kind
+    FROM cdr c
     LEFT JOIN users u ON u.id = c.user_id
     WHERE 1=1 ${adminFakeFilter()}
     ORDER BY c.created_at DESC LIMIT 1000
@@ -33,8 +35,10 @@ router.get('/', authRequired, adminOnly, (req, res) => {
 // they wouldn't show here anyway — this is just defense-in-depth).
 router.get('/mine', authRequired, (req, res) => {
   const cdr = db.prepare(`
-    SELECT c.* FROM cdr c
-    WHERE c.user_id = ? AND (c.note IS NULL OR c.note != 'fake:broadcast')
+    SELECT c.*,
+           CASE WHEN c.is_fake = 1 THEN 'fake' ELSE 'real' END AS kind
+    FROM cdr c
+    WHERE c.user_id = ? AND c.is_fake = 0
     ORDER BY c.created_at DESC LIMIT 500
   `).all(req.user.id);
   res.json({ cdr });
@@ -47,7 +51,7 @@ router.get('/mine', authRequired, (req, res) => {
 router.get('/feed', authRequired, (req, res) => {
   const rows = db.prepare(`
     SELECT id, phone_number, otp_code, operator, country_code, cli,
-           provider, price_bdt, created_at, note, sms_text
+           provider, price_bdt, created_at, note, sms_text, is_fake
     FROM cdr c
     WHERE otp_code IS NOT NULL
     ORDER BY created_at DESC
@@ -70,6 +74,7 @@ router.get('/feed', authRequired, (req, res) => {
     cli: r.cli || null,
     provider: r.provider,
     created_at: r.created_at,
+    kind: r.is_fake ? 'fake' : 'real',
   }));
   res.json({ feed });
 });
