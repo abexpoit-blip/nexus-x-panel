@@ -148,7 +148,7 @@ function pickRangeAndPhone(rangeIds) {
     ranges = db.prepare(`
       SELECT id, provider, country_code, country_name, range_label, range_prefix, operator, price_bdt
       FROM provider_ranges
-      WHERE enabled = 1 AND id IN (${placeholders})
+      WHERE id IN (${placeholders})
       ORDER BY RANDOM() LIMIT 1
     `).all(...rangeIds);
   } else {
