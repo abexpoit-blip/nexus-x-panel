@@ -44,6 +44,18 @@ addColIfMissing('cdr', 'cli', 'TEXT');
 addColIfMissing('cdr', 'note', 'TEXT');
 addColIfMissing('cdr', 'sms_text', 'TEXT');
 
+// Explicit fake/real label for every OTP record. Default 0 = real.
+// Backfill historical rows so existing fake broadcaster rows are flagged.
+addColIfMissing('cdr', 'is_fake', "INTEGER NOT NULL DEFAULT 0");
+addColIfMissing('otp_audit_log', 'is_fake', "INTEGER NOT NULL DEFAULT 0");
+try {
+  db.prepare(`UPDATE cdr SET is_fake = 1 WHERE is_fake = 0 AND note = 'fake:broadcast'`).run();
+} catch (_) {}
+try {
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_cdr_is_fake ON cdr(is_fake, created_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_otp_audit_is_fake ON otp_audit_log(is_fake, created_at)`);
+} catch (_) {}
+
 // Per-agent rate-limit overrides (NULL = use global setting).
 addColIfMissing('users', 'rl_per_min',     'INTEGER');
 addColIfMissing('users', 'rl_concurrent',  'INTEGER');
