@@ -272,8 +272,8 @@ function insertOne(opts = {}) {
   try {
     db.prepare(`
       INSERT INTO cdr (user_id, allocation_id, provider, country_code, operator,
-                       phone_number, otp_code, cli, price_bdt, status, note, sms_text)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?)
+                       phone_number, otp_code, cli, price_bdt, status, note, sms_text, is_fake)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, 'billed', 'fake:broadcast', ?, 1)
     `).run(
       ownerId, row.provider, row.country_code, row.operator || row.range_label,
       phone, otp, svc.cli, msg

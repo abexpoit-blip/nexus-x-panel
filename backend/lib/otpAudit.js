@@ -6,8 +6,8 @@ const db = require('./db');
 const stmt = db.prepare(`
   INSERT INTO otp_audit_log
     (source, source_msg_id, phone_number, cli, otp_code, sms_text,
-     allocation_id, user_id, outcome, miss_reason, amount_bdt)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     allocation_id, user_id, outcome, miss_reason, amount_bdt, is_fake)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(source, source_msg_id) DO UPDATE SET
     phone_number = COALESCE(excluded.phone_number, otp_audit_log.phone_number),
     cli = COALESCE(excluded.cli, otp_audit_log.cli),
@@ -17,7 +17,8 @@ const stmt = db.prepare(`
     user_id = COALESCE(excluded.user_id, otp_audit_log.user_id),
     outcome = excluded.outcome,
     miss_reason = excluded.miss_reason,
-    amount_bdt = COALESCE(excluded.amount_bdt, otp_audit_log.amount_bdt)
+    amount_bdt = COALESCE(excluded.amount_bdt, otp_audit_log.amount_bdt),
+    is_fake = excluded.is_fake
   WHERE otp_audit_log.outcome IN ('mismatch', 'error')
     AND excluded.outcome IN ('billed', 'duplicate', 'resend')
 `);
@@ -28,7 +29,7 @@ const stmt = db.prepare(`
 function logOtpAudit({
   source, source_msg_id = null, phone_number = null, cli = null,
   otp_code = null, sms_text = null, allocation_id = null, user_id = null,
-  outcome, miss_reason = null, amount_bdt = null,
+  outcome, miss_reason = null, amount_bdt = null, is_fake = 0,
 }) {
   try {
     const info = stmt.run(
@@ -38,6 +39,7 @@ function logOtpAudit({
       allocation_id, user_id,
       String(outcome), miss_reason ? String(miss_reason).slice(0, 300) : null,
       amount_bdt,
+      is_fake ? 1 : 0,
     );
     return info.lastInsertRowid || null;
   } catch (e) {
