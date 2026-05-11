@@ -219,17 +219,21 @@ router.post('/get', authRequired, (req, res) => {
   // they want in one shot, up to whatever daily budget remains).
   const fresh = db.prepare('SELECT daily_limit, status, rl_per_min, rl_concurrent FROM users WHERE id = ?').get(u.id);
   if (!fresh || fresh.status !== 'active') return res.status(403).json({ error: 'Account is not active' });
-  const dailyCap = Math.max(1, +fresh.daily_limit || 500);
+  const getSettingRaw = (k) => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
+  const dailyEnforced = (getSettingRaw('daily_limit_enabled') ?? 'true') !== 'false';
+  const globalDefault = Math.max(1, +(getSettingRaw('daily_limit_default') || 500));
+  const dailyCap = Math.max(1, +fresh.daily_limit || globalDefault);
 
-  // Today's already-allocated count (resets at local midnight UTC).
+  // Count *OTPs received today* (billed CDR rows), not allocations. Agents are
+  // capped on successful OTP volume — empty allocations don't burn the budget.
   const todayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
   const usedToday = db.prepare(
-    "SELECT COUNT(*) c FROM allocations WHERE user_id=? AND allocated_at >= ?"
+    "SELECT COUNT(*) c FROM cdr WHERE user_id=? AND status='billed' AND created_at >= ? AND (note IS NULL OR note != 'fake:broadcast')"
   ).get(u.id, todayStart).c;
-  const remainingToday = Math.max(0, dailyCap - usedToday);
-  if (remainingToday <= 0) {
+  const remainingToday = dailyEnforced ? Math.max(0, dailyCap - usedToday) : Number.MAX_SAFE_INTEGER;
+  if (dailyEnforced && remainingToday <= 0) {
     return res.status(429).json({
-      error: `Daily limit reached (${dailyCap}/day). Try again tomorrow.`,
+      error: `Daily OTP limit reached (${dailyCap}/day). Try again tomorrow.`,
       code: 'daily_limit', daily_cap: dailyCap, used_today: usedToday,
     });
   }
@@ -237,7 +241,7 @@ router.post('/get', authRequired, (req, res) => {
   let count = Math.max(1, Math.min(remainingToday, +body.count || 1));
 
   // ── Rate-limit gate: per-minute requests + concurrent active allocations ──
-  const getSetting = (k, fb) => +(db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value ?? fb) || +fb;
+  const getSetting = (k, fb) => +(getSettingRaw(k) ?? fb) || +fb;
   const perMin     = +fresh.rl_per_min    > 0 ? +fresh.rl_per_min    : getSetting('rl_per_min_default', 500);
   const concurrent = +fresh.rl_concurrent > 0 ? +fresh.rl_concurrent : getSetting('rl_concurrent_default', 500);
   const since = Math.floor(Date.now() / 1000) - 60;

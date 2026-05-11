@@ -118,9 +118,10 @@ router.post('/withdrawals/request', authRequired, (req, res) => {
   const { amount_bdt, method, account_name, account_number, note } = req.body || {};
   const amt = Number(amount_bdt);
   const cfg = getPaymentConfig();
-
-  if (!Number.isFinite(amt) || amt < cfg.min_amount || amt > 1_000_000) {
-    return res.status(400).json({ error: `Amount must be between ৳${cfg.min_amount} and ৳1,000,000` });
+  const minEnforced = (db.prepare("SELECT value FROM settings WHERE key='wd_min_enabled'").get()?.value ?? 'true') !== 'false';
+  const floor = minEnforced ? cfg.min_amount : 1;
+  if (!Number.isFinite(amt) || amt < floor || amt > 1_000_000) {
+    return res.status(400).json({ error: `Amount must be between ৳${floor} and ৳1,000,000` });
   }
   if (!cfg.methods_enabled.includes(method)) {
     return res.status(400).json({ error: 'Selected payment method is not currently accepted' });
