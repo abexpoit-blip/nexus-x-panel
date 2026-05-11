@@ -9,7 +9,7 @@ const db_settings = require('../lib/db');
 
 const router = express.Router();
 
-const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims', 'smshadi', 'iprn'];
+const ALLOWED_PROVIDERS = ['seven1tel', 'xisora', 'ims', 'ims2', 'smshadi', 'iprn'];
 const ALLOWED_CURRENCIES = ['EUR', 'USD', 'GBP'];
 
 function validate(body, partial = false) {
