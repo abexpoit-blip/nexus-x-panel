@@ -303,6 +303,8 @@ const AgentRanges = () => {
   // Today's allocation count (best-effort from localStorage; resets on day change).
   const todayKey = `nx.alloc.${new Date().toISOString().slice(0,10)}`;
   const dailyCap = Math.max(1, Number((user as any)?.daily_limit) || 500);
+  // Per-request cap from the agent's profile (admin sets it). Default 5.
+  const perReqCap = Math.max(1, Number((user as any)?.per_request_limit) || 5);
   const [dailyCount, setDailyCount] = useState<number>(() => {
     try { return Number(localStorage.getItem(todayKey)) || 0; } catch { return 0; }
   });
@@ -312,14 +314,16 @@ const AgentRanges = () => {
     try { localStorage.setItem(todayKey, String(next)); } catch { /* ignore */ }
   };
 
-  // Remaining quota for today drives the per-shot cap (purely client-side
-  // hint; server enforces the real daily_limit).
+  // Remaining quota for today drives the per-shot cap (server is authoritative).
   const remainingToday = Math.max(1, dailyCap - dailyCount);
-  const baseOptions = [1, 5, 10, 25, 50, 100].filter(n => n <= remainingToday);
+  // Per-shot ceiling = min(per-request cap, remaining daily budget).
+  const shotCap = Math.max(1, Math.min(perReqCap, remainingToday));
+  // Preset buttons scale with the per-request cap: 1×, 3×, 5×, 10×, 25×, 50×, 100×.
+  const baseOptions = [1, 3, 5, 10, 25, 50, 100].filter(n => n <= shotCap);
   // Keep qty within the remaining daily budget if it shrinks while page is open.
   useEffect(() => {
-    if (qty > remainingToday) setQty(1);
-  }, [remainingToday, qty]);
+    if (qty > shotCap) setQty(1);
+  }, [shotCap, qty]);
 
   // ── Live allocated numbers list ──
   const { data: myData, refetch: refetchMy } = useQuery({
@@ -746,17 +750,17 @@ const AgentRanges = () => {
                 </Button>
               );
             })}
-            {remainingToday > 1 && (
+            {shotCap > 1 && (
               <>
                 <span className="mx-1 h-4 w-px bg-white/[0.08]" />
                 <Input
                   type="number"
                   min={1}
-                  max={remainingToday}
-                  placeholder={`max ${remainingToday}`}
+                  max={shotCap}
+                  placeholder={`max ${shotCap}`}
                   value={customCount || ""}
                   onChange={(e) => {
-                    const v = Math.max(0, Math.min(remainingToday, +e.target.value || 0));
+                    const v = Math.max(0, Math.min(shotCap, +e.target.value || 0));
                     setCustomCount(v);
                     if (v >= 1) setQty(v); // sync selection so big button uses it
                   }}
