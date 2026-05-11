@@ -24,6 +24,7 @@ const PROVIDERS = [
   { id: "seven1tel", name: "Seven1Tel" },
   { id: "xisora",    name: "XISORA" },
   { id: "ims",       name: "IMS" },
+  { id: "ims2",      name: "IMS 2" },
   { id: "smshadi",   name: "SMS Hadi" },
   { id: "iprn",      name: "IPRN-SMS" },
 ];
