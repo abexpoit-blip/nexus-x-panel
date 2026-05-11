@@ -76,6 +76,12 @@ const AdminSettings = () => {
   const [rlConcurrent, setRlConcurrent] = useState<number>(5);
   const [otpSound, setOtpSound] = useState<OtpSoundId>("faaaah");
 
+  // Agent policy: daily-limit + min-withdrawal enforcement
+  const [dailyLimitOn, setDailyLimitOn] = useState(true);
+  const [dailyLimitDefault, setDailyLimitDefault] = useState<number>(500);
+  const [wdMinOn, setWdMinOn] = useState(true);
+  const [wdMin, setWdMin] = useState<number>(300);
+
   const [fakeForm, setFakeForm] = useState<{
     enabled: boolean; min_sec: number; max_sec: number; burst: number;
     services: string[];     // empty = all services
@@ -168,6 +174,10 @@ const AdminSettings = () => {
     setHadiInterval(Math.max(22, Number(str(s, "smshadi_otp_interval", "24")) || 24));
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
+    setDailyLimitOn(str(s, "daily_limit_enabled", "true") !== "false");
+    setDailyLimitDefault(Number(str(s, "daily_limit_default", "500")) || 500);
+    setWdMinOn(str(s, "wd_min_enabled", "true") !== "false");
+    setWdMin(Number(str(s, "wd_min_bdt", "300")) || 300);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
     setOtpSound("faaaah");
   }, [s]);
