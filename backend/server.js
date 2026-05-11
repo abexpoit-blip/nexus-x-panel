@@ -138,6 +138,10 @@ app.listen(PORT, () => {
   try { require('./workers/imsBot').start(); }
   catch (e) { console.warn('ims bot start error:', e.message); }
 
+  // Start IMS-2 bot (second imssms.org account; no-op if ims2_enabled=false)
+  try { require('./workers/imsBot2').start(); }
+  catch (e) { console.warn('ims2 bot start error:', e.message); }
+
   // Start IPRN bot (no-op if iprn_enabled=false)
   try { require('./workers/iprnBot').start(); }
   catch (e) { console.warn('iprn bot start error:', e.message); }
