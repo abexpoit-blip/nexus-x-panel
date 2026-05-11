@@ -14,7 +14,16 @@ import { GradientMesh, PageHeader } from "@/components/premium";
 // will fall back to this row whenever a more specific match doesn't exist.
 const empty: Partial<Rate> & { agent_commission_percent?: number } = {
   provider: "seven1tel", country_code: null as any, country_name: null as any,
-  operator: null as any, price_bdt: 0, active: 1, agent_commission_percent: 60,
+  operator: null as any, price_bdt: 0.40, active: 1, agent_commission_percent: 60,
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  seven1tel: "Server A (Seven1Tel)",
+  xisora: "Server B (XISORA)",
+  ims: "Server C (IMS Bot 1)",
+  ims2: "Server D (IMS Bot 2)",
+  smshadi: "Server E (SMS Hadi)",
+  iprn: "Server F (IPRN)",
 };
 
 const AdminRateCard = () => {
@@ -63,13 +72,14 @@ const AdminRateCard = () => {
             render: (r) => (
               <span className={cn(
                 "inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase",
-                r.provider === "seven1tel"
-                  ? "bg-neon-cyan/15 text-neon-cyan"
-                  : r.provider === "xisora"
-                    ? "bg-neon-amber/15 text-neon-amber"
-                    : "bg-neon-magenta/15 text-neon-magenta"
+                r.provider === "seven1tel" ? "bg-neon-cyan/15 text-neon-cyan"
+                  : r.provider === "xisora" ? "bg-neon-amber/15 text-neon-amber"
+                  : r.provider === "ims" ? "bg-primary/15 text-primary"
+                  : r.provider === "ims2" ? "bg-neon-green/15 text-neon-green"
+                  : r.provider === "smshadi" ? "bg-neon-magenta/15 text-neon-magenta"
+                  : "bg-muted text-muted-foreground"
               )}>
-                {r.provider === "seven1tel" ? "Server A" : r.provider === "xisora" ? "Server B" : r.provider}
+                {(PROVIDER_LABELS[r.provider] || r.provider).split(" ")[0] + " " + (PROVIDER_LABELS[r.provider]?.split(" ")[1] || "")}
               </span>
             ),
           },
@@ -143,8 +153,9 @@ const AdminRateCard = () => {
           <div className="space-y-3">
             <Field label="Provider">
               <select value={form.provider || "seven1tel"} onChange={(e) => setForm({ ...form, provider: e.target.value })} className="w-full h-10 px-3 rounded-md bg-white/[0.04] border border-white/[0.08]">
-                <option value="seven1tel">Server A (Seven1Tel)</option>
-                <option value="xisora">Server B (XISORA)</option>
+                {Object.entries(PROVIDER_LABELS).map(([v, label]) => (
+                  <option key={v} value={v}>{label}</option>
+                ))}
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">

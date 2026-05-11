@@ -17,10 +17,12 @@ router.use(authRequired, adminOnly); // below = admin only (must auth first)
 router.post('/', (req, res) => {
   const { provider, country_code, country_name, operator, price_bdt, agent_commission_percent = 60, active = 1 } = req.body || {};
   if (!provider) return res.status(400).json({ error: 'Provider required' });
+  // Default per-OTP price for new rates: 0.40 BDT (unless admin sets a value, including 0).
+  const newPrice = (price_bdt === undefined || price_bdt === null || price_bdt === '') ? 0.40 : +price_bdt;
   const result = db.prepare(`
     INSERT INTO rates (provider, country_code, country_name, operator, price_bdt, agent_commission_percent, active)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(provider, country_code || null, country_name || null, operator || null, +price_bdt || 0, +agent_commission_percent || 0, active ? 1 : 0);
+  `).run(provider, country_code || null, country_name || null, operator || null, newPrice, +agent_commission_percent || 0, active ? 1 : 0);
   logFromReq(req, 'rate_created', { targetType: 'rate', targetId: result.lastInsertRowid });
   res.status(201).json({ id: result.lastInsertRowid });
 });
