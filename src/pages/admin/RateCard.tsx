@@ -79,7 +79,7 @@ const AdminRateCard = () => {
                   : r.provider === "smshadi" ? "bg-neon-magenta/15 text-neon-magenta"
                   : "bg-muted text-muted-foreground"
               )}>
-                {(PROVIDER_LABELS[r.provider] || r.provider).split(" ")[0] + " " + (PROVIDER_LABELS[r.provider]?.split(" ")[1] || "")}
+                {(PROVIDER_LABELS[r.provider] || r.provider).replace(/\s*\(.*\)/, "")}
               </span>
             ),
           },
