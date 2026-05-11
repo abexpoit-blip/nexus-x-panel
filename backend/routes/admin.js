@@ -127,6 +127,8 @@ router.get('/system-health', (req, res) => {
   try { xisora = require('../workers/xisoraBot').getStatus?.() || null; } catch (_) {}
   let ims = null;
   try { ims = require('../workers/imsBot').getStatus?.() || null; } catch (_) {}
+  let ims2 = null;
+  try { ims2 = require('../workers/imsBot2').getStatus?.() || null; } catch (_) {}
   let smshadi = null;
   try { smshadi = require('../workers/smshadiBot').getStatus?.() || null; } catch (_) {}
   let iprn = null;
@@ -189,6 +191,7 @@ router.get('/system-health', (req, res) => {
     seven1tel_bot: seven1tel,
     xisora_bot: xisora,
     ims_bot: ims,
+    ims2_bot: ims2,
     smshadi_bot: smshadi,
     iprn_bot: iprn,
     fake_otp_bot: fake_otp,
@@ -428,6 +431,7 @@ function loadBots() {
   try { bots.seven1tel = require('../workers/seven1telBot'); } catch (_) {}
   try { bots.xisora    = require('../workers/xisoraBot'); } catch (_) {}
   try { bots.ims       = require('../workers/imsBot'); } catch (_) {}
+  try { bots.ims2      = require('../workers/imsBot2'); } catch (_) {}
   try { bots.smshadi   = require('../workers/smshadiBot'); } catch (_) {}
   try { bots.iprn      = require('../workers/iprnBot'); } catch (_) {}
   try { bots.fake_otp = require('../workers/fakeOtpBroadcaster'); } catch (_) {}
@@ -438,6 +442,7 @@ const BOT_LABELS = {
   seven1tel: { name: 'Seven1Tel Bot',         desc: 'Scrapes seven1tel SMS portal for live OTPs' },
   xisora:    { name: 'XISORA Bot',            desc: 'Polls XISORA API or portal-cookie MDR fallback for live OTPs' },
   ims:       { name: 'IMS Bot',               desc: 'Scrapes imssms.org CDR for live OTPs (15s rate-limit aware)' },
+  ims2:      { name: 'IMS Bot 2',              desc: 'Second imssms.org account — same scraper, independent session & settings (ims2_*)' },
   smshadi:   { name: 'SMS Hadi Bot',          desc: 'Scrapes 2.59.169.96/ints (SMS Hadi) CDR — no rate-limit, sesskey AJAX' },
   iprn:      { name: 'IPRN-SMS Bot',          desc: 'Scrapes panel.iprn-sms.com (CSRF + session); polls each currency (EUR/USD/GBP) used by enabled iprn ranges' },
   fake_otp:  { name: 'Fake OTP Broadcaster',  desc: 'Synthetic CDR rows to keep the public feed warm' },
@@ -472,6 +477,7 @@ router.post('/bots/:bot/:action(start|stop|restart)', (req, res) => {
     seven1tel: 'seven1tel_enabled',
     xisora:    'xisora_enabled',
     ims:       'ims_enabled',
+    ims2:      'ims2_enabled',
     smshadi:   'smshadi_enabled',
     iprn:      'iprn_enabled',
     fake_otp:  'fake_otp_enabled',
