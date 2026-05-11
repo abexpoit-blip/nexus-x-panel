@@ -109,6 +109,12 @@ const AdminSettings = () => {
   const [imsRlMax, setImsRlMax] = useState<number>(90);
   const [imsRlSteps, setImsRlSteps] = useState<number>(4);
   const [imsRlReloginThreshold, setImsRlReloginThreshold] = useState<number>(6);
+  // IMS Bot #2 — second imssms.org account, fully independent settings.
+  const [ims2Url, setIms2Url] = useState("");
+  const [ims2User, setIms2User] = useState("");
+  const [ims2Pass, setIms2Pass] = useState("");
+  const [ims2Cookie, setIms2Cookie] = useState("");
+  const [ims2Interval, setIms2Interval] = useState<number>(18);
   // SMS Hadi (2.59.169.96/ints)
   const [hadiUrl, setHadiUrl] = useState("");
   const [hadiUser, setHadiUser] = useState("");
@@ -150,6 +156,11 @@ const AdminSettings = () => {
     setImsRlMax(Number(str(s, "ims_rl_penalty_max_sec", "90")) || 90);
     setImsRlSteps(Number(str(s, "ims_rl_penalty_steps", "4")) || 4);
     setImsRlReloginThreshold(Number(str(s, "ims_rl_relogin_threshold", "6")) || 6);
+    setIms2Url(str(s, "ims2_base_url", "https://www.imssms.org"));
+    setIms2User(str(s, "ims2_username", "Nexusx0"));
+    setIms2Pass(str(s, "ims2_password", "Nexusx0"));
+    setIms2Cookie(str(s, "ims2_cookie_header"));
+    setIms2Interval(Number(str(s, "ims2_otp_interval", "18")) || 18);
     setHadiUrl(str(s, "smshadi_base_url", "http://2.59.169.96/ints"));
     setHadiUser(str(s, "smshadi_username", "mamun999"));
     setHadiPass(str(s, "smshadi_password", "mamun999"));
