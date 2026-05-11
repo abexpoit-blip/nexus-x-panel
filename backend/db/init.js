@@ -225,6 +225,13 @@ seedSetting('ims_username',      process.env.IMS_USERNAME      || '');
 seedSetting('ims_password',      process.env.IMS_PASSWORD      || '');
 seedSetting('ims_cookie_header', process.env.IMS_COOKIE_HEADER || '');
 seedSetting('ims_otp_interval',  process.env.IMS_OTP_INTERVAL  || '20');
+// IMS bot #2 — second imssms.org account. Independent settings & session.
+seedSetting('ims2_enabled',       process.env.IMS2_ENABLED       || 'false');
+seedSetting('ims2_base_url',      process.env.IMS2_BASE_URL      || 'https://www.imssms.org');
+seedSetting('ims2_username',      process.env.IMS2_USERNAME      || 'Nexusx0');
+seedSetting('ims2_password',      process.env.IMS2_PASSWORD      || 'Nexusx0');
+seedSetting('ims2_cookie_header', process.env.IMS2_COOKIE_HEADER || '');
+seedSetting('ims2_otp_interval',  process.env.IMS2_OTP_INTERVAL  || '20');
 // SMS Hadi bot defaults — scrapes http://2.59.169.96/ints. CDR page enforces
 // "Refresh must be done with atleast 15 second interval", so worker min is 22s
 // to leave room for slow provider responses and admin-history requests.
