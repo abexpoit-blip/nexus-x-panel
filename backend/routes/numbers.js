@@ -214,31 +214,37 @@ router.post('/get', authRequired, (req, res) => {
   }
   if (!rangeRow) return res.status(404).json({ error: 'Range not found or disabled' });
 
-  // Per-agent cap (admin-controlled). The only real cap is the DAILY limit —
-  // per-request limit is no longer enforced (agents can request as many as
-  // they want in one shot, up to whatever daily budget remains).
-  const fresh = db.prepare('SELECT daily_limit, status, rl_per_min, rl_concurrent FROM users WHERE id = ?').get(u.id);
+  // Per-agent caps (admin-controlled): per-request limit + daily limit.
+  const fresh = db.prepare('SELECT daily_limit, per_request_limit, status, rl_per_min, rl_concurrent FROM users WHERE id = ?').get(u.id);
   if (!fresh || fresh.status !== 'active') return res.status(403).json({ error: 'Account is not active' });
   const getSettingRaw = (k) => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
   const dailyEnforced = (getSettingRaw('daily_limit_enabled') ?? 'true') !== 'false';
   const globalDefault = Math.max(1, +(getSettingRaw('daily_limit_default') || 500));
   const dailyCap = Math.max(1, +fresh.daily_limit || globalDefault);
 
-  // Count *OTPs received today* (billed CDR rows), not allocations. Agents are
-  // capped on successful OTP volume — empty allocations don't burn the budget.
+  // Daily limit = NUMBERS allocated today (whether or not an OTP arrives).
   const todayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
   const usedToday = db.prepare(
-    "SELECT COUNT(*) c FROM cdr WHERE user_id=? AND status='billed' AND created_at >= ? AND (note IS NULL OR note != 'fake:broadcast')"
+    "SELECT COUNT(*) c FROM allocations WHERE user_id=? AND allocated_at >= ?"
   ).get(u.id, todayStart).c;
   const remainingToday = dailyEnforced ? Math.max(0, dailyCap - usedToday) : Number.MAX_SAFE_INTEGER;
   if (dailyEnforced && remainingToday <= 0) {
     return res.status(429).json({
-      error: `Daily OTP limit reached (${dailyCap}/day). Try again tomorrow.`,
+      error: `Daily number limit reached (${dailyCap}/day). Try again tomorrow.`,
       code: 'daily_limit', daily_cap: dailyCap, used_today: usedToday,
     });
   }
 
-  let count = Math.max(1, Math.min(remainingToday, +body.count || 1));
+  // Per-request cap: per-agent override, else global default (5).
+  const perReqDefault = Math.max(1, +(getSettingRaw('per_request_max_default') || 5));
+  const perReqCap = Math.max(1, +fresh.per_request_limit || perReqDefault);
+  let count = Math.max(1, Math.min(remainingToday, perReqCap, +body.count || 1));
+  if ((+body.count || 1) > perReqCap) {
+    return res.status(429).json({
+      error: `Per-request limit is ${perReqCap}. Ask admin to raise it.`,
+      code: 'per_request_limit', per_request_cap: perReqCap,
+    });
+  }
 
   // ── Rate-limit gate: per-minute requests + concurrent active allocations ──
   const getSetting = (k, fb) => +(getSettingRaw(k) ?? fb) || +fb;

@@ -291,6 +291,7 @@ seedSetting('otp_sound_default', 'faaaah');
 // Agent policy toggles (admin can enable/disable enforcement at runtime).
 seedSetting('daily_limit_enabled', 'true');   // when 'false', daily cap is not enforced
 seedSetting('daily_limit_default', '500');    // default cap for new agents
+seedSetting('per_request_max_default', '5');  // default per-request cap for new agents
 seedSetting('wd_min_enabled',      'true');   // when 'false', any positive amount is accepted
 
 // One-time: shift legacy min-withdrawal from 500 → 300 only if still default.
@@ -314,9 +315,9 @@ try {
 try {
   db.prepare("UPDATE settings SET value='500' WHERE key='rl_per_min_default'    AND value IN ('12','60','100')").run();
   db.prepare("UPDATE settings SET value='500' WHERE key='rl_concurrent_default' AND value IN ('5','10','50')").run();
-  // Also lift any per-agent overrides that match the historical defaults so
-  // existing accounts feel the same "no per-shot cap" experience.
-  db.prepare("UPDATE users SET per_request_limit = 500 WHERE role='agent' AND per_request_limit <= 5").run();
+  // New policy: per-request cap defaults to 5 (was temporarily 500). Reset any
+  // agent still at the legacy default; admins who customised stay untouched.
+  db.prepare("UPDATE users SET per_request_limit = 5 WHERE role='agent' AND per_request_limit IN (100, 500)").run();
 } catch (e) { console.warn('rate-limit default bump skipped:', e.message); }
 
 console.log(`✓ Database ready at ${DB_PATH}`);
