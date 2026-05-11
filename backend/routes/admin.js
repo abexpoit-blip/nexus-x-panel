@@ -629,6 +629,33 @@ router.get('/bots/ims/cdr-debug', (req, res) => {
   });
 });
 
+// GET /api/admin/bots/ims2/cdr-debug?limit=50 — same as /ims/cdr-debug for the
+// second imssms.org account.
+router.get('/bots/ims2/cdr-debug', (req, res) => {
+  let mod;
+  try { mod = require('../workers/imsBot2'); }
+  catch (e) { return res.status(500).json({ error: 'ims2 worker not loaded: ' + e.message }); }
+  if (typeof mod.getCdrDebug !== 'function') {
+    return res.status(500).json({ error: 'ims2 worker missing getCdrDebug (deploy newer build)' });
+  }
+  const limit = Math.min(50, Math.max(1, +req.query.limit || 50));
+  const entries = mod.getCdrDebug(limit) || [];
+  const status = (typeof mod.getStatus === 'function' ? mod.getStatus() : {}) || {};
+  res.json({
+    bot: 'ims2',
+    entries,
+    summary: {
+      total: entries.length,
+      ok: entries.filter(e => e.ok).length,
+      errors: entries.filter(e => !e.ok).length,
+      last_error: status.last_error || null,
+      last_cdr_success_at: status.last_cdr_success_at || null,
+      consec_fail: status.consec_fail || 0,
+      rl_streak: status.rl_streak || 0,
+    },
+  });
+});
+
 // =============================================================
 // SMS Hadi — admin OTP history (SMSCDRReports proxy with paging)
 // No 15s rate-limit on this panel, so we can serve filtered pages live.
