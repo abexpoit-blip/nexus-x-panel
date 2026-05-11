@@ -904,6 +904,36 @@ const AdminSettings = () => {
             saving={savingKey?.startsWith("ims_") || false}
           />
 
+          {/* ─── IMS Bot #2 (second imssms.org account — fully independent) ─── */}
+          <BotConfigCard
+            tone="magenta"
+            title="IMS Bot 2 (imssms.org — 2nd account)"
+            urlKey="ims2_base_url"
+            url={ims2Url} setUrl={setIms2Url}
+            user={ims2User} setUser={setIms2User} userKey="ims2_username"
+            pass={ims2Pass} setPass={setIms2Pass} passKey="ims2_password"
+            cookie={ims2Cookie} setCookie={setIms2Cookie} cookieKey="ims2_cookie_header"
+            cookiePlaceholder="PHPSESSID=..."
+            cookieHint="Second imssms.org account. Independent session — won't conflict with IMS Bot #1. Min interval 16s."
+            interval={ims2Interval} setInterval={setIms2Interval} intervalKey="ims2_otp_interval"
+            showPw={showPw}
+            health={healthState["ims2"]}
+            onSave={async () => {
+              await setSetting("ims2_base_url", ims2Url);
+              await setSetting("ims2_username", ims2User);
+              await setSetting("ims2_password", ims2Pass);
+              await setSetting("ims2_cookie_header", ims2Cookie);
+              await setSetting("ims2_otp_interval", String(Math.max(16, ims2Interval)));
+            }}
+            onHealth={() => runHealth("ims2")}
+            onClearCookies={async () => {
+              if (!confirm("Clear saved IMS Bot 2 session cookie? Next tick re-logs in via captcha.")) return;
+              await setSetting("ims2_session_cookie", "");
+              toast({ title: "IMS 2 session cleared" });
+            }}
+            saving={savingKey?.startsWith("ims2_") || false}
+          />
+
           {/* ─── SMS Hadi (2.59.169.96/ints — provider enforces 15s+ CDR refresh gap) ─── */}
           <BotConfigCard
             tone="cyan"
