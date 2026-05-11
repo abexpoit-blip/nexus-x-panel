@@ -76,6 +76,12 @@ const AdminSettings = () => {
   const [rlConcurrent, setRlConcurrent] = useState<number>(5);
   const [otpSound, setOtpSound] = useState<OtpSoundId>("faaaah");
 
+  // Agent policy: daily-limit + min-withdrawal enforcement
+  const [dailyLimitOn, setDailyLimitOn] = useState(true);
+  const [dailyLimitDefault, setDailyLimitDefault] = useState<number>(500);
+  const [wdMinOn, setWdMinOn] = useState(true);
+  const [wdMin, setWdMin] = useState<number>(300);
+
   const [fakeForm, setFakeForm] = useState<{
     enabled: boolean; min_sec: number; max_sec: number; burst: number;
     services: string[];     // empty = all services
@@ -168,6 +174,10 @@ const AdminSettings = () => {
     setHadiInterval(Math.max(22, Number(str(s, "smshadi_otp_interval", "24")) || 24));
     setRlPerMin(Number(str(s, "rl_per_min_default", "12")) || 12);
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
+    setDailyLimitOn(str(s, "daily_limit_enabled", "true") !== "false");
+    setDailyLimitDefault(Number(str(s, "daily_limit_default", "500")) || 500);
+    setWdMinOn(str(s, "wd_min_enabled", "true") !== "false");
+    setWdMin(Number(str(s, "wd_min_bdt", "300")) || 300);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
     setOtpSound("faaaah");
   }, [s]);
@@ -386,6 +396,80 @@ const AdminSettings = () => {
                 {savingKey === "rl_defaults" ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
                 Save defaults
               </Button>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 mt-0.5">
+                <Gauge className="w-4 h-4 text-neon-cyan" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Agent Policy</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Daily OTP cap (counts received OTPs, not allocations) and the minimum agent withdrawal amount. Flip a switch off to disable enforcement entirely.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground">Daily OTP limit</div>
+                  <div className="text-xs text-muted-foreground">Caps every agent at N successful OTPs per day.</div>
+                </div>
+                <Switch
+                  checked={dailyLimitOn}
+                  onCheckedChange={(v) => { setDailyLimitOn(v); setSetting("daily_limit_enabled", v); }}
+                  disabled={savingKey === "daily_limit_enabled"}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Default OTP / day per agent</Label>
+                  <Input type="number" min={1} max={100000} value={dailyLimitDefault}
+                    onChange={(e) => setDailyLimitDefault(+e.target.value)}
+                    disabled={!dailyLimitOn}
+                    className="bg-white/[0.04] border-white/[0.1] font-mono" />
+                </div>
+                <Button size="sm" variant="outline"
+                  onClick={() => setSetting("daily_limit_default", String(Math.max(1, dailyLimitDefault | 0)))}
+                  disabled={savingKey === "daily_limit_default"}
+                  className="border-white/[0.1]">
+                  {savingKey === "daily_limit_default" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                  Save
+                </Button>
+              </div>
+
+              <div className="h-px bg-white/[0.06]" />
+
+              <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground">Minimum withdrawal</div>
+                  <div className="text-xs text-muted-foreground">Blocks payout requests below the floor.</div>
+                </div>
+                <Switch
+                  checked={wdMinOn}
+                  onCheckedChange={(v) => { setWdMinOn(v); setSetting("wd_min_enabled", v); }}
+                  disabled={savingKey === "wd_min_enabled"}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Minimum withdrawal (৳ BDT)</Label>
+                  <Input type="number" min={1} max={1000000} value={wdMin}
+                    onChange={(e) => setWdMin(+e.target.value)}
+                    disabled={!wdMinOn}
+                    className="bg-white/[0.04] border-white/[0.1] font-mono" />
+                </div>
+                <Button size="sm" variant="outline"
+                  onClick={() => setSetting("wd_min_bdt", String(Math.max(1, wdMin | 0)))}
+                  disabled={savingKey === "wd_min_bdt"}
+                  className="border-white/[0.1]">
+                  {savingKey === "wd_min_bdt" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                  Save
+                </Button>
+              </div>
             </div>
           </GlassCard>
 

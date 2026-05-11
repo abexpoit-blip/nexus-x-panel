@@ -288,6 +288,16 @@ try {
 // Premium single-sound mode — every agent gets the viral "Faaaah" horn.
 seedSetting('otp_sound_default', 'faaaah');
 
+// Agent policy toggles (admin can enable/disable enforcement at runtime).
+seedSetting('daily_limit_enabled', 'true');   // when 'false', daily cap is not enforced
+seedSetting('daily_limit_default', '500');    // default cap for new agents
+seedSetting('wd_min_enabled',      'true');   // when 'false', any positive amount is accepted
+
+// One-time: shift legacy min-withdrawal from 500 → 300 only if still default.
+try {
+  db.prepare("UPDATE settings SET value='300', updated_at=strftime('%s','now') WHERE key='wd_min_bdt' AND value IN ('500','1000')").run();
+} catch (_) {}
+
 // One-time backfill: bump existing agents from the legacy default of 100
 // to the new platform default of 500. Only touches rows that still match
 // the old default — admin-customised limits are left untouched.

@@ -1,7 +1,8 @@
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Navigate, useNavigate, Outlet } from "react-router-dom";
 import { useAuth, type UserRole } from "@/contexts/AuthContext";
 import { AppSidebar } from "./Sidebar";
+import { Pages } from "@/lib/lazyPages";
 import { NotificationBell } from "@/components/NotificationBell";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Menu, Wallet, Search, Wrench, ShieldAlert, LogOut } from "lucide-react";
@@ -21,6 +22,26 @@ export const AppLayout = ({ requiredRole }: AppLayoutProps) => {
 
   // Ambient OTP alerts (sound + browser push) for agents — runs across every page.
   useOtpAlerts(user?.role === "agent");
+
+  // Warm up every lazy page for the active role on idle so subsequent
+  // navigations don't pay the chunk-fetch cost (big perf win on slow links).
+  useEffect(() => {
+    if (!user?.role) return;
+    const prefix = user.role === "admin" ? "/admin/" : "/agent/";
+    const targets = Object.entries(Pages).filter(([p]) => p.startsWith(prefix));
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    const schedule = w.requestIdleCallback
+      ? (cb: () => void) => w.requestIdleCallback!(cb, { timeout: 2500 })
+      : (cb: () => void) => window.setTimeout(cb, 1500);
+    let i = 0;
+    const tick = () => {
+      const entry = targets[i++];
+      if (!entry) return;
+      entry[1].prefetch().catch(() => {});
+      schedule(tick);
+    };
+    schedule(tick);
+  }, [user?.role]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role !== requiredRole) return <Navigate to={`/${user?.role}/dashboard`} replace />;

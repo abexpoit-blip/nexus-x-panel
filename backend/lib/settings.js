@@ -43,7 +43,7 @@ const PAY_KEYS = {
   methods: 'wd_methods_enabled',
 };
 const PAY_DEFAULTS = {
-  min: 500,
+  min: 300,
   fee: 2,
   sla: 24,
   methods: { bkash: true, nagad: true, rocket: true, bank: true, crypto: false },

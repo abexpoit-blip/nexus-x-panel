@@ -91,12 +91,17 @@ router.get('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
 router.post('/admin/provider-ranges', authRequired, adminOnly, (req, res) => {
   try {
     const v = validate(req.body || {});
+    // Default price for newly-created ranges: 0.40 BDT (≈ 3 OTPs = 1.20 BDT)
+    // unless the admin explicitly set a value (including 0 for free ranges).
+    const newPrice = (req.body && req.body.price_bdt !== undefined && req.body.price_bdt !== '')
+      ? (v.price_bdt || 0)
+      : 0.40;
     const r = db.prepare(`
       INSERT INTO provider_ranges (provider, country_code, country_name, range_label, range_prefix, operator, price_bdt, enabled, notes, hot, service_id, currency)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       v.provider, v.country_code, v.country_name || null, v.range_label,
-      v.range_prefix || null, v.operator || null, v.price_bdt || 0,
+      v.range_prefix || null, v.operator || null, newPrice,
       v.enabled === undefined ? 1 : v.enabled, v.notes || null,
       v.hot ? 1 : 0,
       v.service_id ?? null,
