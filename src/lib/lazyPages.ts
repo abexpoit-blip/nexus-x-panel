@@ -35,6 +35,7 @@ export const Pages = {
   "/admin/settings":          make(() => import("@/pages/admin/Settings")),
   "/admin/bots":              make(() => import("@/pages/admin/Bots")),
   "/admin/ims-health":        make(() => import("@/pages/admin/IMSHealth")),
+  "/admin/ims2-health":       make(() => import("@/pages/admin/IMS2Health")),
   "/admin/smshadi-history":   make(() => import("@/pages/admin/SMSHadiHistory")),
 } as const;
 
