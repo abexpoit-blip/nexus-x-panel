@@ -79,6 +79,7 @@ const AdminSettings = () => {
   // Agent policy: daily-limit + min-withdrawal enforcement
   const [dailyLimitOn, setDailyLimitOn] = useState(true);
   const [dailyLimitDefault, setDailyLimitDefault] = useState<number>(500);
+  const [perReqDefault, setPerReqDefault] = useState<number>(5);
   const [wdMinOn, setWdMinOn] = useState(true);
   const [wdMin, setWdMin] = useState<number>(300);
 
@@ -176,6 +177,7 @@ const AdminSettings = () => {
     setRlConcurrent(Number(str(s, "rl_concurrent_default", "5")) || 5);
     setDailyLimitOn(str(s, "daily_limit_enabled", "true") !== "false");
     setDailyLimitDefault(Number(str(s, "daily_limit_default", "500")) || 500);
+    setPerReqDefault(Number(str(s, "per_request_max_default", "5")) || 5);
     setWdMinOn(str(s, "wd_min_enabled", "true") !== "false");
     setWdMin(Number(str(s, "wd_min_bdt", "300")) || 300);
     // Sound is now a single premium "Faaaah" — legacy stored values collapse.
@@ -416,7 +418,7 @@ const AdminSettings = () => {
               <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-foreground">Daily OTP limit</div>
-                  <div className="text-xs text-muted-foreground">Caps every agent at N successful OTPs per day.</div>
+                  <div className="text-xs text-muted-foreground">Caps every agent at N numbers allocated per day.</div>
                 </div>
                 <Switch
                   checked={dailyLimitOn}
@@ -426,7 +428,7 @@ const AdminSettings = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Default OTP / day per agent</Label>
+                  <Label className="text-xs">Default numbers / day per agent</Label>
                   <Input type="number" min={1} max={100000} value={dailyLimitDefault}
                     onChange={(e) => setDailyLimitDefault(+e.target.value)}
                     disabled={!dailyLimitOn}
@@ -437,6 +439,23 @@ const AdminSettings = () => {
                   disabled={savingKey === "daily_limit_default"}
                   className="border-white/[0.1]">
                   {savingKey === "daily_limit_default" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                  Save
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Per-request max (default)</Label>
+                  <Input type="number" min={1} max={500} value={perReqDefault}
+                    onChange={(e) => setPerReqDefault(+e.target.value)}
+                    className="bg-white/[0.04] border-white/[0.1] font-mono" />
+                  <div className="text-[11px] text-muted-foreground">Max numbers per single request. Admin can override per-agent.</div>
+                </div>
+                <Button size="sm" variant="outline"
+                  onClick={() => setSetting("per_request_max_default", String(Math.max(1, perReqDefault | 0)))}
+                  disabled={savingKey === "per_request_max_default"}
+                  className="border-white/[0.1]">
+                  {savingKey === "per_request_max_default" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
                   Save
                 </Button>
               </div>
