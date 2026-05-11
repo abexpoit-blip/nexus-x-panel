@@ -401,6 +401,80 @@ const AdminSettings = () => {
 
           <GlassCard>
             <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 mt-0.5">
+                <Gauge className="w-4 h-4 text-neon-cyan" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Agent Policy</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Daily OTP cap (counts received OTPs, not allocations) and the minimum agent withdrawal amount. Flip a switch off to disable enforcement entirely.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground">Daily OTP limit</div>
+                  <div className="text-xs text-muted-foreground">Caps every agent at N successful OTPs per day.</div>
+                </div>
+                <Switch
+                  checked={dailyLimitOn}
+                  onCheckedChange={(v) => { setDailyLimitOn(v); setSetting("daily_limit_enabled", v); }}
+                  disabled={savingKey === "daily_limit_enabled"}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Default OTP / day per agent</Label>
+                  <Input type="number" min={1} max={100000} value={dailyLimitDefault}
+                    onChange={(e) => setDailyLimitDefault(+e.target.value)}
+                    disabled={!dailyLimitOn}
+                    className="bg-white/[0.04] border-white/[0.1] font-mono" />
+                </div>
+                <Button size="sm" variant="outline"
+                  onClick={() => setSetting("daily_limit_default", String(Math.max(1, dailyLimitDefault | 0)))}
+                  disabled={savingKey === "daily_limit_default"}
+                  className="border-white/[0.1]">
+                  {savingKey === "daily_limit_default" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                  Save
+                </Button>
+              </div>
+
+              <div className="h-px bg-white/[0.06]" />
+
+              <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground">Minimum withdrawal</div>
+                  <div className="text-xs text-muted-foreground">Blocks payout requests below the floor.</div>
+                </div>
+                <Switch
+                  checked={wdMinOn}
+                  onCheckedChange={(v) => { setWdMinOn(v); setSetting("wd_min_enabled", v); }}
+                  disabled={savingKey === "wd_min_enabled"}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Minimum withdrawal (৳ BDT)</Label>
+                  <Input type="number" min={1} max={1000000} value={wdMin}
+                    onChange={(e) => setWdMin(+e.target.value)}
+                    disabled={!wdMinOn}
+                    className="bg-white/[0.04] border-white/[0.1] font-mono" />
+                </div>
+                <Button size="sm" variant="outline"
+                  onClick={() => setSetting("wd_min_bdt", String(Math.max(1, wdMin | 0)))}
+                  disabled={savingKey === "wd_min_bdt"}
+                  className="border-white/[0.1]">
+                  {savingKey === "wd_min_bdt" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                  Save
+                </Button>
+              </div>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start gap-3 mb-4">
               <div className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 mt-0.5">
                 <Music className="w-4 h-4 text-neon-magenta" />
               </div>
