@@ -299,15 +299,15 @@ try {
   db.prepare("UPDATE settings SET value='300', updated_at=strftime('%s','now') WHERE key='wd_min_bdt' AND value IN ('500','1000')").run();
 } catch (_) {}
 
-// One-time backfill: bump existing agents from the legacy default of 100
-// to the new platform default of 500. Only touches rows that still match
-// the old default — admin-customised limits are left untouched.
+// Hard reset (admin-decreed): every agent gets daily_limit=500 and
+// per_request_limit=5 on backend boot. Admins who need a custom cap can
+// edit the agent row in the UI AFTER the boot reset.
 try {
-  const r = db.prepare(
-    "UPDATE users SET daily_limit = 500 WHERE role = 'agent' AND daily_limit = 100"
+  const r1 = db.prepare(
+    "UPDATE users SET daily_limit = 500 WHERE role = 'agent' AND COALESCE(daily_limit,0) <> 500"
   ).run();
-  if (r.changes) console.log(`✓ Backfilled daily_limit=500 for ${r.changes} agent(s)`);
-} catch (e) { console.warn('daily_limit backfill skipped:', e.message); }
+  if (r1.changes) console.log(`✓ Reset daily_limit=500 for ${r1.changes} agent(s)`);
+} catch (e) { console.warn('daily_limit reset skipped:', e.message); }
 
 // Per-request limit is no longer enforced — only daily_limit gates allocation.
 // Bump legacy low rate-limit defaults so they don't artificially cap unlimited
@@ -315,9 +315,11 @@ try {
 try {
   db.prepare("UPDATE settings SET value='500' WHERE key='rl_per_min_default'    AND value IN ('12','60','100')").run();
   db.prepare("UPDATE settings SET value='500' WHERE key='rl_concurrent_default' AND value IN ('5','10','50')").run();
-  // New policy: per-request cap defaults to 5 (was temporarily 500). Reset any
-  // agent still at the legacy default; admins who customised stay untouched.
-  db.prepare("UPDATE users SET per_request_limit = 5 WHERE role='agent' AND per_request_limit IN (100, 500)").run();
+  // Hard reset (admin-decreed): every agent's per-request cap → 5.
+  const r2 = db.prepare(
+    "UPDATE users SET per_request_limit = 5 WHERE role='agent' AND COALESCE(per_request_limit,0) <> 5"
+  ).run();
+  if (r2.changes) console.log(`✓ Reset per_request_limit=5 for ${r2.changes} agent(s)`);
 } catch (e) { console.warn('rate-limit default bump skipped:', e.message); }
 
 console.log(`✓ Database ready at ${DB_PATH}`);
