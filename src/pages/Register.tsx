@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, UserPlus, ShieldX, User, Phone, Send, Lock, AtSign, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { api, tokenStore } from "@/lib/api";
 import { PlexusBackground } from "@/components/PlexusBackground";
 
 const Register = () => {
@@ -51,13 +51,24 @@ const Register = () => {
 
     setLoading(true);
     try {
-      await api.register({
+      const res = await api.register({
         username: form.username,
         password: form.password,
         full_name: form.name,
         phone: form.phone,
         telegram: form.telegram,
       });
+      if (res?.token && res?.user) {
+        // Auto-approve: sign in immediately and route to agent dashboard
+        tokenStore.set(res.token);
+        localStorage.setItem("nexus_user", JSON.stringify(res.user));
+        toast({
+          title: "Welcome to Nexus X!",
+          description: "Your account is active. Signing you in…",
+        });
+        window.location.href = "/agent/dashboard";
+        return;
+      }
       toast({
         title: "Registration Submitted!",
         description: "Your account is pending admin approval. You'll be notified once approved.",

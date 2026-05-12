@@ -61,6 +61,7 @@ const AdminSettings = () => {
 
   // Local form state
   const [signupOpen, setSignupOpen] = useState(false);
+  const [autoApprove, setAutoApprove] = useState(false);
   const [maintOn, setMaintOn] = useState(false);
   const [maintMsg, setMaintMsg] = useState("");
   const [tgChannel, setTgChannel] = useState("");
@@ -134,6 +135,7 @@ const AdminSettings = () => {
   useEffect(() => {
     if (!s) return;
     setSignupOpen(bool(s, "signup_enabled"));
+    setAutoApprove(bool(s, "auto_approve_signups"));
     setMaintOn(bool(s, "maintenance_mode"));
     setMaintMsg(str(s, "maintenance_message"));
     setTgChannel(str(s, "tg_public_channel"));
@@ -307,6 +309,31 @@ const AdminSettings = () => {
                 checked={signupOpen}
                 onCheckedChange={(v) => { setSignupOpen(v); setSetting("signup_enabled", v); }}
                 disabled={savingKey === "signup_enabled"}
+              />
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "p-2 rounded-lg border mt-0.5",
+                  autoApprove ? "bg-neon-cyan/10 border-neon-cyan/30" : "bg-white/[0.04] border-white/[0.08]"
+                )}>
+                  <Zap className={cn("w-4 h-4", autoApprove ? "text-neon-cyan" : "text-muted-foreground")} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Auto-Approve New Agents</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When ON, new signups are activated instantly and logged in straight away.
+                    When OFF, accounts stay pending until an admin approves them on the Agents page.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={autoApprove}
+                onCheckedChange={(v) => { setAutoApprove(v); setSetting("auto_approve_signups", v); }}
+                disabled={savingKey === "auto_approve_signups"}
               />
             </div>
           </GlassCard>
