@@ -6,7 +6,6 @@ const {
   setAuthCookie, clearAuthCookie, signImpersonationToken,
 } = require('../middleware/auth');
 const { log, logFromReq } = require('../lib/audit');
-const { getSettingRaw } = require('../lib/settings');
 
 const router = express.Router();
 
@@ -70,8 +69,9 @@ router.post('/register', (req, res) => {
   const hash = bcrypt.hashSync(password, 10);
   // Read admin-configured defaults at signup time so new agents are NOT
   // pinned to the original column DEFAULT (some legacy DBs had 100 / 5).
-  const dailyDefault   = Math.max(1, +(getSettingRaw('daily_limit_default')    || 500));
-  const perReqDefault  = Math.max(1, +(getSettingRaw('per_request_max_default') || 5));
+  const readSetting = (k) => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
+  const dailyDefault  = Math.max(1, +(readSetting('daily_limit_default')     || 500));
+  const perReqDefault = Math.max(1, +(readSetting('per_request_max_default') || 5));
   // New agents start in 'pending' status — admin must approve before they can log in
   const result = db.prepare(`
     INSERT INTO users (username, password_hash, role, full_name, phone, telegram, status, daily_limit, per_request_limit)
