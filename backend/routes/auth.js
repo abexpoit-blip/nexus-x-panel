@@ -72,24 +72,50 @@ router.post('/register', (req, res) => {
   const readSetting = (k) => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
   const dailyDefault  = Math.max(1, +(readSetting('daily_limit_default')     || 500));
   const perReqDefault = Math.max(1, +(readSetting('per_request_max_default') || 5));
-  // New agents start in 'pending' status — admin must approve before they can log in
+  // Admin can flip this to auto-approve new signups (status='active', direct login)
+  const autoApprove = readSetting('auto_approve_signups') === 'true';
+  const initialStatus = autoApprove ? 'active' : 'pending';
   const result = db.prepare(`
     INSERT INTO users (username, password_hash, role, full_name, phone, telegram, status, daily_limit, per_request_limit)
-    VALUES (?, ?, 'agent', ?, ?, ?, 'pending', ?, ?)
-  `).run(username, hash, full_name || null, phone || null, telegram || null, dailyDefault, perReqDefault);
+    VALUES (?, ?, 'agent', ?, ?, ?, ?, ?, ?)
+  `).run(username, hash, full_name || null, phone || null, telegram || null, initialStatus, dailyDefault, perReqDefault);
 
-  log({ userId: result.lastInsertRowid, action: 'register_pending', ip: req.ip, meta: { username } });
+  log({
+    userId: result.lastInsertRowid,
+    action: autoApprove ? 'register_auto_approved' : 'register_pending',
+    ip: req.ip,
+    meta: { username },
+  });
 
   // Notify all admins about the new pending signup
   try {
     const admins = db.prepare("SELECT id FROM users WHERE role='admin'").all();
     const ins = db.prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'info')");
     for (const a of admins) {
-      ins.run(a.id, 'New agent signup', `${username} (${full_name || 'no name'}) is awaiting approval.`);
+      ins.run(
+        a.id,
+        autoApprove ? 'New agent signup (auto-approved)' : 'New agent signup',
+        `${username} (${full_name || 'no name'})${autoApprove ? ' joined.' : ' is awaiting approval.'}`,
+      );
     }
   } catch (e) { console.warn('admin notify failed:', e.message); }
 
-  // Do NOT issue a token — agent cannot log in until approved
+  if (autoApprove) {
+    // Auto-approve flow — issue token + cookie so the user is logged in directly.
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+    const token = signToken(user);
+    recordSession(user.id, token, req);
+    setAuthCookie(res, token);
+    const { password_hash, ...safe } = user;
+    return res.status(201).json({
+      pending: false,
+      token,
+      user: safe,
+      message: 'Account created — you are now signed in.',
+    });
+  }
+
+  // Manual-approval flow — agent waits for admin
   res.status(201).json({
     pending: true,
     message: 'Your account has been created and is awaiting admin approval. You will be notified once approved.',
