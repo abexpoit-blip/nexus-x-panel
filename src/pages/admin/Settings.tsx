@@ -61,6 +61,7 @@ const AdminSettings = () => {
 
   // Local form state
   const [signupOpen, setSignupOpen] = useState(false);
+  const [autoApprove, setAutoApprove] = useState(false);
   const [maintOn, setMaintOn] = useState(false);
   const [maintMsg, setMaintMsg] = useState("");
   const [tgChannel, setTgChannel] = useState("");
@@ -134,6 +135,7 @@ const AdminSettings = () => {
   useEffect(() => {
     if (!s) return;
     setSignupOpen(bool(s, "signup_enabled"));
+    setAutoApprove(bool(s, "auto_approve_signups"));
     setMaintOn(bool(s, "maintenance_mode"));
     setMaintMsg(str(s, "maintenance_message"));
     setTgChannel(str(s, "tg_public_channel"));
