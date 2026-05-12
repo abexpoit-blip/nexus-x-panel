@@ -68,10 +68,17 @@ let _seenIds = new Set();
 let _sesskey = null;
 let _nextCdrAt = 0, _lastCdrRequestAt = 0, _cdrGate = Promise.resolve();
 const SEEN_MAX = 5000;
-const SMSHADI_MIN_CDR_GAP_MS = 60_000;
-const SMSHADI_POST_LOGIN_COOLDOWN_MS = 20_000;
-const SMSHADI_503_BASE_COOLDOWN_MS = 5 * 60_000;
-const SMSHADI_503_MAX_COOLDOWN_MS = 30 * 60_000;
+// Portal rule: "Refresh must be done with at least 15 second interval."
+// Anything longer than 15s is wasted polling. Use 16s as a small safety margin.
+const SMSHADI_MIN_CDR_GAP_MS = 16_000;
+const SMSHADI_POST_LOGIN_COOLDOWN_MS = 16_000;
+// Soft cooldown when the portal returns the 15s rate-warning page — just wait
+// the portal's own interval out, don't pile 60s+ on top.
+const SMSHADI_RATE_LIMIT_BASE_MS = 16_000;
+const SMSHADI_RATE_LIMIT_MAX_MS  = 45_000;
+// 503 = provider temporarily blocking us. Back off, but nowhere near 5-30 min.
+const SMSHADI_503_BASE_COOLDOWN_MS = 30_000;
+const SMSHADI_503_MAX_COOLDOWN_MS  = 3 * 60_000;
 const SMSHADI_LATE_GRACE_SEC = 24 * 3600;
 const RESEND_SEC = 600;
 const SMSHADI_DASHBOARD_WARMUP_DELAY_MS = 15_000;
@@ -515,7 +522,10 @@ async function loop() {
         _loggedIn = false; _sesskey = null;
       }
       if (/cdr_rate_limited|rate_limited_wait_15s/i.test(e.message)) {
-        const cooldown = setCdrCooldown(Math.max(60_000, Math.min(5 * 60_000, 60_000 + _consecFail * 30_000)));
+        const cooldown = setCdrCooldown(Math.min(
+          SMSHADI_RATE_LIMIT_MAX_MS,
+          SMSHADI_RATE_LIMIT_BASE_MS + (_consecFail - 1) * 5_000,
+        ));
         warn(`SMS Hadi portal 15s rate-limit hit: next CDR request in ${cooldown}s`);
         await sleep(cooldown * 1000);
         continue;
